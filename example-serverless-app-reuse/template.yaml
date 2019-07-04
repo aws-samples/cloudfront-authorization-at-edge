@@ -1,0 +1,30 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Example stack that shows how to reuse the serverless application and include your own resources
+
+Resources:
+  MyLambdaEdgeProtectedSpaSetup:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/spa-lambda-edge-cognito-auth
+        SemanticVersion: 1.0.0
+  AlanTuring:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: alan.turing@example.com
+      UserPoolId: !GetAtt MyLambdaEdgeProtectedSpaSetup.Outputs.UserPoolId
+  EdsgerDijkstra:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: edgser.dijkstra@example.com
+      UserPoolId: !GetAtt MyLambdaEdgeProtectedSpaSetup.Outputs.UserPoolId
+
+Outputs:
+  MySpaS3Bucket:
+    Description: The S3 Bucket into which my SPA will be uploaded
+    Value: !GetAtt MyLambdaEdgeProtectedSpaSetup.Outputs.S3Bucket

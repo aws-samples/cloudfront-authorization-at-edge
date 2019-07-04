@@ -1,0 +1,71 @@
+/* Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+   SPDX-License-Identifier: MIT-0 */
+
+.App {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.explanation-points {
+  max-width: 800px;
+}
+
+.explanation {
+  max-width: 1000px;
+  text-align: center;
+}
+
+/* Tooltip container */
+.config {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px solid black;
+}
+
+/* Tooltip text */
+.config .config-text {
+  visibility: hidden;
+  width: 700px;
+  background-color: #555;
+  color: #fff;
+  text-align: left;
+  padding: 15px;
+  border-radius: 6px;
+
+  /* Position the tooltip text */
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  /* left: 50%; */
+  margin-left: -560px;
+
+  /* Fade in tooltip */
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+/* Tooltip arrow */
+.config .config-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 80%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.config:hover .config-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.config-text {
+  display: block;
+  font-family: monospace;
+  white-space: pre;
+}

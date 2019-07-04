@@ -1,0 +1,503 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: cloudfront-authorization-at-edge
+    Description: >
+      Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge.
+      Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWT's and handle OAuth2 redirects.
+    Author: AWS Samples
+    SpdxLicenseId: MIT-0
+    LicenseUrl: LICENSE
+    ReadmeUrl: SERVERLESS-REPO.md
+    Labels:
+      [
+        "cognito",
+        "lambda@edge",
+        "cloudfront",
+        "s3",
+        "react",
+        "angular",
+        "vue",
+        "amplify",
+      ]
+    HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
+
+Parameters:
+  EmailAddress:
+    Type: String
+    Description: The email address of the user that will be created in the Cognito User Pool. Leave empty to skip user creation.
+    Default: ""
+  RedirectPathSignIn:
+    Type: String
+    Description: The URL path that should handle the redirect from Cognito after sign-in
+    Default: /parseauth
+  RedirectPathSignOut:
+    Type: String
+    Description: The URL path that should handle the redirect from Cognito after sign-out
+    Default: /
+  RedirectPathAuthRefresh:
+    Type: String
+    Description: The URL path that should handle the JWT refresh request
+    Default: /refreshauth
+  SignOutUrl:
+    Type: String
+    Description: The URL path that you can visit to sign-out
+    Default: /signout
+  AlternateDomainNames:
+    Type: CommaDelimitedList
+    Description: "If you intend to use one or more custom domain names for the CloudFront distribution, please set that up yourself on the CloudFront distribution after deployment. If you provide those domain names now (comma-separated) the necessary Cognito configuration will already be done for you. Alternatively, update the Cognito configuration yourself after deployment: add sign in and sign out URLs for your custom domains to the user pool app client settings."
+    Default: ""
+  CookieSettings:
+    Type: String
+    Description: The settings for the cookies holding the JWT's. To be provided as a JSON object
+    Default: >-
+      {
+        "idToken": "Path=/; Secure; SameSite=Lax",
+        "accessToken": "Path=/; Secure; SameSite=Lax",
+        "refreshToken": "Path=/; Secure; SameSite=Lax",
+        "nonce": "Path=/; Secure; HttpOnly; Max-Age=300; SameSite=Lax"
+      }
+  OAuthScopes:
+    Type: String
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT. To be provided as a JSON array
+    Default: >-
+      ["phone", "email", "profile", "openid", "aws.cognito.signin.user.admin"]
+  HttpHeaders:
+    Type: String
+    Description: The HTTP headers to set on all responses from CloudFront. To be provided as a JSON object
+    Default: >-
+      {
+        "Content-Security-Policy": "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+        "Referrer-Policy": "same-origin",
+        "X-XSS-Protection": "1; mode=block",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      }
+  CreateCloudFrontDistribution:
+    Type: String
+    Description: Set to 'false' to skip the creation of a CloudFront distribution and associated resources, such as the private S3 bucket and the sample React app. This may be of use to you, if you just want to create the Lambda@Edge functions to use with your own CloudFront distribution.
+    Default: "true"
+
+Conditions:
+  CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
+  CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
+
+Globals:
+  Function:
+    Timeout: 60
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateCloudFrontDistribution
+    Properties:
+      AccessControl: Private
+
+  CheckAuthHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda-edge/check-auth/
+      Handler: bundle.handler
+      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Timeout: 5
+
+  ParseAuthHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda-edge/parse-auth/
+      Handler: bundle.handler
+      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Timeout: 5
+
+  RefreshAuthHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda-edge/refresh-auth/
+      Handler: bundle.handler
+      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Timeout: 5
+
+  HttpHeadersHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda-edge/http-headers/
+      Handler: bundle.handler
+      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Timeout: 5
+  
+  SignOutHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda-edge/sign-out/
+      Handler: bundle.handler
+      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Timeout: 5
+
+  LambdaEdgeExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - edgelambda.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Condition: CreateCloudFrontDistribution
+    Properties:
+      DistributionConfig:
+        CacheBehaviors:
+          - PathPattern: !Ref RedirectPathSignIn
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt ParseAuthHandlerCodeUpdate.FunctionArn
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: !Ref RedirectPathAuthRefresh
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt RefreshAuthHandlerCodeUpdate.FunctionArn
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: !Ref SignOutUrl
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt SignOutHandlerCodeUpdate.FunctionArn
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+        DefaultCacheBehavior:
+          Compress: true
+          ForwardedValues:
+            QueryString: true
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !GetAtt CheckAuthHandlerCodeUpdate.FunctionArn
+            - EventType: origin-response
+              LambdaFunctionARN: !GetAtt HttpHeadersHandlerCodeUpdate.FunctionArn
+          TargetOriginId: protected-bucket
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        Origins:
+          - DomainName: !Sub "${S3Bucket}.s3.amazonaws.com"
+            Id: protected-bucket
+            S3OriginConfig:
+              OriginAccessIdentity:
+                !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+          - DomainName: example.org
+            Id: dummy-origin
+            CustomOriginConfig:
+              OriginProtocolPolicy: match-viewer
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Condition: CreateCloudFrontDistribution
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: "CloudFront OAI"
+
+  CloudfrontBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CreateCloudFrontDistribution
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UserPoolName: !Sub "${AWS::Region}-${AWS::StackName}-${AWS::AccountId}"
+      UsernameAttributes:
+        - email
+
+  User:
+    Type: AWS::Cognito::UserPoolUser
+    Condition: CreateUser
+    Properties:
+      Username: !Ref EmailAddress
+      UserPoolId: !Ref UserPool
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+
+  UserPoolDomain:
+    Type: Custom::UserPoolDomain
+    Properties:
+      ServiceToken: !GetAtt UserPoolDomainHandler.Arn
+      UserPoolId: !Ref UserPool
+
+  UserPoolDomainHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/cfn-custom-resources/user-pool-domain/
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: cognito-idp:DescribeUserPoolDomain
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:CreateUserPoolDomain
+                - cognito-idp:DeleteUserPoolDomain
+              Resource: !GetAtt UserPool.Arn
+
+  UserPoolClientUpdate:
+    Type: Custom::UserPoolClientUpdate
+    Properties:
+      ServiceToken: !GetAtt UserPoolClientUpdateHandler.Arn
+      UserPoolId: !Ref UserPool
+      UserPoolClientId: !Ref UserPoolClient
+      CloudFrontDistributionDomainName:
+        !If [ CreateCloudFrontDistribution, !GetAtt CloudFrontDistribution.DomainName, "" ]
+      RedirectPathSignIn: !Ref RedirectPathSignIn
+      RedirectPathSignOut: !Ref RedirectPathSignOut
+      AlternateDomainNames: !Ref AlternateDomainNames
+      OAuthScopes: !Ref OAuthScopes
+
+  UserPoolClientUpdateHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/cfn-custom-resources/user-pool-client/
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:UpdateUserPoolClient
+              Resource: !GetAtt UserPool.Arn
+
+  ReactApp:
+    Type: Custom::ReactApp
+    Condition: CreateCloudFrontDistribution
+    Properties:
+      ServiceToken: !GetAtt ReactAppHandler.Arn
+      BucketName: !Ref S3Bucket
+      UserPoolId: !Ref UserPool
+      ClientId: !Ref UserPoolClient
+      CognitoAuthDomain: !GetAtt UserPoolDomain.DomainName
+      RedirectPathSignIn: !Ref RedirectPathSignIn
+      RedirectPathSignOut: !Ref RedirectPathSignOut
+      OAuthScopes: !Ref OAuthScopes
+      SignOutUrl: !Ref SignOutUrl
+
+  ReactAppHandler:
+    Type: AWS::Serverless::Function
+    Condition: CreateCloudFrontDistribution
+    Properties:
+      CodeUri: src/cfn-custom-resources/react-app/
+      Handler: bundle.handler
+      Runtime: nodejs10.x
+      Timeout: 180
+      MemorySize: 2048
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource:
+                - !GetAtt S3Bucket.Arn
+            - Effect: Allow
+              Action:
+                - s3:DeleteObject
+                - s3:PutObject
+              Resource:
+                - !GetAtt S3Bucket.Arn
+                - !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
+
+  ParseAuthHandlerCodeUpdate:
+    Type: Custom::LambdaCodeUpdate
+    Properties:
+      ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
+      LambdaFunction: !GetAtt ParseAuthHandler.Arn
+      Configuration: !Sub >
+        {
+          "userPoolId": "${UserPool}",
+          "clientId": "${UserPoolClient}",
+          "oauthScopes": ${OAuthScopes},
+          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+          "redirectPathSignIn": "${RedirectPathSignIn}",
+          "redirectPathSignOut": "${RedirectPathSignOut}",
+          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+          "cookieSettings": ${CookieSettings},
+          "httpHeaders": ${HttpHeaders}
+        }
+
+  CheckAuthHandlerCodeUpdate:
+    Type: Custom::LambdaCodeUpdate
+    Properties:
+      ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
+      LambdaFunction: !GetAtt CheckAuthHandler.Arn
+      Configuration: !Sub >
+        {
+          "userPoolId": "${UserPool}",
+          "clientId": "${UserPoolClient}",
+          "oauthScopes": ${OAuthScopes},
+          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+          "redirectPathSignIn": "${RedirectPathSignIn}",
+          "redirectPathSignOut": "${RedirectPathSignOut}",
+          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+          "cookieSettings": ${CookieSettings},
+          "httpHeaders": ${HttpHeaders}
+        }
+
+  HttpHeadersHandlerCodeUpdate:
+    Type: Custom::LambdaCodeUpdate
+    Properties:
+      ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
+      LambdaFunction: !GetAtt HttpHeadersHandler.Arn
+      Configuration: !Ref HttpHeaders
+
+  RefreshAuthHandlerCodeUpdate:
+    Type: Custom::LambdaCodeUpdate
+    Properties:
+      ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
+      LambdaFunction: !GetAtt RefreshAuthHandler.Arn
+      Configuration: !Sub >
+        {
+          "userPoolId": "${UserPool}",
+          "clientId": "${UserPoolClient}",
+          "oauthScopes": ${OAuthScopes},
+          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+          "redirectPathSignIn": "${RedirectPathSignIn}",
+          "redirectPathSignOut": "${RedirectPathSignOut}",
+          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+          "cookieSettings": ${CookieSettings},
+          "httpHeaders": ${HttpHeaders}
+        }
+
+  SignOutHandlerCodeUpdate:
+    Type: Custom::LambdaCodeUpdate
+    Properties:
+      ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
+      LambdaFunction: !GetAtt SignOutHandler.Arn
+      Configuration: !Sub >
+        {
+          "userPoolId": "${UserPool}",
+          "clientId": "${UserPoolClient}",
+          "oauthScopes": ${OAuthScopes},
+          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+          "redirectPathSignIn": "${RedirectPathSignIn}",
+          "redirectPathSignOut": "${RedirectPathSignOut}",
+          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+          "cookieSettings": ${CookieSettings},
+          "httpHeaders": ${HttpHeaders}
+        }
+
+  LambdaCodeUpdateHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/cfn-custom-resources/lambda-code-update/
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - lambda:GetFunction
+                - lambda:UpdateFunctionCode
+              Resource:
+                - !GetAtt ParseAuthHandler.Arn
+                - !GetAtt CheckAuthHandler.Arn
+                - !GetAtt HttpHeadersHandler.Arn
+                - !GetAtt RefreshAuthHandler.Arn
+                - !GetAtt SignOutHandler.Arn
+
+Outputs:
+  S3Bucket:
+    Description: The S3 Bucket where the SPA (React, Angular, Vue, ...) is uploaded to
+    Condition: CreateCloudFrontDistribution
+    Value: !Ref S3Bucket
+  WebsiteUrl:
+    Description: URL of the CloudFront distribution that serves your SPA from S3
+    Condition: CreateCloudFrontDistribution
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+  CloudFrontDistribution:
+    Description: ID of the CloudFront distribution that serves your SPA from S3
+    Condition: CreateCloudFrontDistribution
+    Value: !Ref CloudFrontDistribution
+  UserPoolId:
+    Description: The ID of the Cognito User Pool
+    Value: !Ref UserPool
+  ClientId:
+    Description: Client ID to use to interact with the User Pool
+    Value: !Ref UserPoolClient
+  CognitoAuthDomain:
+    Description: The domain where the Cognito Hosted UI is served
+    Value: !GetAtt UserPoolDomain.DomainName
+  RedirectUrisSignIn:
+    Description: The URI(s) that will handle the redirect from Cognito after successfull sign-in
+    Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignIn
+  RedirectUrisSignOut:
+    Description: The URI(s) that will handle the redirect from Cognito after successfull sign-out
+    Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignOut
+  ParseAuthHandler:
+    Description: The Lambda function ARN to use in Lambda@Edge for parsing the URL of the redirect from the Cognito hosted UI after succesful sign-in
+    Value: !GetAtt ParseAuthHandlerCodeUpdate.FunctionArn
+  CheckAuthHandler:
+    Description: The Lambda function ARN to use in Lambda@Edge for checking the presence of a valid JWT
+    Value: !GetAtt CheckAuthHandlerCodeUpdate.FunctionArn
+  HttpHeadersHandler:
+    Description: The Lambda function ARN to use in Lambda@Edge for setting HTTP security headers
+    Value: !GetAtt HttpHeadersHandlerCodeUpdate.FunctionArn
+  RefreshAuthHandler:
+    Description: The Lambda function ARN to use in Lambda@Edge for getting new JWT's using the refresh token
+    Value: !GetAtt RefreshAuthHandlerCodeUpdate.FunctionArn
+  SignOutHandler:
+    Description: The Lambda function ARN to use in Lambda@Edge for signing out
+    Value: !GetAtt SignOutHandlerCodeUpdate.FunctionArn

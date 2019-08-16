@@ -1,6 +1,6 @@
 ## CloudFront authorization@edge
 
-This repo accompanies the [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/).
+This repo accompanies the [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/authorizationedge-using-cookies-protect-your-amazon-cloudfront-content-from-being-downloaded-by-unauthenticated-users/).
 
 In that blog post a solution is explained, that puts Cognito authentication in front of (S3) downloads from CloudFront, using Lambda@Edge. JWT's are transferred using cookies to make authorization transparent to clients.
 

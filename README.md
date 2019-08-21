@@ -54,7 +54,7 @@ NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge m
 
 #### Deployment
 
-1. Clone this repo `git clone https://github.com/aws-samples/spa-authorization-at-edge`
+1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge`
 2. Install dependencies: `npm install`
 3. TypeScript compile and run Webpack: `npm run build`
 4. Run SAM build. Use a container to support binaries: `sam build --use-container`

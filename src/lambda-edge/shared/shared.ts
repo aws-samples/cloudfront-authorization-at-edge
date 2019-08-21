@@ -3,6 +3,7 @@
 
 import { CloudFrontHeaders } from 'aws-lambda';
 import { readFileSync } from 'fs';
+import { parse } from 'cookie';
 
 export interface CookieSettings {
     idToken: string;
@@ -58,13 +59,7 @@ function extractCookiesFromHeaders(headers: CloudFrontHeaders) {
     if (!headers['cookie']) {
         return {};
     }
-    const cookies = headers['cookie'].reduce((reduced, header) => {
-        const cookies_ = header.value.split(';').reduce((reduced_, cookie) => {
-            const [name, ...value] = cookie.split('=');
-            return Object.assign(reduced_, { [name.trim()]: decodeURI(value.join('=')) });
-        }, {} as Cookies);
-        return Object.assign(reduced, cookies_);
-    }, {} as Cookies);
+    const cookies = headers['cookie'].reduce((reduced, header) => Object.assign(reduced, parse(header.value)), {} as Cookies);
 
     return cookies;
 }

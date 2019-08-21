@@ -54,7 +54,7 @@ NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge m
 
 #### Deployment
 
-1. Clone this repo `git clone https://github.com/aws-samples/spa-authorization-at-edge`
+1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge`
 2. Install dependencies: `npm install`
 3. TypeScript compile and run Webpack: `npm run build`
 4. Run SAM build. Use a container to support binaries: `sam build --use-container`
@@ -74,6 +74,16 @@ Deploy the solution while setting parameter `CreateCloudFrontDistribution` to `f
 The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can refer to in your CloudFront distribution.
 
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
+
+## Contributing to this repo
+
+If you want to contribute, please read [CONTRIBUTING](./CONTRIBUTING.md), and note the hints below.
+
+### Declaration of npm dependencies
+
+The sources that are not webpacked but rather run through `sam build` should have their dependencies listed in their own package.json files––to make `sam build` work properly.
+
+For the sources that are webpacked this doesn't matter.
 
 ## License Summary
 

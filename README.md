@@ -75,9 +75,13 @@ The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can 
 
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
 
-## Declaration of npm dependencies
+## Contributing to this repo
 
-The sources that are not webpacked but rather run through `sam build` should have their dependencies listed in their own package.json files.
+If you want to contribute, please read [CONTRIBUTING](./CONTRIBUTING.md), and note the hints below.
+
+### Declaration of npm dependencies
+
+The sources that are not webpacked but rather run through `sam build` should have their dependencies listed in their own package.json files––to make `sam build` work properly.
 
 For the sources that are webpacked this doesn't matter.
 

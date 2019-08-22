@@ -96,13 +96,14 @@ function generateNonce() {
 }
 
 function randomChoiceFromIndexable(indexable: string | any[]) {
-    const bytesNeeded = Math.ceil(indexable.length / 256);
-    const chunks = Math.floor(256 / indexable.length) || 1;
-    const maximum = indexable.length * chunks;
-    let randomNumber = maximum;
-    while (randomNumber >= maximum) {
-        randomNumber = randomBytes(bytesNeeded).reduce((acc, byte) => acc + byte);
+    if (indexable.length > 256) {
+        throw new Error(`indexable is too large to index with a single byte! Length: ${indexable.length}`);
     }
+    const chunks = Math.floor(256 / indexable.length) || 1;
+    let randomNumber: number;
+    do {
+        randomNumber = randomBytes(1)[0];
+    } while (randomNumber >= indexable.length * chunks)
     const index = randomNumber % indexable.length;
     return indexable[index];
 }

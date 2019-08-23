@@ -7,6 +7,11 @@ import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from './validate-jwt';
 import { getConfig, extractAndParseCookies, decodeToken } from '../shared/shared';
 
+// Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
+const SECRET_ALLOWED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+const PKCE_LENGTH = 43; // Should be between 43 and 128 - per spec
+const NONCE_LENGTH = 16; // how many characters should your nonces be?
+
 const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, redirectPathAuthRefresh,
     tokenIssuer, tokenJwksUri, cookieSettings, cloudFrontHeaders } = getConfig();
 
@@ -72,12 +77,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     }
 }
 
-// Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
-const PKCE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-const PKCE_LENGTH = 128; // recommended maximum length of pkce
-
 function generatePkceVerifier() {
-    const pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(PKCE_CHARS)).join('');
+    const pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
     return {
         pkce,
         pkceHash: createHash('sha256')
@@ -87,19 +88,15 @@ function generatePkceVerifier() {
     };
 }
 
-// Allowed cookie characters per https://www.ietf.org/rfc/rfc6265.txt
-const NONCE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&'*+-.^_`|~";
-const NONCE_LENGTH = 16; // how many characters should your nonces be?
-
 function generateNonce() {
-    return [...new Array(NONCE_LENGTH)].map(() => randomChoiceFromIndexable(NONCE_CHARS)).join('');
+    return [...new Array(NONCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
 }
 
-function randomChoiceFromIndexable(indexable: string | any[]) {
+function randomChoiceFromIndexable(indexable: string) {
     if (indexable.length > 256) {
-        throw new Error(`indexable is too large to index with a single byte! Length: ${indexable.length}`);
+        throw new Error(`indexable is too large: ${indexable.length}`);
     }
-    const chunks = Math.floor(256 / indexable.length) || 1;
+    const chunks = Math.floor(256 / indexable.length);
     let randomNumber: number;
     do {
         randomNumber = randomBytes(1)[0];

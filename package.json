@@ -16,6 +16,7 @@
   "author": "",
   "devDependencies": {
     "@types/aws-lambda": "^8.10.31",
+    "@types/cookie": "^0.3.3",
     "@types/fs-extra": "^7.0.0",
     "@types/jsonwebtoken": "^8.3.3",
     "@types/ncp": "^2.0.1",
@@ -30,6 +31,7 @@
   "dependencies": {
     "aws-sdk": "^2.514.0",
     "axios": "^0.19.0",
+    "cookie": "^0.4.0",
     "jsonwebtoken": "^8.5.1",
     "jwks-rsa": "^1.6.0",
     "ncp": "^2.0.0",

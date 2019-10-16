@@ -48,11 +48,14 @@ The solution can be deployed with a few clicks through the [Serverless Applicati
 1. Download and install [Node.js](https://nodejs.org/en/download/)
 2. Download and install [AWS SAM CLI](https://github.com/awslabs/aws-sam-cli)
 3. Of course you need an AWS account and necessary permissions to create resources in it. Make sure your AWS credentials can be found during deployment, e.g. by making your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY available as environment variables.
-5. You need an existing S3 bucket to use for the SAM deployment. Create an empty bucket.
+4. You need an existing S3 bucket to use for the SAM deployment. Create an empty bucket.
+5. Ensure your system includes a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please enable/install "Linux Subsystem for Windows" or Cygwin or something similar)
 
 NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge must be deployed to us-east-1 as it is a global configuration.
 
 #### Deployment
+
+NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please run this in "Linux Subsystem for Windows" or in Cygwin or something similar)
 
 1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge`
 2. Install dependencies: `npm install`
@@ -69,11 +72,24 @@ See [./example-serverless-app-reuse](./example-serverless-app-reuse)
 
 ## I already have a CloudFront distribution, I just want to add auth
 
-Deploy the solution while setting parameter `CreateCloudFrontDistribution` to `false`. This way, only the Lambda@Edge functions will de deployed in your account, including a User Pool and Client. Then you can wire those Lambda@Edge functions up into your own CloudFront distribution.
+Deploy the solution (e.g. from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/spa-authorization-at-edge)) while setting parameter `CreateCloudFrontDistribution` to `false`. This way, only the Lambda@Edge functions will de deployed in your account, including a User Pool and Client. Then you can wire those Lambda@Edge functions up into your own CloudFront distribution.
 
 The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can refer to in your CloudFront distribution.
 
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
+
+## Deploying to another region
+
+This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).
+
+This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low. However, to keep the solution simple, these resources are included in the same template as the CloudFront/Lambda@Edge resources, and thus forced to be deployed to us-east-1 also.
+
+If your users aren't near us-east-1 (North Virgina) and low latency is important enough to you, you can split [this solution's SAM template](./template.yaml) into two separate templates:
+
+- a template with CloudFront and Lambda@Edge resources, that you deploy to us-east-1
+- a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users 
+
+NOTE: Even if your users aren't near us-east-1, latency might not bother them too much: latency will only be perceived by users when they open the Cognito Hosted UI to sign in, and when Lambda@Edge fetches the JWKS from the Cognito User Pool to validate JWT's. The JWKS is cached by the Lambda@Edge function, so as long as the Lambda@Edge function stays warm the JWKS won't need to be fetched again.
 
 ## Contributing to this repo
 

@@ -15,6 +15,6 @@ If you supply an email address, a user will be created that you can use to sign-
 
 To open the web app after succesful deployment, navigate to the CloudFormation stack, in the "Outputs" tab, click on the output named: "WebsiteUrl".
 
-NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge must be deployed to us-east-1 as it is a global configuration.
+NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge must be deployed to us-east-1 as it is a global configuration. If you want to deploy the regional services (like Cognito and the S3 bucket) to another region: that will work too, but you'll have to adapt this solution's SAM template, read more [here](./README.md#deploying-to-another-region).
 
 NOTE: The purpose of this sample application is to demonstrate how Lambda@Edge can be used to implement authorization, with Cognito as identity provider (IDP). Please treat the application as an _**illustration**_––thoroughly review it and adapt it to your needs, if you want to use it for serious things.

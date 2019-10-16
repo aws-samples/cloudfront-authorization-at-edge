@@ -84,12 +84,12 @@ This solution contains CloudFront and Lambda@Edge resources that must be deploye
 
 This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low. However, to keep the solution simple, these resources are included in the same template as the CloudFront/Lambda@Edge resources, and thus forced to be deployed to us-east-1 also.
 
-If your users aren't near us-east-1 (North Virgina) and low latency is important enough to you, you can split this solution's [SAM template](./template.yaml) into two separate templates:
+If your users aren't near us-east-1 (North Virgina) and low latency is important enough to you, you can split [this solution's SAM template](./template.yaml) into two separate templates:
 
 - a template with CloudFront and Lambda@Edge resources, that you deploy to us-east-1
 - a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users 
 
-NOTE: Even if your users aren't near us-east-1, latency shouldn't bother them too much: latency is only perceived by users when they open the Cognito Hosted UI to sign in, and when Lambda@Edge fetches the JWKS from the Cognito User Pool to validate JWT's. The JWKS is cached by the Lambda@Edge function, so as long as the Lambda@Edge function stays warm the JWKS won't need to be fetched again.
+NOTE: Even if your users aren't near us-east-1, latency might not bother them too much: latency will only be perceived by users when they open the Cognito Hosted UI to sign in, and when Lambda@Edge fetches the JWKS from the Cognito User Pool to validate JWT's. The JWKS is cached by the Lambda@Edge function, so as long as the Lambda@Edge function stays warm the JWKS won't need to be fetched again.
 
 ## Contributing to this repo
 

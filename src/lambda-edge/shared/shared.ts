@@ -41,7 +41,7 @@ export function getConfig(): Config {
     const config = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as ConfigFromDisk;
 
     // Derive the issuer and JWKS uri all JWT's will be signed with from the User Pool's ID and region:
-    const userPoolRegion = config.userPoolId.match(/(\S{2}-\S{4}-\S{1,2})_\S*/)![1];
+    const userPoolRegion = config.userPoolId.match(/^(\S+?)_\S+$/)![1];
     const tokenIssuer = `https://cognito-idp.${userPoolRegion}.amazonaws.com/${config.userPoolId}`;
     const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
 

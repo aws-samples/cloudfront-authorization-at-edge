@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.0.2
+    SemanticVersion: 1.0.3
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -107,7 +107,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -116,7 +116,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -125,7 +125,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -134,7 +134,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
   
@@ -143,7 +143,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs8.10 # Currently for Lambda@Edge still a faster runtime than nodejs10.x
+      Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 

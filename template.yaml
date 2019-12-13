@@ -498,18 +498,30 @@ Outputs:
   ParseAuthHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for parsing the URL of the redirect from the Cognito hosted UI after succesful sign-in
     Value: !GetAtt ParseAuthHandlerCodeUpdate.FunctionArn
+    Export:
+      Name: !Sub "${AWS::StackName}-ParseAuthHandler"
   CheckAuthHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for checking the presence of a valid JWT
     Value: !GetAtt CheckAuthHandlerCodeUpdate.FunctionArn
+    Export:
+      Name: !Sub "${AWS::StackName}-CheckAuthHandler"
   HttpHeadersHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for setting HTTP security headers
     Value: !GetAtt HttpHeadersHandlerCodeUpdate.FunctionArn
+    Export:
+      Name: !Sub "${AWS::StackName}-HttpHeadersHandler"
   RefreshAuthHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for getting new JWT's using the refresh token
     Value: !GetAtt RefreshAuthHandlerCodeUpdate.FunctionArn
+    Export:
+      Name: !Sub "${AWS::StackName}-RefreshAuthHandler"
   SignOutHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for signing out
     Value: !GetAtt SignOutHandlerCodeUpdate.FunctionArn
+    Export:
+      Name: !Sub "${AWS::StackName}-SignOutHandler"
   CodeUpdateHandler:
     Description: The Lambda function ARN of the custom resource that adds configuration to a function and publishes a version for use as Lambda@Edge
     Value: !GetAtt LambdaCodeUpdateHandler.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-CodeUpdateHandler"

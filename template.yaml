@@ -63,7 +63,7 @@ Parameters:
         "idToken": "Path=/; Secure; SameSite=Lax",
         "accessToken": "Path=/; Secure; SameSite=Lax",
         "refreshToken": "Path=/; Secure; SameSite=Lax",
-        "nonce": "Path=/; Secure; HttpOnly; Max-Age=300; SameSite=Lax"
+        "nonce": "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
       }
   OAuthScopes:
     Type: String
@@ -86,6 +86,10 @@ Parameters:
     Type: String
     Description: Set to 'false' to skip the creation of a CloudFront distribution and associated resources, such as the private S3 bucket and the sample React app. This may be of use to you, if you just want to create the Lambda@Edge functions to use with your own CloudFront distribution.
     Default: "true"
+  Version:
+    Type: String
+    Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
+    Default: ""
 
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
@@ -364,6 +368,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt ParseAuthHandler.Arn
+      Version: !Ref Version
       Configuration: !Sub >
         {
           "userPoolId": "${UserPool}",
@@ -382,6 +387,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt CheckAuthHandler.Arn
+      Version: !Ref Version
       Configuration: !Sub >
         {
           "userPoolId": "${UserPool}",
@@ -400,6 +406,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt HttpHeadersHandler.Arn
+      Version: !Ref Version
       Configuration: !Ref HttpHeaders
 
   RefreshAuthHandlerCodeUpdate:
@@ -407,6 +414,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt RefreshAuthHandler.Arn
+      Version: !Ref Version
       Configuration: !Sub >
         {
           "userPoolId": "${UserPool}",
@@ -425,6 +433,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt SignOutHandler.Arn
+      Version: !Ref Version
       Configuration: !Sub >
         {
           "userPoolId": "${UserPool}",

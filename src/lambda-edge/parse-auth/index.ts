@@ -3,13 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import axios from 'axios';
-import { Agent } from 'https';
-import { getConfig, extractAndParseCookies, getCookieHeaders } from '../shared/shared';
-
-const axiosInstance = axios.create({
-    httpsAgent: new Agent({ keepAlive: true }),
-});
+import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry } from '../shared/shared';
 
 const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, cookieSettings, cloudFrontHeaders } = getConfig();
 
@@ -18,14 +12,23 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const domainName = request.headers['host'][0].value;
     const { code, state } = parseQueryString(request.querystring);
 
+    let redirectedFromUri = `https://${domainName}`;
+
     try {
         if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
-            throw new Error('invalid query string');
+            throw new Error('Invalid query string. Your query string should include parameters "state" and "code"');
         }
         const { nonce: currentNonce, requestedUri } = JSON.parse(state);
+        redirectedFromUri += requestedUri;
         const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
         if (!currentNonce || !originalNonce || currentNonce !== originalNonce) {
-            throw new Error(`nonce mismatch! expected: "${originalNonce}" got: "${currentNonce}"`);
+            let message = 'Nonce mismatch. ';
+            if (!originalNonce) {
+                message += 'Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).'
+            } else {
+                message += `"${currentNonce}" !== "${originalNonce}"`;
+            }
+            throw new Error(message);
         }
         const body = stringifyQueryString({
             grant_type: 'authorization_code',
@@ -34,14 +37,15 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             code,
             code_verifier: pkce
         });
-        const res = await axiosInstance.post(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+        const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         return {
             status: '307',
             statusDescription: 'Temporary Redirect',
             headers: {
                 'location': [{
                     key: 'location',
-                    value: `https://${domainName}${requestedUri}`,
+                    value: redirectedFromUri,
                 }],
                 'set-cookie': getCookieHeaders(clientId, oauthScopes, res.data, domainName, cookieSettings),
                 ...cloudFrontHeaders,
@@ -49,10 +53,30 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         };
     } catch (err) {
         return {
-            body: 'Bad Request',
+            body: getHtml('Bad Request', err.message || err.toString(), redirectedFromUri),
             status: '400', // Note: do not send 403 (!) as we have CloudFront send back index.html for 403's to enable SPA-routing
-            statusDescription: 'Bad Request',
-            headers: cloudFrontHeaders,
+            headers: {
+                ...cloudFrontHeaders,
+                'content-type': [{
+                    key: 'Content-Type',
+                    value: 'text/html; charset=UTF-8',
+                }]
+            }
         };
     }
+}
+
+function getHtml(title: string, message: string, tryAgainHref: string) {
+    return `<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+    </head>
+    <body>
+        <h1>${title}</h1>
+        <p><b>ERROR:</b> ${message}</p>
+        <a href="${tryAgainHref}">Try again</a>
+    </body>
+</html>`;
 }

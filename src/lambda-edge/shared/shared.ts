@@ -208,7 +208,7 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
             }
             if (attempts >= 2) {
                 // After attempting twice immediately, do some exponential backoff with jitter
-                await new Promise(resolve => setTimeout(resolve, 25 * Math.pow(2, attempts) + Math.random() * attempts * 25));
+                await new Promise(resolve => setTimeout(resolve, 25 * (Math.pow(2, attempts) + Math.random() * attempts)));
             }
             console.log(`HTTP POST to ${url} failed (attempt ${attempts}), will retry: ${error}`);
         }

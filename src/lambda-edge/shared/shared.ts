@@ -4,6 +4,8 @@
 import { CloudFrontHeaders } from 'aws-lambda';
 import { readFileSync } from 'fs';
 import { parse } from 'cookie';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { Agent } from 'https';
 
 export interface CookieSettings {
     idToken: string;
@@ -171,7 +173,7 @@ export function getCookieHeaders(
     } else if (!tokens.refresh_token) {
         cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
     }
-    
+
     // Return object in format of CloudFront headers
     return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
@@ -185,4 +187,30 @@ function expireCookie(cookie: string) {
     const expires = `Expires=${new Date(0).toUTCString()}`;
     const [, ...settings] = cookieParts; // first part is the cookie value, which we'll clear
     return ['', ...settings, expires].join('; ');
+}
+
+const AXIOS_INSTANCE = axios.create({
+    httpsAgent: new Agent({ keepAlive: true }),
+});
+
+
+export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig): Promise<AxiosResponse<any>> {
+    let attempts = 0;
+    while (++attempts) {
+        try {
+            return await AXIOS_INSTANCE.post(url, data, config);
+        } catch (err) {
+            console.error(`HTTP POST to ${url} failed (attempt ${attempts}):`);
+            console.error(err.response && err.response.data || err);
+            if (attempts >= 5) {
+                // Try 5 times at most
+                break;
+            }
+            if (attempts >= 2) {
+                // After attempting twice immediately, do some exponential backoff with jitter
+                await new Promise(resolve => setTimeout(resolve, 25 * (Math.pow(2, attempts) + Math.random() * attempts)));
+            }
+        }
+    }
+    throw new Error(`HTTP POST to ${url} failed`);
 }

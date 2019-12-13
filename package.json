@@ -9,12 +9,13 @@
     "webpack": "webpack --progress",
     "analyze": "webpack --profile --json > stats.json && webpack-bundle-analyzer ./stats.json",
     "build": "npm run tsc && npm run webpack",
-    "update-dependencies": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [[ ! -f ${DIR}/package.json ]] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm --depth 9999 update); done",
+    "update-dependencies": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [[ ! -f ${DIR}/package.json ]] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && rm -rf node_modules package-lock.json && npm update --dev); done; npm i",
     "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [[ ! -f ${DIR}/package.json ]] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --ignore-scripts); done"
   },
   "keywords": [],
   "author": "",
   "devDependencies": {
+    "@types/adm-zip": "^0.4.32",
     "@types/aws-lambda": "^8.10.34",
     "@types/cookie": "^0.3.3",
     "@types/fs-extra": "^7.0.0",
@@ -29,7 +30,8 @@
     "webpack-cli": "^3.3.9"
   },
   "dependencies": {
-    "aws-sdk": "^2.556.0",
+    "adm-zip": "^0.4.13",
+    "aws-sdk": "^2.589.0",
     "axios": "^0.19.0",
     "cookie": "^0.4.0",
     "jsonwebtoken": "^8.5.1",

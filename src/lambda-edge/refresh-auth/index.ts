@@ -3,13 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import axios from 'axios';
-import { Agent } from 'https';
-import { getConfig, extractAndParseCookies, getCookieHeaders } from '../shared/shared';
-
-const axiosInstance = axios.create({
-    httpsAgent: new Agent({ keepAlive: true }),
-});
+import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry } from '../shared/shared';
 
 const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, cloudFrontHeaders } = getConfig();
 
@@ -40,7 +34,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             client_id: clientId,
             refresh_token: refreshToken,
         });
-        const res = await axiosInstance.post(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
         tokens.id_token = res.data.id_token;
         tokens.access_token = res.data.access_token;
     } catch (err) {

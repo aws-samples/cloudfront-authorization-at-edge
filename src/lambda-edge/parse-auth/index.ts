@@ -22,13 +22,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         redirectedFromUri += requestedUri;
         const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
         if (!currentNonce || !originalNonce || currentNonce !== originalNonce) {
-            let message = 'Nonce mismatch. ';
             if (!originalNonce) {
-                message += 'Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).'
-            } else {
-                message += `"${currentNonce}" !== "${originalNonce}"`;
+                throw new Error('Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).');
             }
-            throw new Error(message);
+            throw new Error('Nonce mismatch');
         }
         const body = stringifyQueryString({
             grant_type: 'authorization_code',
@@ -53,7 +50,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         };
     } catch (err) {
         return {
-            body: getHtml('Bad Request', err.message || err.toString(), redirectedFromUri),
+            body: getHtml('Bad Request', err.toString(), redirectedFromUri),
             status: '400', // Note: do not send 403 (!) as we have CloudFront send back index.html for 403's to enable SPA-routing
             headers: {
                 ...cloudFrontHeaders,

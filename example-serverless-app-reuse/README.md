@@ -10,7 +10,8 @@ This directory contains two examples:
 
 You can deploy the examples as follows:
 
-```shell
+```sh
+#!/bin/sh
 STACK_NAME=my-protected-cloudfront-stack
 TEMPLATE=reuse-complete.yaml # Or reuse-auth-only.yaml
 sam deploy --template-file $TEMPLATE --stack-name $STACK_NAME \

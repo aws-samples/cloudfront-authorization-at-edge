@@ -12,8 +12,10 @@ You can deploy the examples as follows:
 
 ```sh
 #!/bin/sh
+
 STACK_NAME=my-protected-cloudfront-stack
 TEMPLATE=reuse-complete.yaml # Or reuse-auth-only.yaml
+
 sam deploy --template-file $TEMPLATE --stack-name $STACK_NAME \
            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --region us-east-1
 

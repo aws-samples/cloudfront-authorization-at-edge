@@ -1,0 +1,80 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Example stack that shows how to reuse only the auth portion of the serverless application
+  in your own CloudFront distribution. Note that after deployment, you should manually update the
+  User Pool client, and point the Callback URL and Sign out URL at the CloudFront distribution. To work
+  around this circular dependency, you can also add an alternate domain name to the CloudFront distribution,
+  and provide that as parameter to the serverless stack. Then the User Pool client will be set to the right
+  Callback URL and Sign out URL automatically.
+
+Resources:
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        # Aliases: <your alternate domain names, also pass these to the serverless stack below>
+        # ViewerCertificate: <the config for your HTTPS certificate>
+        CacheBehaviors:
+          - PathPattern: /parseauth
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.ParseAuthHandler
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: /refreshauth
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.RefreshAuthHandler
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+          - PathPattern: /signout
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+            LambdaFunctionAssociations:
+              - EventType: viewer-request
+                LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.SignOutHandler
+            TargetOriginId: dummy-origin
+            ViewerProtocolPolicy: redirect-to-https
+        DefaultCacheBehavior:
+          Compress: true
+          ForwardedValues:
+            QueryString: true
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.CheckAuthHandler
+            - EventType: origin-response
+              LambdaFunctionARN: !GetAtt LambdaEdgeProtection.Outputs.HttpHeadersHandler
+          TargetOriginId: protected-origin
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        Origins:
+          - DomainName: example.org
+            Id: dummy-origin
+            CustomOriginConfig:
+              OriginProtocolPolicy: match-viewer
+          - DomainName: example.com
+            Id: protected-origin
+            CustomOriginConfig:
+              OriginProtocolPolicy: match-viewer
+
+  LambdaEdgeProtection:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge
+        SemanticVersion: 1.0.4
+      Parameters:
+        CreateCloudFrontDistribution: "false"
+        # AlternateDomainNames: <your alternate domain names, this will be the same list as the aliases of your CloudFront distribution above>

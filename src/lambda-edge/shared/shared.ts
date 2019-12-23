@@ -214,3 +214,18 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
     }
     throw new Error(`HTTP POST to ${url} failed`);
 }
+
+export function createErrorHtml(title: string, message: string, tryAgainHref: string) {
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="utf-8">
+      <title>${title}</title>
+  </head>
+  <body>
+      <h1>${title}</h1>
+      <p><b>ERROR:</b> ${message}</p>
+      <a href="${tryAgainHref}">Try again</a>
+  </body>
+</html>`;
+}

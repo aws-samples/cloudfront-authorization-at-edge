@@ -18,7 +18,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             throw new Error('Invalid query string. Your query string should include parameters "state" and "code"');
         }
         const { nonce: currentNonce, requestedUri } = JSON.parse(state);
-        redirectedFromUri += requestedUri;
+        redirectedFromUri += requestedUri || '';
         const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
         if (!currentNonce || !originalNonce || currentNonce !== originalNonce) {
             if (!originalNonce) {

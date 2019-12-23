@@ -3,7 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry } from '../shared/shared';
+import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
 const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, cloudFrontHeaders } = getConfig();
 
@@ -19,11 +19,19 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, clientId);
 
     if (isInvalidRefreshRequest(currentNonce, originalNonce, idToken, accessToken, refreshToken)) {
+        let message = 'Invalid refresh request';
+        if (!originalNonce) {
+            message = 'Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).';
+        }
         return {
-            body: 'Bad Request',
+            body: createErrorHtml('Bad Request', message, `https://${domainName}${requestedUri}`),
             status: '400', // Note: do not send 403 (!) as we have CloudFront send back index.html for 403's to enable SPA-routing 
-            statusDescription: 'Bad Request',
-            headers: cloudFrontHeaders,
+            headers: {
+                ...cloudFrontHeaders,
+                'content-type': [{
+                    key: 'Content-Type',
+                    value: 'text/html; charset=UTF-8',
+            }]},
         };
     }
 

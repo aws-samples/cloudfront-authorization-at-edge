@@ -10,6 +10,8 @@ import {
 import axios from 'axios';
 import Lambda from 'aws-sdk/clients/lambda';
 import Zip from 'adm-zip';
+import { writeFileSync, mkdtempSync } from 'fs'
+import { resolve } from 'path';
 
 const LAMBDA_CLIENT = new Lambda({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
 
@@ -21,12 +23,22 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
     console.log(`Adding configuration to Lambda function ${lambdaFunction}:\n${configuration}`);
     const { Code } = await LAMBDA_CLIENT.getFunction({ FunctionName: lambdaFunction }).promise();
     const { data } = await axios.get(Code!.Location!, { responseType: 'arraybuffer' });
-    const ZipFile = new Zip(data);
-    ZipFile.addFile('configuration.json', Buffer.from(configuration));
+
+    // Extract Lambda zip contents to temporary folder, add configuration.json, and rezip
+    const lambdaZip = new Zip(data);
+    console.log('Lambda zip contents:', lambdaZip.getEntries().map(entry => entry.name));
+    console.log('Adding (fresh) configuration.json ...');
+    const tempDir = mkdtempSync('/tmp/lambda-package');
+    lambdaZip.extractAllTo(tempDir, true);
+    writeFileSync(resolve(tempDir, 'configuration.json'), Buffer.from(configuration));
+    const newLambdaZip = new Zip();
+    newLambdaZip.addLocalFolder(tempDir);
+    console.log('New Lambda zip contents:', newLambdaZip.getEntries().map(entry => entry.name));
+    
     const { CodeSha256, Version, FunctionArn } = await LAMBDA_CLIENT.updateFunctionCode(
         {
             FunctionName: lambdaFunction,
-            ZipFile: ZipFile.toBuffer(),
+            ZipFile: newLambdaZip.toBuffer(),
             Publish: true
         }
     ).promise();

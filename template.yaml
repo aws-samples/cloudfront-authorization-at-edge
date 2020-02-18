@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.0.5
+    SemanticVersion: 1.0.6
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -212,6 +212,7 @@ Resources:
           TargetOriginId: protected-bucket
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
+        DefaultRootObject: index.html
         Origins:
           - DomainName: !Sub "${S3Bucket}.s3.amazonaws.com"
             Id: protected-bucket
@@ -223,9 +224,6 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
         CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
           - ErrorCode: 404
             ResponseCode: 200
             ResponsePagePath: /index.html
@@ -249,6 +247,12 @@ Resources:
               - "s3:GetObject"
             Effect: "Allow"
             Resource: !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+          - Action:
+              - "s3:ListBucket"
+            Effect: "Allow"
+            Resource: !GetAtt S3Bucket.Arn
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
 

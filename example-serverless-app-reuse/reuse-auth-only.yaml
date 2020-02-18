@@ -60,11 +60,11 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
         Origins:
-          - DomainName: example.org
+          - DomainName: example.org # Dummy origin is used for Lambda@Edge functions, keep this as-is
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
-          - DomainName: example.com
+          - DomainName: change.this.to.your.origin
             Id: protected-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer

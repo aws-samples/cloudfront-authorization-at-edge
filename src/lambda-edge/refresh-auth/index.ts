@@ -48,7 +48,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     } catch (err) {
         return {
             body: createErrorHtml('Bad Request', err.toString(), redirectedFromUri),
-            status: '400', // Note: do not send 403 (!) as we have CloudFront send back index.html for 403's to enable SPA-routing 
+            status: '400',
             headers: {
                 ...cloudFrontHeaders,
                 'content-type': [{

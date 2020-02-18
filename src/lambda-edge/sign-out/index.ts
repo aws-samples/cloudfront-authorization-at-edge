@@ -15,7 +15,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     if (!idToken) {
         return {
             body: 'Bad Request',
-            status: '400', // Note: do not send 403 (!) as we have CloudFront send back index.html for 403's to enable SPA-routing
+            status: '400',
             statusDescription: 'Bad Request',
             headers: cloudFrontHeaders,
         };

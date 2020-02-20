@@ -49,12 +49,14 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         return request;
 
     } catch (err) {
+        // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
+        // Cognito decodes the URL, causing a malformed link due to the JSON string, and results in an empty 400 response from Cognito.
         const { pkce, pkceHash } = generatePkceVerifier();
         const loginQueryString = stringifyQueryString({
             redirect_uri: `https://${domainName}${redirectPathSignIn}`,
             response_type: 'code',
             client_id: clientId,
-            state: JSON.stringify({ nonce, requestedUri }),
+            state: Buffer.from(JSON.stringify({ nonce, requestedUri })).toString('base64'),
             scope: oauthScopes.join(' '),
             code_challenge_method: 'S256',
             code_challenge: pkceHash,

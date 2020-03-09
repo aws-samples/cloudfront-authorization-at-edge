@@ -68,6 +68,8 @@ NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, z
 
 Providing an email address (as above in step 6) is optional. If you provide it, a user will be created in the Cognito User Pool that you can sign-in with.
 
+Additionally, adding a `--parameter-overrides` value of `EnableSPAMode="false"` will omit the launch of the single page React application and instead will launch a bare bones non-spa site.
+
 ### Option 3: Deploy by including the Serverless Application in your own CloudFormation template
 
 See [./example-serverless-app-reuse](./example-serverless-app-reuse)
@@ -89,7 +91,7 @@ This solution also contains an Amazon Cognito User Pool and S3 bucket, that shou
 If your users aren't near us-east-1 (North Virgina) and low latency is important enough to you, you can split [this solution's SAM template](./template.yaml) into two separate templates:
 
 - a template with CloudFront and Lambda@Edge resources, that you deploy to us-east-1
-- a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users 
+- a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users
 
 NOTE: Even if your users aren't near us-east-1, latency might not bother them too much: latency will only be perceived by users when they open the Cognito Hosted UI to sign in, and when Lambda@Edge fetches the JWKS from the Cognito User Pool to validate JWTs. The JWKS is cached by the Lambda@Edge function, so as long as the Lambda@Edge function stays warm the JWKS won't need to be fetched again.
 

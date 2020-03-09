@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.0.9
+    SemanticVersion: 1.0.10
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -82,6 +82,13 @@ Parameters:
         "X-Frame-Options": "DENY",
         "X-Content-Type-Options": "nosniff"
       }
+  EnableSPAMode:
+    Type: String
+    Description: Set to 'false' to disable SPA-specific features (i.e. when deploying a static site that won't interact with logout/refresh)
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
   CreateCloudFrontDistribution:
     Type: String
     Description: Set to 'false' to skip the creation of a CloudFront distribution and associated resources, such as the private S3 bucket and the sample React app. This may be of use to you, if you just want to create the Lambda@Edge functions to use with your own CloudFront distribution.
@@ -94,6 +101,13 @@ Parameters:
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
   CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
+  NonSPAMode: !Equals [ !Ref EnableSPAMode, 'false']
+  CreateCloudFrontDistributionNonSPAMode: !And
+    - !Equals [ !Ref EnableSPAMode, 'false' ]
+    - !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
+  CreateCloudFrontDistributionSPAMode: !And
+    - !Equals [ !Ref EnableSPAMode, 'false' ]
+    - !Equals [!Ref CreateCloudFrontDistribution, "false"]
 
 Globals:
   Function:
@@ -141,7 +155,7 @@ Resources:
       Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
-  
+
   SignOutHandler:
     Type: AWS::Serverless::Function
     Properties:
@@ -224,9 +238,12 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
         CustomErrorResponses:
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /index.html
+          - !If
+            - NonSPAMode
+            - !Ref AWS::NoValue
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
 
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
@@ -276,6 +293,10 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref UserPool
+      GenerateSecret: !If
+        - NonSPAMode
+        - true
+        - false
 
   UserPoolDomain:
     Type: Custom::UserPoolDomain
@@ -328,9 +349,62 @@ Resources:
                 - cognito-idp:UpdateUserPoolClient
               Resource: !GetAtt UserPool.Arn
 
+  ClientSecretRetrieval:
+    Type: Custom::ClientSecretRetrieval
+    Properties:
+      ServiceToken: !GetAtt ClientSecretRetrievalHandler.Arn
+      UserPoolId: !Ref UserPool
+      UserPoolClientId: !Ref UserPoolClient
+
+  ClientSecretRetrievalHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/cfn-custom-resources/client-secret-retrieval/
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:DescribeUserPoolClient
+              Resource: !GetAtt UserPool.Arn
+
+  NonSPAApp:
+    Type: Custom::NonSPAApp
+    Condition: CreateCloudFrontDistributionNonSPAMode
+    Properties:
+      ServiceToken: !GetAtt NonSPAAppHandler.Arn
+      BucketName: !Ref S3Bucket
+
+  NonSPAAppHandler:
+    Type: AWS::Serverless::Function
+    Condition: CreateCloudFrontDistributionNonSPAMode
+    Properties:
+      CodeUri: src/cfn-custom-resources/non-spa-app/
+      Handler: bundle.handler
+      Runtime: nodejs10.x
+      Timeout: 180
+      MemorySize: 2048
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource:
+                - !GetAtt S3Bucket.Arn
+            - Effect: Allow
+              Action:
+                - s3:DeleteObject
+                - s3:PutObject
+              Resource:
+                - !GetAtt S3Bucket.Arn
+                - !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
+
   ReactApp:
     Type: Custom::ReactApp
-    Condition: CreateCloudFrontDistribution
+    Condition: CreateCloudFrontDistributionSPAMode
     Properties:
       ServiceToken: !GetAtt ReactAppHandler.Arn
       BucketName: !Ref S3Bucket
@@ -344,7 +418,7 @@ Resources:
 
   ReactAppHandler:
     Type: AWS::Serverless::Function
-    Condition: CreateCloudFrontDistribution
+    Condition: CreateCloudFrontDistributionSPAMode
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
@@ -383,7 +457,8 @@ Resources:
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
+          "httpHeaders": ${HttpHeaders},
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
         }
 
   CheckAuthHandlerCodeUpdate:
@@ -402,7 +477,8 @@ Resources:
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
+          "httpHeaders": ${HttpHeaders},
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
         }
 
   HttpHeadersHandlerCodeUpdate:
@@ -429,7 +505,8 @@ Resources:
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
+          "httpHeaders": ${HttpHeaders},
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
         }
 
   SignOutHandlerCodeUpdate:
@@ -448,7 +525,8 @@ Resources:
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
+          "httpHeaders": ${HttpHeaders},
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
         }
 
   LambdaCodeUpdateHandler:
@@ -490,6 +568,9 @@ Outputs:
   ClientId:
     Description: Client ID to use to interact with the User Pool
     Value: !Ref UserPoolClient
+  ClientSecret:
+    Description: The client secret associated with the User Pool Client. This will be empty in SPA mode.
+    Value: !GetAtt ClientSecretRetrieval.ClientSecret
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
     Value: !GetAtt UserPoolDomain.DomainName

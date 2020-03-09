@@ -5,7 +5,7 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, cloudFrontHeaders } = getConfig();
+const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, cloudFrontHeaders, clientSecret } = getConfig();
 
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -20,6 +20,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
         validateRefreshRequest(currentNonce, originalNonce, idToken, accessToken, refreshToken);
 
+        let headers: { 'Content-Type': string, Authorization?: string } = { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+        if(clientSecret !== '') {
+            const encodedSecret = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+            headers['Authorization'] = `Basic ${encodedSecret}`
+        }
+
         let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
         try {
             const body = stringifyQueryString({
@@ -27,7 +34,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 client_id: clientId,
                 refresh_token: refreshToken,
             });
-            const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+            const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers });
             tokens.id_token = res.data.id_token;
             tokens.access_token = res.data.access_token;
         } catch (err) {

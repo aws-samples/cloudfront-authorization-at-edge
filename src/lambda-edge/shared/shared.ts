@@ -28,6 +28,7 @@ interface ConfigFromDisk {
     redirectPathAuthRefresh: string;
     cookieSettings: CookieSettings;
     httpHeaders: HttpHeaders;
+    clientSecret: string;
 }
 
 
@@ -55,7 +56,7 @@ export function getConfig(): Config {
 type Cookies = { [key: string]: string };
 
 function extractCookiesFromHeaders(headers: CloudFrontHeaders) {
-    // Cookies are present in the HTTP header "Cookie" that may be present multiple times. 
+    // Cookies are present in the HTTP header "Cookie" that may be present multiple times.
     // This utility function parses occurrences  of that header and splits out all the cookies and their values
     // A simple object is returned that allows easy access by cookie name: e.g. cookies["nonce"]
     if (!headers['cookie']) {

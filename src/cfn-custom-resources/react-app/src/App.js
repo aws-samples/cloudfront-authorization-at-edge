@@ -27,12 +27,6 @@ Amplify.configure({
   }
 });
 
-const decodeToken = (token) => {
-  const tokenBody = token.split('.')[1];
-  const decodableTokenBody = tokenBody.replace(/-/g, '+').replace(/_/g, '/');
-  return JSON.parse(window.atob(decodableTokenBody));
-}
-
 const App = () => {
 
   const [state, setState] = useState({
@@ -44,7 +38,7 @@ const App = () => {
     Auth.currentSession()
       .then(user => setState({
         username: user.username,
-        email: decodeToken(user.getIdToken().getJwtToken()).email,
+        email: user.getIdToken().decodePayload().email,
       }));
     // Schedule check and refresh (when needed) of JWT's every 5 min:
     const i = setInterval(() => Auth.currentSession(), 5 * 60 * 1000);

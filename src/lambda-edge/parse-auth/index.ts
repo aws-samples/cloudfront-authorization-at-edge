@@ -13,7 +13,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     let redirectedFromUri = `https://${domainName}`;
     
     try {
-        const { code, state } = parseQueryString(request.querystring);
+        const { code, state, error: cognitoError, error_description } = parseQueryString(request.querystring);
+        if (cognitoError) {
+            throw new Error(`[Cognito] ${[cognitoError, error_description].join(': ')}`);
+        }
         if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
             throw new Error('Invalid query string. Your query string should include parameters "state" and "code"');
         }

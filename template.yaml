@@ -90,10 +90,15 @@ Parameters:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
     Default: ""
+  CustomAuthDomain:
+    Type: String
+    Description: Domain name of your own domain of the User Pool. Leave empty to use the Amazon Cognito domain.
+    Default: ""
 
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
   CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
+  UseCustomAuthDomain: !Not [!Equals [!Ref CustomAuthDomain, ""]]
 
 Globals:
   Function:
@@ -141,7 +146,7 @@ Resources:
       Runtime: nodejs10.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
-  
+
   SignOutHandler:
     Type: AWS::Serverless::Function
     Properties:
@@ -336,7 +341,10 @@ Resources:
       BucketName: !Ref S3Bucket
       UserPoolId: !Ref UserPool
       ClientId: !Ref UserPoolClient
-      CognitoAuthDomain: !GetAtt UserPoolDomain.DomainName
+      CognitoAuthDomain: !If
+        - UseCustomAuthDomain
+        - !Ref CustomAuthDomain
+        - !GetAtt UserPoolDomain.DomainName
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
       OAuthScopes: !Ref OAuthScopes
@@ -373,18 +381,23 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt ParseAuthHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration: !Sub
+        - >
+          {
+            "userPoolId": "${UserPool}",
+            "clientId": "${UserPoolClient}",
+            "oauthScopes": ${OAuthScopes},
+            "cognitoAuthDomain": "${CognitoAuthDomain}",
+            "redirectPathSignIn": "${RedirectPathSignIn}",
+            "redirectPathSignOut": "${RedirectPathSignOut}",
+            "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+            "cookieSettings": ${CookieSettings},
+            "httpHeaders": ${HttpHeaders}
+          }
+        - CognitoAuthDomain: !If
+            - UseCustomAuthDomain
+            - !Ref CustomAuthDomain
+            - !GetAtt UserPoolDomain.DomainName
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -392,18 +405,23 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt CheckAuthHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration: !Sub
+        - >
+          {
+            "userPoolId": "${UserPool}",
+            "clientId": "${UserPoolClient}",
+            "oauthScopes": ${OAuthScopes},
+            "cognitoAuthDomain": "${CognitoAuthDomain}",
+            "redirectPathSignIn": "${RedirectPathSignIn}",
+            "redirectPathSignOut": "${RedirectPathSignOut}",
+            "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+            "cookieSettings": ${CookieSettings},
+            "httpHeaders": ${HttpHeaders}
+          }
+        - CognitoAuthDomain: !If
+            - UseCustomAuthDomain
+            - !Ref CustomAuthDomain
+            - !GetAtt UserPoolDomain.DomainName
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -419,18 +437,23 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt RefreshAuthHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration: !Sub
+        - >
+          {
+            "userPoolId": "${UserPool}",
+            "clientId": "${UserPoolClient}",
+            "oauthScopes": ${OAuthScopes},
+            "cognitoAuthDomain": "${CognitoAuthDomain}",
+            "redirectPathSignIn": "${RedirectPathSignIn}",
+            "redirectPathSignOut": "${RedirectPathSignOut}",
+            "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+            "cookieSettings": ${CookieSettings},
+            "httpHeaders": ${HttpHeaders}
+          }
+        - CognitoAuthDomain: !If
+            - UseCustomAuthDomain
+            - !Ref CustomAuthDomain
+            - !GetAtt UserPoolDomain.DomainName
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -438,18 +461,23 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt SignOutHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration: !Sub
+        - >
+          {
+            "userPoolId": "${UserPool}",
+            "clientId": "${UserPoolClient}",
+            "oauthScopes": ${OAuthScopes},
+            "cognitoAuthDomain": "${CognitoAuthDomain}",
+            "redirectPathSignIn": "${RedirectPathSignIn}",
+            "redirectPathSignOut": "${RedirectPathSignOut}",
+            "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+            "cookieSettings": ${CookieSettings},
+            "httpHeaders": ${HttpHeaders}
+          }
+        - CognitoAuthDomain: !If
+            - UseCustomAuthDomain
+            - !Ref CustomAuthDomain
+            - !GetAtt UserPoolDomain.DomainName
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function
@@ -492,7 +520,10 @@ Outputs:
     Value: !Ref UserPoolClient
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
-    Value: !GetAtt UserPoolDomain.DomainName
+    Value: !If
+      - UseCustomAuthDomain
+      - !Ref CustomAuthDomain
+      - !GetAtt UserPoolDomain.DomainName
   RedirectUrisSignIn:
     Description: The URI(s) that will handle the redirect from Cognito after successfull sign-in
     Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignIn

@@ -25,7 +25,7 @@ async function uploadApp(action: 'Create' | 'Update' | 'Delete', config: Configu
         mkdirSync('/tmp/empty_directory', { recursive: true });
         await s3SpaUpload('/tmp/empty_directory', config.BucketName, { delete: true });
     }
-    return physicalResourceId || "NonSPAApp";
+    return physicalResourceId || "StaticSite";
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event, context) => {

@@ -101,7 +101,7 @@ Parameters:
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
   CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
-  NonSPAMode: !Equals [ !Ref EnableSPAMode, 'false']
+  StaticSiteMode: !Equals [ !Ref EnableSPAMode, 'false']
   CreateCloudFrontDistributionNonSPAMode: !And
     - !Equals [!Ref EnableSPAMode, 'false' ]
     - !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
@@ -239,7 +239,7 @@ Resources:
               OriginProtocolPolicy: match-viewer
         CustomErrorResponses:
           - !If
-            - NonSPAMode
+            - StaticSiteMode
             - !Ref AWS::NoValue
             - ErrorCode: 404
               ResponseCode: 200
@@ -294,7 +294,7 @@ Resources:
     Properties:
       UserPoolId: !Ref UserPool
       GenerateSecret: !If
-        - NonSPAMode
+        - StaticSiteMode
         - true
         - false
 
@@ -370,14 +370,14 @@ Resources:
                 - cognito-idp:DescribeUserPoolClient
               Resource: !GetAtt UserPool.Arn
 
-  NonSPAApp:
-    Type: Custom::NonSPAApp
+  StaticSite:
+    Type: Custom::StaticSite
     Condition: CreateCloudFrontDistributionNonSPAMode
     Properties:
-      ServiceToken: !GetAtt NonSPAAppHandler.Arn
+      ServiceToken: !GetAtt StaticSiteHandler.Arn
       BucketName: !Ref S3Bucket
 
-  NonSPAAppHandler:
+  StaticSiteHandler:
     Type: AWS::Serverless::Function
     Condition: CreateCloudFrontDistributionNonSPAMode
     Properties:

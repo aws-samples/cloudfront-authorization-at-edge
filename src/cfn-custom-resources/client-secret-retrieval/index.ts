@@ -28,7 +28,7 @@ async function retrieveClientSecret(
     const res = await COGNITO_CLIENT.describeUserPoolClient(input).promise();
     return {
         physicalResourceId: `${userPoolId}-${clientId}-retrieved-client-secret`,
-        Data: { ClientSecret: res.UserPoolClient!.ClientSecret }
+        Data: { ClientSecret: res.UserPoolClient!.ClientSecret || '' }
     };
 }
 
@@ -50,6 +50,8 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
     let response: CloudFormationCustomResourceResponse;
     try {
         const { physicalResourceId, Data } = await retrieveClientSecret(RequestType, UserPoolId, UserPoolClientId);
+        console.log(physicalResourceId)
+        console.log(Data)
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId!,

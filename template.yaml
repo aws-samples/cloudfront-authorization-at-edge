@@ -103,11 +103,11 @@ Conditions:
   CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
   NonSPAMode: !Equals [ !Ref EnableSPAMode, 'false']
   CreateCloudFrontDistributionNonSPAMode: !And
-    - !Equals [ !Ref EnableSPAMode, 'false' ]
+    - !Equals [!Ref EnableSPAMode, 'false' ]
     - !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
   CreateCloudFrontDistributionSPAMode: !And
-    - !Equals [ !Ref EnableSPAMode, 'false' ]
-    - !Equals [!Ref CreateCloudFrontDistribution, "false"]
+    - !Equals [ !Ref EnableSPAMode, 'true' ]
+    - !Not [!Equals [ !Ref CreateCloudFrontDistribution, "false"]]
 
 Globals:
   Function:

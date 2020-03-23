@@ -102,10 +102,10 @@ Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
   CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
   StaticSiteMode: !Equals [ !Ref EnableSPAMode, 'false']
-  CreateCloudFrontDistributionNonSPAMode: !And
+  CreateCloudFrontDistributionStaticSiteMode: !And
     - !Equals [!Ref EnableSPAMode, 'false' ]
     - !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
-  CreateCloudFrontDistributionSPAMode: !And
+  CreateCloudFrontDistributionSpaMode: !And
     - !Equals [ !Ref EnableSPAMode, 'true' ]
     - !Not [!Equals [ !Ref CreateCloudFrontDistribution, "false"]]
 
@@ -372,14 +372,14 @@ Resources:
 
   StaticSite:
     Type: Custom::StaticSite
-    Condition: CreateCloudFrontDistributionNonSPAMode
+    Condition: CreateCloudFrontDistributionStaticSiteMode
     Properties:
       ServiceToken: !GetAtt StaticSiteHandler.Arn
       BucketName: !Ref S3Bucket
 
   StaticSiteHandler:
     Type: AWS::Serverless::Function
-    Condition: CreateCloudFrontDistributionNonSPAMode
+    Condition: CreateCloudFrontDistributionStaticSiteMode
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
@@ -404,7 +404,7 @@ Resources:
 
   ReactApp:
     Type: Custom::ReactApp
-    Condition: CreateCloudFrontDistributionSPAMode
+    Condition: CreateCloudFrontDistributionSpaMode
     Properties:
       ServiceToken: !GetAtt ReactAppHandler.Arn
       BucketName: !Ref S3Bucket
@@ -418,7 +418,7 @@ Resources:
 
   ReactAppHandler:
     Type: AWS::Serverless::Function
-    Condition: CreateCloudFrontDistributionSPAMode
+    Condition: CreateCloudFrontDistributionSpaMode
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler

@@ -381,7 +381,7 @@ Resources:
     Type: AWS::Serverless::Function
     Condition: CreateCloudFrontDistributionNonSPAMode
     Properties:
-      CodeUri: src/cfn-custom-resources/non-spa-app/
+      CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
       Runtime: nodejs10.x
       Timeout: 180
@@ -451,14 +451,14 @@ Resources:
         {
           "userPoolId": "${UserPool}",
           "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
           "oauthScopes": ${OAuthScopes},
           "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
           "redirectPathSignIn": "${RedirectPathSignIn}",
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders},
+          "httpHeaders": ${HttpHeaders}
         }
 
   CheckAuthHandlerCodeUpdate:
@@ -471,14 +471,14 @@ Resources:
         {
           "userPoolId": "${UserPool}",
           "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
           "oauthScopes": ${OAuthScopes},
           "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
           "redirectPathSignIn": "${RedirectPathSignIn}",
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders},
+          "httpHeaders": ${HttpHeaders}
         }
 
   HttpHeadersHandlerCodeUpdate:
@@ -499,14 +499,14 @@ Resources:
         {
           "userPoolId": "${UserPool}",
           "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
           "oauthScopes": ${OAuthScopes},
           "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
           "redirectPathSignIn": "${RedirectPathSignIn}",
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders},
+          "httpHeaders": ${HttpHeaders}
         }
 
   SignOutHandlerCodeUpdate:
@@ -519,14 +519,14 @@ Resources:
         {
           "userPoolId": "${UserPool}",
           "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}"
+          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
           "oauthScopes": ${OAuthScopes},
           "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
           "redirectPathSignIn": "${RedirectPathSignIn}",
           "redirectPathSignOut": "${RedirectPathSignOut}",
           "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
           "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders},
+          "httpHeaders": ${HttpHeaders}
         }
 
   LambdaCodeUpdateHandler:

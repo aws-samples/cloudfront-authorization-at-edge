@@ -216,7 +216,7 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
 }
 
 export function createErrorHtml(title: string, message: string, tryAgainHref: string) {
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
   <head>
       <meta charset="utf-8">
@@ -228,4 +228,21 @@ export function createErrorHtml(title: string, message: string, tryAgainHref: st
       <a href="${tryAgainHref}">Try again</a>
   </body>
 </html>`;
+}
+
+export const urlSafe = {
+    /*
+        Functions to translate base64-encoded strings, so they can be used:
+        - in URL's without needing additional encoding
+        - in OAuth2 PKCE verifier
+
+        stringify:
+            use this on a base64-encoded string to translate = + / into replacement characters
+
+        parse:
+            use this on a string that was previously urlSafe.stringify'ed to return it to
+            its prior pure-base64 form. Note that trailing = are not added, but NodeJS does not care
+    */
+    stringify: (b64encodedString: string) => b64encodedString.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
+    parse: (b64encodedString: string) => b64encodedString.replace(/-/g, '+').replace(/_/g, '/'),
 }

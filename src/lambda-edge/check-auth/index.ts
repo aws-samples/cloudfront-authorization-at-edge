@@ -5,7 +5,7 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from './validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken } from '../shared/shared';
+import { getConfig, extractAndParseCookies, decodeToken, urlSafe } from '../shared/shared';
 
 // Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
 const SECRET_ALLOWED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -56,7 +56,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             redirect_uri: `https://${domainName}${redirectPathSignIn}`,
             response_type: 'code',
             client_id: clientId,
-            state: Buffer.from(JSON.stringify({ nonce, requestedUri })).toString('base64'),
+            state: urlSafe.stringify(Buffer.from(JSON.stringify({ nonce, requestedUri })).toString('base64')),
             scope: oauthScopes.join(' '),
             code_challenge_method: 'S256',
             code_challenge: pkceHash,
@@ -83,10 +83,9 @@ function generatePkceVerifier() {
     const pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
     return {
         pkce,
-        pkceHash: createHash('sha256')
+        pkceHash: urlSafe.stringify(createHash('sha256')
             .update(pkce, 'utf8')
-            .digest('base64')
-            .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
+            .digest('base64')),
     };
 }
 

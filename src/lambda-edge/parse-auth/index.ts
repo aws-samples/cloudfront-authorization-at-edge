@@ -3,7 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
+import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
 
 const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, cookieSettings, cloudFrontHeaders } = getConfig();
 
@@ -11,16 +11,16 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
-    
+
     try {
         const { code, state, error: cognitoError, error_description } = parseQueryString(request.querystring);
         if (cognitoError) {
-            throw new Error(`[Cognito] ${[cognitoError, error_description].join(': ')}`);
+            throw new Error(`[Cognito] ${cognitoError}: ${error_description}`);
         }
         if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
             throw new Error('Invalid query string. Your query string should include parameters "state" and "code"');
         }
-        const { nonce: currentNonce, requestedUri } = JSON.parse(Buffer.from(state, 'base64').toString()); 
+        const { nonce: currentNonce, requestedUri } = JSON.parse(Buffer.from(urlSafe.parse(state), 'base64').toString());
         redirectedFromUri += requestedUri || '';
         const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
         if (!currentNonce || !originalNonce || currentNonce !== originalNonce) {

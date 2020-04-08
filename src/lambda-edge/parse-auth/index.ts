@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
-import { CloudFrontRequestHandler } from 'aws-lambda';
+import { CloudFrontRequestHandler, CloudFrontRequest } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
 
 const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, cookieSettings, cloudFrontHeaders } = getConfig();
@@ -13,22 +13,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     let redirectedFromUri = `https://${domainName}`;
 
     try {
-        const { code, state, error: cognitoError, error_description } = parseQueryString(request.querystring);
-        if (cognitoError) {
-            throw new Error(`[Cognito] ${cognitoError}: ${error_description}`);
-        }
-        if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
-            throw new Error('Invalid query string. Your query string should include parameters "state" and "code"');
-        }
-        const { nonce: currentNonce, requestedUri } = JSON.parse(Buffer.from(urlSafe.parse(state), 'base64').toString());
-        redirectedFromUri += requestedUri || '';
-        const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
-        if (!currentNonce || !originalNonce || currentNonce !== originalNonce) {
-            if (!originalNonce) {
-                throw new Error('Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).');
-            }
-            throw new Error('Nonce mismatch');
-        }
+        const { code, pkce, requestedUri } = validateQueryStringAndCookies(request);
+        redirectedFromUri += requestedUri;
+
         const body = stringifyQueryString({
             grant_type: 'authorization_code',
             client_id: clientId,
@@ -63,4 +50,34 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             }
         };
     }
+}
+
+function validateQueryStringAndCookies(request: CloudFrontRequest) {
+    const { code, state, error: cognitoError, error_description } = parseQueryString(request.querystring);
+    if (cognitoError) {
+        throw new Error(`[Cognito] ${cognitoError}: ${error_description}`);
+    }
+    if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
+        throw new Error(
+            ['Invalid query string. Your query string does not include parameters "state" and "code".',
+                'This can happen if your authentication attempt did not originate from this site - this is not allowed'].join(' ')
+        );
+    }
+    let parsedState: { nonce?: string, requestedUri?: string };
+    try {
+        parsedState = JSON.parse(Buffer.from(urlSafe.parse(state), 'base64').toString());
+    } catch {
+        throw new Error('Invalid query string. Your query string does not include a valid "state" parameter');
+    }
+    if (!parsedState.requestedUri || !parsedState.nonce) {
+        throw new Error('Invalid query string. Your query string does not include a valid "state" parameter');
+    }
+    const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
+    if (!parsedState.nonce || !originalNonce || parsedState.nonce !== originalNonce) {
+        if (!originalNonce) {
+            throw new Error('Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).');
+        }
+        throw new Error('Nonce mismatch. This can happen if you start multiple authentication attempts in parallel (e.g. in separate tabs)');
+    }
+    return { code, pkce, requestedUri: parsedState.requestedUri || '' };
 }

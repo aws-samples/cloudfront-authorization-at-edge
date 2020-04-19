@@ -5,7 +5,7 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, cookieSettings, cloudFrontHeaders } = getConfig();
+const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, cookieSettings, cloudFrontHeaders, clientSecret } = getConfig();
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
@@ -37,7 +37,14 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             code_verifier: pkce
         });
 
-        const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        const headers: { 'Content-Type': string, Authorization?: string } = { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+        if(clientSecret) {
+            const encodedSecret = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+            headers['Authorization'] = `Basic ${encodedSecret}`
+        }
+
+        const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers } );
         return {
             status: '307',
             statusDescription: 'Temporary Redirect',

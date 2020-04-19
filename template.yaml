@@ -57,13 +57,13 @@ Parameters:
     Default: ""
   CookieSettings:
     Type: String
-    Description: The settings for the cookies holding the JWT's. To be provided as a JSON object
+    Description: The settings for the cookies holding the JWT's. To be provided as a JSON object. If left to null, a default setting is used that should be suitable given the value of "EnableSPAMode" parameter.
     Default: >-
       {
-        "idToken": "Path=/; Secure; SameSite=Lax",
-        "accessToken": "Path=/; Secure; SameSite=Lax",
-        "refreshToken": "Path=/; Secure; SameSite=Lax",
-        "nonce": "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
+        "idToken": null // e.g. "Path=/; Secure; SameSite=Lax",
+        "accessToken": null // e.g. "Path=/; Secure; SameSite=Lax",
+        "refreshToken": null // e.g. "Path=/; Secure; SameSite=Lax",
+        "nonce": null // e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
       }
   OAuthScopes:
     Type: String
@@ -93,6 +93,9 @@ Parameters:
     Type: String
     Description: Set to 'false' to skip the creation of a CloudFront distribution and associated resources, such as the private S3 bucket and the sample React app. This may be of use to you, if you just want to create the Lambda@Edge functions to use with your own CloudFront distribution.
     Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
   Version:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
@@ -100,14 +103,16 @@ Parameters:
 
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
-  CreateCloudFrontDistribution: !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
-  StaticSiteMode: !Equals [ !Ref EnableSPAMode, 'false']
+  CreateCloudFrontDistribution:
+    !Equals [!Ref CreateCloudFrontDistribution, "true"]
+  SPAMode: !Equals [!Ref EnableSPAMode, "true"]
+  StaticSiteMode: !Equals [!Ref EnableSPAMode, "false"]
   CreateCloudFrontDistributionStaticSiteMode: !And
-    - !Equals [!Ref EnableSPAMode, 'false' ]
-    - !Not [!Equals [!Ref CreateCloudFrontDistribution, "false"]]
+    - !Equals [!Ref EnableSPAMode, "false"]
+    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
   CreateCloudFrontDistributionSpaMode: !And
-    - !Equals [ !Ref EnableSPAMode, 'true' ]
-    - !Not [!Equals [ !Ref CreateCloudFrontDistribution, "false"]]
+    - !Equals [!Ref EnableSPAMode, "true"]
+    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
 
 Globals:
   Function:
@@ -125,7 +130,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -134,7 +139,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -143,7 +148,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -152,7 +157,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -161,7 +166,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -231,19 +236,18 @@ Resources:
           - DomainName: !Sub "${S3Bucket}.s3.amazonaws.com"
             Id: protected-bucket
             S3OriginConfig:
-              OriginAccessIdentity:
-                !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
           - DomainName: example.org
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
         CustomErrorResponses:
           - !If
-            - StaticSiteMode
-            - !Ref AWS::NoValue
+            - SPAMode # In SPA mode, 404's from S3 should return index.html, to enable SPA routing
             - ErrorCode: 404
               ResponseCode: 200
               ResponsePagePath: /index.html
+            - !Ref AWS::NoValue
 
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
@@ -309,7 +313,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -329,7 +333,11 @@ Resources:
       UserPoolId: !Ref UserPool
       UserPoolClientId: !Ref UserPoolClient
       CloudFrontDistributionDomainName:
-        !If [ CreateCloudFrontDistribution, !GetAtt CloudFrontDistribution.DomainName, "" ]
+        !If [
+          CreateCloudFrontDistribution,
+          !GetAtt CloudFrontDistribution.DomainName,
+          "",
+        ]
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
       AlternateDomainNames: !Ref AlternateDomainNames
@@ -340,7 +348,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -351,6 +359,7 @@ Resources:
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval
+    Condition: StaticSiteMode
     Properties:
       ServiceToken: !GetAtt ClientSecretRetrievalHandler.Arn
       UserPoolId: !Ref UserPool
@@ -358,10 +367,11 @@ Resources:
 
   ClientSecretRetrievalHandler:
     Type: AWS::Serverless::Function
+    Condition: StaticSiteMode
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -383,7 +393,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -422,7 +432,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -447,19 +457,32 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt ParseAuthHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration:
+        Fn::Sub:
+          - >
+            {
+              "userPoolId": "${UserPool}",
+              "clientId": "${UserPoolClient}",
+              "clientSecret": "${ClientSecret}",
+              "oauthScopes": ${OAuthScopes},
+              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "redirectPathSignIn": "${RedirectPathSignIn}",
+              "redirectPathSignOut": "${RedirectPathSignOut}",
+              "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+              "cookieSettings": ${CookieSettings},
+              "mode": "${Mode}",
+              "httpHeaders": ${HttpHeaders}
+            }
+          - Mode:
+              !If
+                - SPAMode
+                - "spaMode"
+                - "staticSiteMode"
+            ClientSecret:
+              !If
+                - StaticSiteMode
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - ""
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -467,19 +490,32 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt CheckAuthHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration:
+        Fn::Sub:
+          - >
+            {
+              "userPoolId": "${UserPool}",
+              "clientId": "${UserPoolClient}",
+              "clientSecret": "${ClientSecret}",
+              "oauthScopes": ${OAuthScopes},
+              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "redirectPathSignIn": "${RedirectPathSignIn}",
+              "redirectPathSignOut": "${RedirectPathSignOut}",
+              "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+              "cookieSettings": ${CookieSettings},
+              "mode": "${Mode}",
+              "httpHeaders": ${HttpHeaders}
+            }
+          - Mode:
+              !If
+                - SPAMode
+                - "spaMode"
+                - "staticSiteMode"
+            ClientSecret:
+              !If
+                - StaticSiteMode
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - ""
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -495,19 +531,32 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt RefreshAuthHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration:
+        Fn::Sub:
+          - >
+            {
+              "userPoolId": "${UserPool}",
+              "clientId": "${UserPoolClient}",
+              "clientSecret": "${ClientSecret}",
+              "oauthScopes": ${OAuthScopes},
+              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "redirectPathSignIn": "${RedirectPathSignIn}",
+              "redirectPathSignOut": "${RedirectPathSignOut}",
+              "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+              "cookieSettings": ${CookieSettings},
+              "mode": "${Mode}",
+              "httpHeaders": ${HttpHeaders}
+            }
+          - Mode:
+              !If
+                - SPAMode
+                - "spaMode"
+                - "staticSiteMode"
+            ClientSecret:
+              !If
+                - StaticSiteMode
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - ""
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -515,26 +564,39 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt SignOutHandler.Arn
       Version: !Ref Version
-      Configuration: !Sub >
-        {
-          "userPoolId": "${UserPool}",
-          "clientId": "${UserPoolClient}",
-          "clientSecret": "${ClientSecretRetrieval.ClientSecret}",
-          "oauthScopes": ${OAuthScopes},
-          "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
-          "redirectPathSignIn": "${RedirectPathSignIn}",
-          "redirectPathSignOut": "${RedirectPathSignOut}",
-          "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
-          "cookieSettings": ${CookieSettings},
-          "httpHeaders": ${HttpHeaders}
-        }
+      Configuration:
+        Fn::Sub:
+          - >
+            {
+              "userPoolId": "${UserPool}",
+              "clientId": "${UserPoolClient}",
+              "clientSecret": "${ClientSecret}",
+              "oauthScopes": ${OAuthScopes},
+              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "redirectPathSignIn": "${RedirectPathSignIn}",
+              "redirectPathSignOut": "${RedirectPathSignOut}",
+              "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
+              "cookieSettings": ${CookieSettings},
+              "mode": "${Mode}",
+              "httpHeaders": ${HttpHeaders}
+            }
+          - Mode:
+              !If
+                - SPAMode
+                - "spaMode"
+                - "staticSiteMode"
+            ClientSecret:
+              !If
+                - StaticSiteMode
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - ""
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -570,6 +632,7 @@ Outputs:
     Value: !Ref UserPoolClient
   ClientSecret:
     Description: The client secret associated with the User Pool Client. This will be empty in SPA mode.
+    Condition: StaticSiteMode
     Value: !GetAtt ClientSecretRetrieval.ClientSecret
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served

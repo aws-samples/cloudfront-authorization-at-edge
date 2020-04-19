@@ -14,9 +14,26 @@ export interface CookieSettings {
     nonce: string;
 }
 
+export const DEFAULT_COOKIE_SETTINGS: { [key: string]: CookieSettings } = {
+    spaMode: {
+        idToken: "Path=/; Secure; SameSite=Lax",
+        accessToken: "Path=/; Secure; SameSite=Lax",
+        refreshToken: "Path=/; Secure; SameSite=Lax",
+        nonce: "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
+    },
+    staticSiteMode: {
+        idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+        accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+        refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+        nonce: "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
+    },
+}
+
 export interface HttpHeaders {
     [key: string]: string;
 }
+
+type Mode = 'spaMode' | 'staticSiteMode';
 
 interface ConfigFromDisk {
     userPoolId: string;
@@ -27,6 +44,7 @@ interface ConfigFromDisk {
     redirectPathSignOut: string;
     redirectPathAuthRefresh: string;
     cookieSettings: CookieSettings;
+    mode: Mode,
     httpHeaders: HttpHeaders;
     clientSecret: string;
 }
@@ -125,24 +143,26 @@ export function decodeToken(jwt: string) {
     return JSON.parse(Buffer.from(decodableTokenBody, 'base64').toString());
 }
 
-export function getCookieHeaders(
+export function getCookieHeaders(param: {
     clientId: string,
     oauthScopes: string[],
     tokens: { id_token: string, access_token: string, refresh_token?: string },
     domainName: string,
-    cookieSettings: CookieSettings,
-    expireAllTokens = false,
+    explicitCookieSettings: CookieSettings,
+    mode: Mode,
+    expireAllTokens?: boolean,
+}
 ) {
     // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
-    const decodedIdToken = decodeToken(tokens.id_token);
+    const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
-    const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`;
+    const keyPrefix = `CognitoIdentityServiceProvider.${param.clientId}`;
     const idTokenKey = `${keyPrefix}.${tokenUserName}.idToken`;
     const accessTokenKey = `${keyPrefix}.${tokenUserName}.accessToken`;
     const refreshTokenKey = `${keyPrefix}.${tokenUserName}.refreshToken`;
     const lastUserKey = `${keyPrefix}.LastAuthUser`;
     const scopeKey = `${keyPrefix}.${tokenUserName}.tokenScopesString`;
-    const scopesString = oauthScopes.join(' ');
+    const scopesString = param.oauthScopes.join(' ');
     const userDataKey = `${keyPrefix}.${tokenUserName}.userData`;
     const userData = JSON.stringify({
         UserAttributes: [
@@ -158,20 +178,24 @@ export function getCookieHeaders(
         Username: tokenUserName
     });
 
+    const cookieSettings = Object.fromEntries(
+        Object.entries(param.explicitCookieSettings).map(([k, v]) => [k, v || DEFAULT_COOKIE_SETTINGS[param.mode][k as keyof CookieSettings]])
+    ) as CookieSettings;
+
     const cookies = {
-        [idTokenKey]: `${tokens.id_token}; ${withCookieDomain(domainName, cookieSettings.idToken)}`,
-        [accessTokenKey]: `${tokens.access_token}; ${withCookieDomain(domainName, cookieSettings.accessToken)}`,
-        [refreshTokenKey]: `${tokens.refresh_token}; ${withCookieDomain(domainName, cookieSettings.refreshToken)}`,
-        [lastUserKey]: `${tokenUserName}; ${withCookieDomain(domainName, cookieSettings.idToken)}`,
-        [scopeKey]: `${scopesString}; ${withCookieDomain(domainName, cookieSettings.accessToken)}`,
-        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(domainName, cookieSettings.idToken)}`,
-        'amplify-signin-with-hostedUI': `true; ${withCookieDomain(domainName, cookieSettings.accessToken)}`,
+        [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
+        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
+        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, cookieSettings.refreshToken)}`,
+        [lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
+        [scopeKey]: `${scopesString}; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
+        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
+        'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
     };
 
     // Expire cookies if needed
-    if (expireAllTokens) {
+    if (param.expireAllTokens) {
         Object.keys(cookies).forEach(key => cookies[key] = expireCookie(cookies[key]));
-    } else if (!tokens.refresh_token) {
+    } else if (!param.tokens.refresh_token) {
         cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
     }
 

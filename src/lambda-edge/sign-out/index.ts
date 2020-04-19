@@ -5,7 +5,7 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, cloudFrontHeaders, redirectPathSignOut } = getConfig();
+const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, mode, cloudFrontHeaders, redirectPathSignOut } = getConfig();
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
@@ -35,7 +35,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 key: 'location',
                 value: `https://${cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
             }],
-            'set-cookie': getCookieHeaders(clientId, oauthScopes, tokens, domainName, cookieSettings, true),
+            'set-cookie': getCookieHeaders({
+                clientId, oauthScopes, tokens, domainName, explicitCookieSettings: cookieSettings, mode, expireAllTokens: true
+            }),
             ...cloudFrontHeaders,
         }
     };

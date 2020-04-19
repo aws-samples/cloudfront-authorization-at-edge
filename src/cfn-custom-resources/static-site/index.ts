@@ -8,7 +8,7 @@ import {
     CloudFormationCustomResourceUpdateEvent
 } from 'aws-lambda';
 import axios from 'axios';
-import s3SpaUpload from 's3-spa-upload';
+import staticSiteUpload from 's3-spa-upload';
 import { mkdirSync } from 'fs';
 
 
@@ -17,13 +17,13 @@ interface Configuration {
 }
 
 
-async function uploadApp(action: 'Create' | 'Update' | 'Delete', config: Configuration, physicalResourceId?: string) {
+async function uploadPages(action: 'Create' | 'Update' | 'Delete', config: Configuration, physicalResourceId?: string) {
     if (action === 'Create' || action === 'Update') {
-        await s3SpaUpload(`${__dirname}/app`, config.BucketName);
+        await staticSiteUpload(`${__dirname}/pages`, config.BucketName);
     } else {
         // "Trick" to empty the bucket is to upload an empty dir
         mkdirSync('/tmp/empty_directory', { recursive: true });
-        await s3SpaUpload('/tmp/empty_directory', config.BucketName, { delete: true });
+        await staticSiteUpload('/tmp/empty_directory', config.BucketName, { delete: true });
     }
     return physicalResourceId || "StaticSite";
 }
@@ -47,7 +47,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event, contex
     let response: CloudFormationCustomResourceResponse;
     try {
         const physicalResourceId = await Promise.race([
-            uploadApp(RequestType, config as Configuration, PhysicalResourceId),
+            uploadPages(RequestType, config as Configuration, PhysicalResourceId),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Task timeout')), context.getRemainingTimeInMillis() - 500))
         ]);
         response = {

@@ -5,7 +5,7 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, cloudFrontHeaders, clientSecret } = getConfig();
+const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, mode, cloudFrontHeaders, clientSecret } = getConfig();
 
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -22,7 +22,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
         let headers: { 'Content-Type': string, Authorization?: string } = { 'Content-Type': 'application/x-www-form-urlencoded' }
 
-        if(clientSecret !== '') {
+        if (clientSecret !== '') {
             const encodedSecret = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
             headers['Authorization'] = `Basic ${encodedSecret}`
         }
@@ -48,7 +48,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     key: 'location',
                     value: redirectedFromUri,
                 }],
-                'set-cookie': getCookieHeaders(clientId, oauthScopes, tokens, domainName, cookieSettings),
+                'set-cookie': getCookieHeaders({
+                    clientId, oauthScopes, tokens, domainName, explicitCookieSettings: cookieSettings, mode
+                }),
                 ...cloudFrontHeaders,
             }
         };
@@ -73,7 +75,7 @@ function validateRefreshRequest(currentNonce?: string | string[], originalNonce?
     } else if (currentNonce !== originalNonce) {
         throw new Error('Nonce mismatch');
     }
-    Object.entries({ idToken, accessToken, refreshToken}).forEach(([tokenType, token]) => {
+    Object.entries({ idToken, accessToken, refreshToken }).forEach(([tokenType, token]) => {
         if (!token) {
             throw new Error(`Missing ${tokenType}`);
         }

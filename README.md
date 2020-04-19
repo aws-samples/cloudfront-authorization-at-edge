@@ -68,8 +68,6 @@ NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, z
 
 Providing an email address (as above in step 6) is optional. If you provide it, a user will be created in the Cognito User Pool that you can sign-in with.
 
-Additionally, adding a `--parameter-overrides` value of `EnableSPAMode="false"` will omit the launch of the single page React application and instead will launch a bare bones non-spa site.
-
 ### Option 3: Deploy by including the Serverless Application in your own CloudFormation template
 
 See [./example-serverless-app-reuse](./example-serverless-app-reuse)
@@ -94,6 +92,19 @@ If your users aren't near us-east-1 (North Virgina) and low latency is important
 - a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users
 
 NOTE: Even if your users aren't near us-east-1, latency might not bother them too much: latency will only be perceived by users when they open the Cognito Hosted UI to sign in, and when Lambda@Edge fetches the JWKS from the Cognito User Pool to validate JWTs. The JWKS is cached by the Lambda@Edge function, so as long as the Lambda@Edge function stays warm the JWKS won't need to be fetched again.
+
+## SPA mode or Static Site mode?
+
+The default deployment mode of this sample application is "SPA mode" - which entails some settings that make the deployment suitable for hosting a SPA such as a React/Angular/Vue app:
+
+- The User Pool client does not use a client secret, as that would not make sense for JavaScript running in the browser
+- The cookies with JWT's are not "http only", so that they can be read and used by the SPA (e.g. to display the user name, or to refresh tokens)
+
+If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. To that end, upon deploying, set parameter "EnableSPAMode" to false (--parameter-overrides EnableSPAMode="false"). This will:
+
+- Enforce use of a client secret
+- Set cookies to be http only by default (unless you've provided other cookie settings explicitly)
+- Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
 
 ## Contributing to this repo
 

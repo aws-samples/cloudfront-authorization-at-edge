@@ -25,7 +25,7 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
 - [react-app](src/cfn-custom-resources/react-app): A sample React app that is protected by the solution. It uses AWS Amplify Framework to read the JWT's from cookies. The directory also contains a Lambda function that implements a CloudFormation custom resource to build the React app and upload it to S3
-- [static-site](src/cfn-custom-resources/static-site): A sample static site (see [SPA mode or Static Site mode?](#spa-mode-or-static-site-mode) that is protected by the solution. The directory also contains a Lambda function that implements a CloudFormation custom resource to upload the static site to S3
+- [static-site](src/cfn-custom-resources/static-site): A sample static site (see [SPA mode or Static Site mode?](#spa-mode-or-static-site-mode)) that is protected by the solution. The directory also contains a Lambda function that implements a CloudFormation custom resource to upload the static site to S3
 - [user-pool-client](src/cfn-custom-resources/user-pool-client): Lambda function that implements a CloudFormation custom resource to update the User Pool client with OAuth config
 - [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to update the User Pool with a domain for the hosted UI
 - [lambda-code-update](src/cfn-custom-resources/lambda-code-update): Lambda function that implements a CloudFormation custom resource to inject configuration into the lambda@Edge functions and publish versions

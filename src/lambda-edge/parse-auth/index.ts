@@ -28,7 +28,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
         if (clientSecret) {
             const encodedSecret = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-            headers['Authorization'] = `Basic ${encodedSecret}`
+            headers.Authorization = `Basic ${encodedSecret}`;
         }
 
         const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers });

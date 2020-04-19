@@ -14,7 +14,7 @@ export interface CookieSettings {
     nonce: string;
 }
 
-export const DEFAULT_COOKIE_SETTINGS: { [key: string]: CookieSettings } = {
+export const defaultCookieSettings: { [key: string]: CookieSettings } = {
     spaMode: {
         idToken: "Path=/; Secure; SameSite=Lax",
         accessToken: "Path=/; Secure; SameSite=Lax",
@@ -179,7 +179,7 @@ export function getCookieHeaders(param: {
     });
 
     const cookieSettings = Object.fromEntries(
-        Object.entries(param.explicitCookieSettings).map(([k, v]) => [k, v || DEFAULT_COOKIE_SETTINGS[param.mode][k as keyof CookieSettings]])
+        Object.entries(param.explicitCookieSettings).map(([k, v]) => [k, v || defaultCookieSettings[param.mode][k as keyof CookieSettings]])
     ) as CookieSettings;
 
     const cookies = {

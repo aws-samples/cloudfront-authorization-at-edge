@@ -57,13 +57,13 @@ Parameters:
     Default: ""
   CookieSettings:
     Type: String
-    Description: The settings for the cookies holding the JWT's. To be provided as a JSON object. If left to null, a default setting is used that should be suitable given the value of "EnableSPAMode" parameter.
+    Description: The settings for the cookies holding e.g. the JWT's. To be provided as a JSON object, mapping cookie type to setting. Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax". If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
     Default: >-
       {
-        "idToken": null // e.g. "Path=/; Secure; SameSite=Lax",
-        "accessToken": null // e.g. "Path=/; Secure; SameSite=Lax",
-        "refreshToken": null // e.g. "Path=/; Secure; SameSite=Lax",
-        "nonce": null // e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
+        "idToken": null,
+        "accessToken": null,
+        "refreshToken": null,
+        "nonce": null
       }
   OAuthScopes:
     Type: String

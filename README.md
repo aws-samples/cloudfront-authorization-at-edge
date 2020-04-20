@@ -100,12 +100,14 @@ The default deployment mode of this sample application is "SPA mode" - which ent
 
 - The User Pool client does not use a client secret, as that would not make sense for JavaScript running in the browser
 - The cookies with JWT's are not "http only", so that they can be read and used by the SPA (e.g. to display the user name, or to refresh tokens)
+- 404's (page not found on S3) will return index.html, to enable SPA-routing
 
-If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. To that end, upon deploying, set parameter "EnableSPAMode" to false (--parameter-overrides EnableSPAMode="false"). This will:
+If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. Also, SPA routing is not needed then. To this end, upon deploying, set parameter "EnableSPAMode" to false (--parameter-overrides EnableSPAMode="false"). This will:
 
 - Enforce use of a client secret
 - Set cookies to be http only by default (unless you've provided other cookie settings explicitly)
 - Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
+- Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
 
 ## Contributing to this repo
 

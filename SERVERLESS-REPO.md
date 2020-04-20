@@ -6,7 +6,7 @@ In that blog post a solution is explained, that puts Cognito authentication in f
 
 This application is an implementation of that solution. If you deploy it, this is what you get:
 
-- Private S3 bucket pre-populated with a sample React or bare bones non Single Page application. You can replace that sample app with your own Single Page Application (React, Anugular, Vue) or any other static content you want authenticated users to be able to download.
+- Private S3 bucket pre-populated with a sample React app (or static site if you turn SPA mode off). You can replace that sample app with your own Single Page Application (React, Anugular, Vue) or any other static content you want authenticated users to be able to download.
 - CloudFront distribution that serves the contents of the S3 bucket
 - Cognito User Pool with hosted UI set up
 - Lambda@Edge functions that make sure only authenticated users can access your S3 content through CloudFront. Redirect to Cognito Hosted UI to sign-in if necessary.

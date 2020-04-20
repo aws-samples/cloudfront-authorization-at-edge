@@ -5,7 +5,7 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from './validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe } from '../shared/shared';
+import { getConfig, extractAndParseCookies, decodeToken, urlSafe, defaultCookieSettings } from '../shared/shared';
 
 // Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
 const SECRET_ALLOWED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -13,7 +13,9 @@ const PKCE_LENGTH = 43; // Should be between 43 and 128 - per spec
 const NONCE_LENGTH = 16; // how many characters should your nonces be?
 
 const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, redirectPathAuthRefresh,
-    tokenIssuer, tokenJwksUri, cookieSettings, cloudFrontHeaders } = getConfig();
+    tokenIssuer, tokenJwksUri, cookieSettings, mode, cloudFrontHeaders } = getConfig();
+
+const COOKIE_SETTING = cookieSettings.nonce || defaultCookieSettings[mode].nonce;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
@@ -27,7 +29,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         }
         // If the token has (nearly) expired and there is a refreshToken: refresh tokens
         const { exp } = decodeToken(idToken);
-        if ((Date.now() / 1000) - 60 > exp && refreshToken) {
+        if ((Date.now() / 1000) - (60 * 5) > exp && refreshToken) {
             return {
                 status: '307',
                 statusDescription: 'Temporary Redirect',
@@ -37,7 +39,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                         value: `https://${domainName}${redirectPathAuthRefresh}?${stringifyQueryString({ requestedUri, nonce })}`
                     }],
                     'set-cookie': [
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${COOKIE_SETTING}` },
                     ],
                     ...cloudFrontHeaders,
                 }
@@ -70,8 +72,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     value: `https://${cognitoAuthDomain}/oauth2/authorize?${loginQueryString}`
                 }],
                 'set-cookie': [
-                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${cookieSettings.nonce}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(pkce)}; ${cookieSettings.nonce}` }
+                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${COOKIE_SETTING}` },
+                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(pkce)}; ${COOKIE_SETTING}` }
                 ],
                 ...cloudFrontHeaders,
             }

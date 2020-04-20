@@ -25,6 +25,7 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
 - [react-app](src/cfn-custom-resources/react-app): A sample React app that is protected by the solution. It uses AWS Amplify Framework to read the JWT's from cookies. The directory also contains a Lambda function that implements a CloudFormation custom resource to build the React app and upload it to S3
+- [static-site](src/cfn-custom-resources/static-site): A sample static site (see [SPA mode or Static Site mode?](#spa-mode-or-static-site-mode)) that is protected by the solution. The directory also contains a Lambda function that implements a CloudFormation custom resource to upload the static site to S3
 - [user-pool-client](src/cfn-custom-resources/user-pool-client): Lambda function that implements a CloudFormation custom resource to update the User Pool client with OAuth config
 - [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to update the User Pool with a domain for the hosted UI
 - [lambda-code-update](src/cfn-custom-resources/lambda-code-update): Lambda function that implements a CloudFormation custom resource to inject configuration into the lambda@Edge functions and publish versions
@@ -89,9 +90,24 @@ This solution also contains an Amazon Cognito User Pool and S3 bucket, that shou
 If your users aren't near us-east-1 (North Virgina) and low latency is important enough to you, you can split [this solution's SAM template](./template.yaml) into two separate templates:
 
 - a template with CloudFront and Lambda@Edge resources, that you deploy to us-east-1
-- a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users 
+- a template with the Amazon Cognito User Pool and S3 bucket, that you deploy to a region closer to your users
 
 NOTE: Even if your users aren't near us-east-1, latency might not bother them too much: latency will only be perceived by users when they open the Cognito Hosted UI to sign in, and when Lambda@Edge fetches the JWKS from the Cognito User Pool to validate JWTs. The JWKS is cached by the Lambda@Edge function, so as long as the Lambda@Edge function stays warm the JWKS won't need to be fetched again.
+
+## SPA mode or Static Site mode?
+
+The default deployment mode of this sample application is "SPA mode" - which entails some settings that make the deployment suitable for hosting a SPA such as a React/Angular/Vue app:
+
+- The User Pool client does not use a client secret, as that would not make sense for JavaScript running in the browser
+- The cookies with JWT's are not "http only", so that they can be read and used by the SPA (e.g. to display the user name, or to refresh tokens)
+- 404's (page not found on S3) will return index.html, to enable SPA-routing
+
+If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. Also, SPA routing is not needed then. To this end, upon deploying, set parameter "EnableSPAMode" to false (--parameter-overrides EnableSPAMode="false"). This will:
+
+- Enforce use of a client secret
+- Set cookies to be http only by default (unless you've provided other cookie settings explicitly)
+- Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
+- Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
 
 ## Contributing to this repo
 

@@ -73,6 +73,15 @@ Providing an email address (as above in step 6) is optional. If you provide it, 
 
 See [./example-serverless-app-reuse](./example-serverless-app-reuse)
 
+### Option 4: Deploy as is, then test a custom application
+You may want to see how your existing application works with the authentication framework before investing the effort to integrate or automate.  One approach involves creating a full deploy from one of the deploy options above, then dropping your application into the bucket that's created.  There are a few points to be aware of:
+
+- If you want your application to load by default instead of the sample REACT single page app (SPA), you'll need to rename the sample REACT's `index.html` and ensure your SPA entry page is named `index.html`.  The renamed sample REACT's page will still work when specifically addressed in a URL.
+- It's also fine to let your SPA have its own page name, but you'll need to remember to test with its actual URL, e.g. if you drop your SPA entry page into the bucket as `myapp.html` your test URL will look like `https://SOMECLOUDFRONTURLSTRING.cloudfront.net/myapp.html`
+- Make sure none of your SPA filenames collide with the REACT app.  Alternately just remove the REACT app first -- but sometimes it's nice to keep it in place to validate that authentication is generally working.
+
+You may find that your application does not render properly -- the default Content Security Policy (CSP) in the CloudFormation parameter may be the issue.  As a quick test you can either remove the `"Content-Security-Policy":"..."` parameter from the CloudFormation's HttpHeaders parameter, or substitute your own. Leave the other headers in the parameter alone unless you have a good reason. 
+
 ## I already have a CloudFront distribution, I just want to add auth
 
 Deploy the solution (e.g. from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge)) while setting parameter `CreateCloudFrontDistribution` to `false`. This way, only the Lambda@Edge functions will de deployed in your account, including a User Pool and Client. Then you can wire those Lambda@Edge functions up into your own CloudFront distribution. Create a behavior for all path patterns (root, RedirectPathSignIn, RedirectPathSignOut, RedirectPathAuthRefresh, SignOutUrl) and configure the corresponding Lambda@Edge function in each behavior.

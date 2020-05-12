@@ -4,15 +4,67 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Example stack that shows how to reuse only the auth portion of the serverless application
-  in your own CloudFront distribution. Note that after deployment, you should manually update the
-  User Pool client, and point the Callback URL and Sign out URL at the CloudFront distribution. To work
-  around this circular dependency, you can also add an alternate domain name to the CloudFront distribution,
-  and provide that as parameter to the serverless stack. Then the User Pool client will be set to the right
-  Callback URL and Sign out URL automatically.
+  Example stack to that reuses the auth portion of the serverless application
+  in your own CloudFront distribution. 
+
+  After deployment, manually update the User Pool client to point the 'Callback URL' and 'Sign out URL' to the 
+  URL of the CloudFront distribution. 
+  
+  Alternately, add an alternate domain name to the CloudFront distribution and provide the name as parameter to the 
+  serverless stack. The alternate domain will also require adding a certificate to the Cloudfront Distribution.  
+  This alternative will set  the User Pool client to the right Callback URL and Sign out URL automatically.
+
+  The sample CloudFront distribution illustrates a full pattern of use -- modify it as needed.
+
+  The HttpHeaders parameter and corresponding reference in the 'LambdaEdgeProtection' nested application Resource
+  illustrates how to pass information to the underlying SAM app
+
+  Outputs illustrate retrieving values from the underlying SAM application
+
+Parameters: 
+  BucketNameParameter: 
+    Type: String
+    Description: A legal bucket name.  Must not exist.
+
+  HttpHeaders:
+    Type: String
+    Description: The HTTP headers to set on all responses from CloudFront. To be provided as a JSON object
+    Default: >-
+      {
+        "Content-Security-Policy": "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
+        "Referrer-Policy": "same-origin",
+        "X-XSS-Protection": "1; mode=block",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      }
 
 Resources:
-
+  ApplicationBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: 
+        Ref: BucketNameParameter
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub '${BucketNameParameter}-OAI'
+  S3AccessPolicyForOAI:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket:
+        Ref: ApplicationBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser:
+                Fn::GetAtt: [ CloudFrontOriginAccessIdentity , S3CanonicalUserId ]
+            Action: "s3:GetObject"
+            Resource: !Sub "${ApplicationBucket.Arn}/*"
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -64,10 +116,19 @@ Resources:
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
-          - DomainName: change.this.to.your.origin
+          - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"
             Id: protected-origin
-            CustomOriginConfig:
-              OriginProtocolPolicy: match-viewer
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+        CustomErrorResponses:
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+        PriceClass: PriceClass_100
+        DefaultRootObject: index.html
 
   LambdaEdgeProtection:
     Type: AWS::Serverless::Application
@@ -77,4 +138,9 @@ Resources:
         SemanticVersion: 1.1.0
       Parameters:
         CreateCloudFrontDistribution: "false"
+        HttpHeaders: !Ref HttpHeaders
         # AlternateDomainNames: <your alternate domain names, this will be the same list as the aliases of your CloudFront distribution above>
+Outputs:
+  UserPoolId:
+    Description: The user pool id to illustrate how to retrieve outputs from the SAM app
+    Value: !GetAtt LambdaEdgeProtection.Outputs.UserPoolId

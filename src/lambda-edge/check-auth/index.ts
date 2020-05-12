@@ -27,9 +27,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         if (!tokenUserName || !idToken) {
             throw new Error('No valid credentials present in cookies');
         }
-        // If the token has (nearly) expired and there is a refreshToken: refresh tokens
+        // If the token has expired or expires in less than 5 minutes and there is a refreshToken: refresh tokens
         const { exp } = decodeToken(idToken);
-        if ((Date.now() / 1000) - (60 * 5) > exp && refreshToken) {
+        if ((Date.now() / 1000) > exp - (60 * 5) && refreshToken) {
             return {
                 status: '307',
                 statusDescription: 'Temporary Redirect',

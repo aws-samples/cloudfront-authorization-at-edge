@@ -19,13 +19,13 @@ export const defaultCookieSettings: { [key: string]: CookieSettings } = {
         idToken: "Path=/; Secure; SameSite=Lax",
         accessToken: "Path=/; Secure; SameSite=Lax",
         refreshToken: "Path=/; Secure; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
+        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
     },
     staticSiteMode: {
         idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
         accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
         refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax"
+        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
     },
 }
 
@@ -47,6 +47,7 @@ interface ConfigFromDisk {
     mode: Mode,
     httpHeaders: HttpHeaders;
     clientSecret: string;
+    nonceSigningSecret: string;
 }
 
 
@@ -133,6 +134,7 @@ export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: str
         refreshToken,
         scopes,
         nonce: cookies['spa-auth-edge-nonce'],
+        nonceHmac: cookies['spa-auth-edge-nonce-hmac'],
         pkce: cookies['spa-auth-edge-pkce'],
     }
 }
@@ -199,6 +201,11 @@ export function getCookieHeaders(param: {
         cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
     }
 
+    // Always expire nonce, nonceHmac and pkce
+    ['spa-auth-edge-nonce', 'spa-auth-edge-nonce-hmac', 'spa-auth-edge-pkce'].forEach(key => {
+        cookies[key] = expireCookie(cookies[key]);
+    });
+
     // Return object in format of CloudFront headers
     return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
@@ -260,6 +267,7 @@ export const urlSafe = {
         Functions to translate base64-encoded strings, so they can be used:
         - in URL's without needing additional encoding
         - in OAuth2 PKCE verifier
+        - in cookies
 
         stringify:
             use this on a base64-encoded string to translate = + / into replacement characters

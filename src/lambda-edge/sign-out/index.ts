@@ -5,26 +5,26 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, mode, cloudFrontHeaders, redirectPathSignOut } = getConfig();
+const CONFIG = getConfig();
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
-    const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, clientId);
+    const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, CONFIG.clientId);
 
     if (!idToken) {
         return {
             body: 'Bad Request',
             status: '400',
             statusDescription: 'Bad Request',
-            headers: cloudFrontHeaders,
+            headers: CONFIG.cloudFrontHeaders,
         };
     }
 
     let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken };
     const qs = {
-        logout_uri: `https://${domainName}${redirectPathSignOut}`,
-        client_id: clientId,
+        logout_uri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
+        client_id: CONFIG.clientId,
     };
 
     return {
@@ -33,12 +33,12 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         headers: {
             'location': [{
                 key: 'location',
-                value: `https://${cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
+                value: `https://${CONFIG.cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
             }],
             'set-cookie': getCookieHeaders({
-                clientId, oauthScopes, tokens, domainName, explicitCookieSettings: cookieSettings, mode, expireAllTokens: true
+                tokens, domainName, explicitCookieSettings: CONFIG.cookieSettings, expireAllTokens: true, ...CONFIG
             }),
-            ...cloudFrontHeaders,
+            ...CONFIG.cloudFrontHeaders,
         }
     };
 }

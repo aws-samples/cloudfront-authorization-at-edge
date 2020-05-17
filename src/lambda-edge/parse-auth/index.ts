@@ -5,7 +5,7 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler, CloudFrontRequest } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, cookieSettings, mode, cloudFrontHeaders, clientSecret } = getConfig();
+const CONFIG = getConfig();
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
@@ -18,20 +18,20 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
         const body = stringifyQueryString({
             grant_type: 'authorization_code',
-            client_id: clientId,
-            redirect_uri: `https://${domainName}${redirectPathSignIn}`,
+            client_id: CONFIG.clientId,
+            redirect_uri: `https://${domainName}${CONFIG.redirectPathSignIn}`,
             code,
             code_verifier: pkce
         });
 
         const headers: { 'Content-Type': string, Authorization?: string } = { 'Content-Type': 'application/x-www-form-urlencoded' }
 
-        if (clientSecret) {
-            const encodedSecret = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+        if (CONFIG.clientSecret) {
+            const encodedSecret = Buffer.from(`${CONFIG.clientId}:${CONFIG.clientSecret}`).toString('base64');
             headers.Authorization = `Basic ${encodedSecret}`;
         }
 
-        const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers });
+        const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers });
         return {
             status: '307',
             statusDescription: 'Temporary Redirect',
@@ -41,9 +41,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     value: redirectedFromUri,
                 }],
                 'set-cookie': getCookieHeaders({
-                    clientId, oauthScopes, tokens: res.data, domainName, explicitCookieSettings: cookieSettings, mode
+                    tokens: res.data, domainName, explicitCookieSettings: CONFIG.cookieSettings, ...CONFIG
                 }),
-                ...cloudFrontHeaders,
+                ...CONFIG.cloudFrontHeaders,
             }
         };
     } catch (err) {
@@ -51,7 +51,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             body: createErrorHtml('Bad Request', err.toString(), redirectedFromUri),
             status: '400',
             headers: {
-                ...cloudFrontHeaders,
+                ...CONFIG.cloudFrontHeaders,
                 'content-type': [{
                     key: 'Content-Type',
                     value: 'text/html; charset=UTF-8',
@@ -81,7 +81,7 @@ function validateQueryStringAndCookies(request: CloudFrontRequest) {
     if (!parsedState.requestedUri || !parsedState.nonce) {
         throw new Error('Invalid query string. Your query string does not include a valid "state" parameter');
     }
-    const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, clientId);
+    const { nonce: originalNonce, pkce } = extractAndParseCookies(request.headers, CONFIG.clientId);
     if (!parsedState.nonce || !originalNonce || parsedState.nonce !== originalNonce) {
         if (!originalNonce) {
             throw new Error('Your browser didn\'t send the nonce cookie along, but it is required for security (prevent CSRF).');

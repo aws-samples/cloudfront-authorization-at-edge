@@ -12,25 +12,30 @@ import Lambda from 'aws-sdk/clients/lambda';
 import Zip from 'adm-zip';
 import { writeFileSync, mkdtempSync } from 'fs'
 import { resolve } from 'path';
+import { randomBytes } from 'crypto';
 
 const LAMBDA_CLIENT = new Lambda({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
 
-async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFunction: string, configuration: string, physicalResourceId?: string) {
+async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFunction: string, stringifiedConfig: string, physicalResourceId?: string) {
     if (action === 'Delete') {
         // Deletes aren't executed; the Lambda Resource should just be deleted
         return { physicalResourceId: physicalResourceId!, Data: {} };
     }
-    console.log(`Adding configuration to Lambda function ${lambdaFunction}:\n${configuration}`);
+    console.log(`Adding configuration to Lambda function ${lambdaFunction}:\n${stringifiedConfig}`);
+
+    // Generate a secret to sign nonces with and add this to the configuration
+    let config = JSON.parse(stringifiedConfig);
+    config.nonceSigningSecret = randomBytes(20).toString('base64');
+    
+    // Fetch and extract Lambda zip contents to temporary folder, add configuration.json, and rezip
     const { Code } = await LAMBDA_CLIENT.getFunction({ FunctionName: lambdaFunction }).promise();
     const { data } = await axios.get(Code!.Location!, { responseType: 'arraybuffer' });
-
-    // Extract Lambda zip contents to temporary folder, add configuration.json, and rezip
     const lambdaZip = new Zip(data);
     console.log('Lambda zip contents:', lambdaZip.getEntries().map(entry => entry.name));
     console.log('Adding (fresh) configuration.json ...');
     const tempDir = mkdtempSync('/tmp/lambda-package');
     lambdaZip.extractAllTo(tempDir, true);
-    writeFileSync(resolve(tempDir, 'configuration.json'), Buffer.from(configuration));
+    writeFileSync(resolve(tempDir, 'configuration.json'), Buffer.from(JSON.stringify(config)));
     const newLambdaZip = new Zip();
     newLambdaZip.addLocalFolder(tempDir);
     console.log('New Lambda zip contents:', newLambdaZip.getEntries().map(entry => entry.name));

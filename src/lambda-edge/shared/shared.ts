@@ -210,7 +210,7 @@ export function getCookieHeaders(param: {
     return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
 
-function expireCookie(cookie: string) {
+function expireCookie(cookie: string = '') {
     const cookieParts = cookie
         .split(';')
         .map(part => part.trim())
@@ -250,15 +250,15 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
 export function createErrorHtml(title: string, message: string, tryAgainHref: string) {
     return `<!DOCTYPE html>
 <html lang="en">
-  <head>
-      <meta charset="utf-8">
-      <title>${title}</title>
-  </head>
-  <body>
-      <h1>${title}</h1>
-      <p><b>ERROR:</b> ${message}</p>
-      <a href="${tryAgainHref}">Try again</a>
-  </body>
+    <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+    </head>
+    <body>
+        <h1>${title}</h1>
+        <p><b>ERROR:</b> ${message}</p>
+        <a href="${tryAgainHref}">Try again</a>
+    </body>
 </html>`;
 }
 

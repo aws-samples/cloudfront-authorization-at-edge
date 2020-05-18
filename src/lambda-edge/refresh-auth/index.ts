@@ -3,7 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
+import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
 const CONFIG = getConfig();
 
@@ -28,6 +28,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         }
 
         let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
+        let cookieHeadersEventType: keyof typeof generateCookieHeaders;
         try {
             const body = stringifyQueryString({
                 grant_type: 'refresh_token',
@@ -37,8 +38,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers });
             tokens.id_token = res.data.id_token;
             tokens.access_token = res.data.access_token;
+            cookieHeadersEventType = 'newTokens';
         } catch (err) {
-            tokens.refresh_token = '';
+            cookieHeadersEventType = 'refreshFailed';
         }
         return {
             status: '307',
@@ -48,8 +50,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     key: 'location',
                     value: redirectedFromUri,
                 }],
-                'set-cookie': getCookieHeaders({
-                    tokens, domainName, explicitCookieSettings: CONFIG.cookieSettings, ...CONFIG
+                'set-cookie': generateCookieHeaders[cookieHeadersEventType]({
+                    tokens, domainName, ...CONFIG
                 }),
                 ...CONFIG.cloudFrontHeaders,
             }

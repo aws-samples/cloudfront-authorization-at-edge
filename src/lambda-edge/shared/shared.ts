@@ -145,16 +145,28 @@ export function decodeToken(jwt: string) {
     return JSON.parse(Buffer.from(decodableTokenBody, 'base64').toString());
 }
 
-export function getCookieHeaders(param: {
+interface GenerateCookieHeadersParam {
     clientId: string,
     oauthScopes: string[],
-    tokens: { id_token: string, access_token: string, refresh_token?: string },
     domainName: string,
-    explicitCookieSettings: CookieSettings,
+    cookieSettings: CookieSettings,
     mode: Mode,
-    expireAllTokens?: boolean,
+    tokens: {
+        id_token: string;
+        access_token: string;
+        refresh_token: string;
+    }
 }
-) {
+
+
+export const generateCookieHeaders = {
+    newTokens: (param: GenerateCookieHeadersParam) => _generateCookieHeaders({ ...param, event: 'newTokens' }),
+    signOut: (param: GenerateCookieHeadersParam) => _generateCookieHeaders({ ...param, event: 'signOut' }),
+    refreshFailed: (param: GenerateCookieHeadersParam) => _generateCookieHeaders({ ...param, event: 'refreshFailed' }),
+};
+
+
+function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'newTokens' | 'signOut' | 'refreshFailed' }) {
     // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
     const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
@@ -180,10 +192,15 @@ export function getCookieHeaders(param: {
         Username: tokenUserName
     });
 
+    // Derive cookie settings by merging the defaults with the explicitly provided values
+    // Default cookies settings depend on the deployment mode (SPA or Static Site)
     const cookieSettings = Object.fromEntries(
-        Object.entries(param.explicitCookieSettings).map(([k, v]) => [k, v || defaultCookieSettings[param.mode][k as keyof CookieSettings]])
+        Object
+            .entries(param.cookieSettings)
+            .map(([k, v]) => [k, v || defaultCookieSettings[param.mode][k as keyof CookieSettings]])
     ) as CookieSettings;
 
+    // Construct object with the cookies
     const cookies = {
         [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
         [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
@@ -194,19 +211,22 @@ export function getCookieHeaders(param: {
         'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
     };
 
-    // Expire cookies if needed
-    if (param.expireAllTokens) {
+    if (param.event === 'signOut') {
+        // Expire all cookies
         Object.keys(cookies).forEach(key => cookies[key] = expireCookie(cookies[key]));
-    } else if (!param.tokens.refresh_token) {
+    } else if (param.event === 'refreshFailed') {
+        // Expire refresh token (so the browser will not send it in vain again)
         cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
     }
 
     // Always expire nonce, nonceHmac and pkce
     ['spa-auth-edge-nonce', 'spa-auth-edge-nonce-hmac', 'spa-auth-edge-pkce'].forEach(key => {
-        cookies[key] = expireCookie(cookies[key]);
+        if (cookies[key]) {
+            cookies[key] = expireCookie(cookies[key]);
+        }
     });
 
-    // Return object in format of CloudFront headers
+    // Return cookie object in format of CloudFront headers
     return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
 
@@ -267,7 +287,7 @@ export const urlSafe = {
         Functions to translate base64-encoded strings, so they can be used:
         - in URL's without needing additional encoding
         - in OAuth2 PKCE verifier
-        - in cookies
+        - in cookies (to be on the safe side, as = + / are in fact valid characters in cookies)
 
         stringify:
             use this on a base64-encoded string to translate = + / into replacement characters

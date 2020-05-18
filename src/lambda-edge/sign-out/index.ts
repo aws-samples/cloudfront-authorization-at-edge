@@ -3,7 +3,7 @@
 
 import { stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders } from '../shared/shared';
+import { getConfig, extractAndParseCookies, generateCookieHeaders, createErrorHtml } from '../shared/shared';
 
 const CONFIG = getConfig();
 
@@ -14,14 +14,19 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
     if (!idToken) {
         return {
-            body: 'Bad Request',
+            body: createErrorHtml('Bad Request', "You are already signed out", `https://${domainName}`),
             status: '400',
-            statusDescription: 'Bad Request',
-            headers: CONFIG.cloudFrontHeaders,
+            headers: {
+                ...CONFIG.cloudFrontHeaders,
+                'content-type': [{
+                    key: 'Content-Type',
+                    value: 'text/html; charset=UTF-8',
+                }]
+            },
         };
     }
 
-    let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken };
+    let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
     const qs = {
         logout_uri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
         client_id: CONFIG.clientId,
@@ -35,8 +40,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 key: 'location',
                 value: `https://${CONFIG.cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
             }],
-            'set-cookie': getCookieHeaders({
-                tokens, domainName, explicitCookieSettings: CONFIG.cookieSettings, expireAllTokens: true, ...CONFIG
+            'set-cookie': generateCookieHeaders.signOut({
+                tokens, domainName, ...CONFIG
             }),
             ...CONFIG.cloudFrontHeaders,
         }

@@ -25,8 +25,8 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
 
     // Generate a secret to sign nonces with and add this to the configuration
     let config = JSON.parse(stringifiedConfig);
-    config.nonceSigningSecret = randomBytes(20).toString('base64');
-    
+    config.nonceSigningSecret = randomBytes(16).toString('base64');
+
     // Fetch and extract Lambda zip contents to temporary folder, add configuration.json, and rezip
     const { Code } = await LAMBDA_CLIENT.getFunction({ FunctionName: lambdaFunction }).promise();
     const { data } = await axios.get(Code!.Location!, { responseType: 'arraybuffer' });
@@ -39,7 +39,7 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
     const newLambdaZip = new Zip();
     newLambdaZip.addLocalFolder(tempDir);
     console.log('New Lambda zip contents:', newLambdaZip.getEntries().map(entry => entry.name));
-    
+
     const { CodeSha256, Version, FunctionArn } = await LAMBDA_CLIENT.updateFunctionCode(
         {
             FunctionName: lambdaFunction,

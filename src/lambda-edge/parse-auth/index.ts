@@ -3,7 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler, CloudFrontRequest } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
+import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
 
 const CONFIG = getConfig();
 
@@ -40,8 +40,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     key: 'location',
                     value: redirectedFromUri,
                 }],
-                'set-cookie': getCookieHeaders({
-                    tokens: res.data, domainName, explicitCookieSettings: CONFIG.cookieSettings, ...CONFIG
+                'set-cookie': generateCookieHeaders.newTokens({
+                    tokens: res.data, domainName, ...CONFIG
                 }),
                 ...CONFIG.cloudFrontHeaders,
             }

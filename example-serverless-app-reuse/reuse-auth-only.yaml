@@ -74,7 +74,7 @@ Resources:
     Properties:
       Location:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge
-        SemanticVersion: 1.1.0
+        SemanticVersion: 1.1.1
       Parameters:
         CreateCloudFrontDistribution: "false"
         # AlternateDomainNames: <your alternate domain names, this will be the same list as the aliases of your CloudFront distribution above>

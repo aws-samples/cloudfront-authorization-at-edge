@@ -25,12 +25,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         if (!tokenUserName || !idToken) {
             throw new Error('No valid credentials present in cookies');
         }
-        // Reuse existing nonce and pkce, be more lenient to users doing parallel sign-in's
-        // But do make sure we were the ones who provided the nonce
-        if (existingNonce && nonceHmac && existingPkce) {
-            // Verify the signature. This throws an error if the signature is invalid
-            verifyNonceSignature(existingNonce, nonceHmac, CONFIG.nonceSigningSecret);
-            // Nonce signature verified. Reuse nonce and pkce to enable parallel sign-in's
+        // Reuse existing nonce and pkce to be more lenient to users doing parallel sign-in's
+        // But do make sure the nonce isn't too old and we were the ones who provided the nonce
+        if (nonce && nonceHmac && pkce && nonceIsValid(nonce, nonceHmac, CONFIG.nonceSigningSecret)) {
             existingNonce = nonce;
             existingPkce = pkce;
         }
@@ -105,7 +102,12 @@ function generatePkceVerifier(pkce?: string) {
 }
 
 function generateNonce() {
-    return [...new Array(NONCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+    const randomString = [...new Array(NONCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+    return `${timestampInSeconds()}T${randomString}`;
+}
+
+function timestampInSeconds() {
+    return Date.now() / 1000 | 0;
 }
 
 function randomChoiceFromIndexable(indexable: string) {
@@ -127,8 +129,15 @@ function signNonce(nonce: string, secret: string) {
     return urlSafe.stringify(digest);
 }
 
-function verifyNonceSignature(nonce: string, signature: string, secret: string) {
-    if (signNonce(nonce, secret) !== signature) {
-        throw new Error("Invalid nonce signature");
+function nonceIsValid(nonce: string, signature: string, secret: string) {
+    // Nonces may be at most 1 hour old
+    const nonceTimestamp = parseInt(nonce.slice(0, nonce.indexOf('T')));
+    if ((timestampInSeconds() - nonceTimestamp) > 3600) {
+        return false;
     }
+    // Nonce should have the right signature: proving we were the ones generating it
+    if (signNonce(nonce, secret) !== signature) {
+        return false;
+    }
+    return true;
 }

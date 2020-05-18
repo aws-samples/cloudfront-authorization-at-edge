@@ -28,7 +28,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         // Reuse existing nonce and pkce, be more lenient to users doing parallel sign-in's
         // But do make sure we were the ones who provided the nonce
         if (existingNonce && nonceHmac && existingPkce) {
+            // Verify the signature. This throws an error if the signature is invalid
             verifyNonceSignature(existingNonce, nonceHmac, CONFIG.nonceSigningSecret);
+            // Nonce signature verified. Reuse nonce and pkce to enable parallel sign-in's
             existingNonce = nonce;
             existingPkce = pkce;
         }

@@ -41,7 +41,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         });
         const tokenResponse = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, { headers }, logger);
         logger.info('Successfully exchanged authorization code for tokens');
-        logger.debug('Response from Cognito token endpoint:\n', tokenResponse);
+        logger.debug('Response from Cognito token endpoint:\n', {
+            status: tokenResponse.status, headers: tokenResponse.headers, responseBody: tokenResponse.data
+        });
 
         const response = {
             status: '307',

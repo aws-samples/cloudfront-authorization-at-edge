@@ -27,23 +27,21 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             code_verifier: pkce
         });
 
-        const headers: { 'Content-Type': string, Authorization?: string } = { 'Content-Type': 'application/x-www-form-urlencoded' }
-
+        const requestConfig: Parameters<typeof httpPostWithRetry>[2] = {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        };
         if (CONFIG.clientSecret) {
             const encodedSecret = Buffer.from(`${CONFIG.clientId}:${CONFIG.clientSecret}`).toString('base64');
-            headers.Authorization = `Basic ${encodedSecret}`;
+            requestConfig.headers.Authorization = `Basic ${encodedSecret}`;
         }
-
         logger.debug('HTTP POST to Cognito token endpoint:\n', {
-            uri: COGNITO_TOKEN_ENDPOINT,
-            body,
-            headers
+            uri: COGNITO_TOKEN_ENDPOINT, body, requestConfig
         });
-        const tokenResponse = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, { headers }, logger);
+        const { status, headers, data: tokens } = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, requestConfig, logger);
         logger.info('Successfully exchanged authorization code for tokens');
-        logger.debug('Response from Cognito token endpoint:\n', {
-            status: tokenResponse.status, headers: tokenResponse.headers, responseBody: tokenResponse.data
-        });
+        logger.debug('Response from Cognito token endpoint:\n', { status, headers, tokens });
 
         const response = {
             status: '307',
@@ -54,7 +52,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     value: redirectedFromUri,
                 }],
                 'set-cookie': generateCookieHeaders.newTokens({
-                    tokens: tokenResponse.data, domainName, ...CONFIG
+                    tokens, domainName, ...CONFIG
                 }),
                 ...CONFIG.cloudFrontHeaders,
             }

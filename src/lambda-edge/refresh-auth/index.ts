@@ -5,7 +5,7 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
-const CONFIG = getConfig();
+const { logger, ...CONFIG } = getConfig();
 
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -35,7 +35,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 client_id: CONFIG.clientId,
                 refresh_token: refreshToken,
             });
-            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers });
+            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers }, logger);
             tokens.id_token = res.data.id_token;
             tokens.access_token = res.data.access_token;
             cookieHeadersEventType = 'newTokens';

@@ -268,11 +268,12 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
         cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
     }
 
-    // Always expire nonce, nonceHmac and pkce
+    // Always expire nonce, nonceHmac and pkce - this is valid in all scenario's:
+    // * event === 'newTokens' --> you just signed in and used your nonce and pkce successfully, don't need them no more
+    // * event === 'refreshFailed' --> you are signed in already, why do you still have a nonce?
+    // * event === 'signOut' --> clear ALL cookies anyway
     ['spa-auth-edge-nonce', 'spa-auth-edge-nonce-hmac', 'spa-auth-edge-pkce'].forEach(key => {
-        if (cookies[key]) {
-            cookies[key] = expireCookie(cookies[key]);
-        }
+        cookies[key] = expireCookie(cookies[key]);
     });
 
     // Return cookie object in format of CloudFront headers

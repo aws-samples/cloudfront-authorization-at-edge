@@ -20,14 +20,14 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const requestedUri = `${request.uri}${request.querystring ? '?' + request.querystring : ''}`;
-    let existingState: State | undefined = undefined;
+    let existingState: ExistingState | undefined = undefined;
     try {
-        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const { idToken, refreshToken, nonce, nonceHmac, pkce } = extractAndParseCookies(request.headers, CONFIG.clientId);
         logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
 
         // Reuse existing nonce and pkce to be more lenient to users doing parallel sign-in's
-        if (nonce && nonceHmac) {
-            existingState = { nonce, nonceHmac };
+        if (nonce && nonceHmac && pkce) {
+            existingState = { nonce, nonceHmac, pkce };
             logger.debug('Existing state found:\n', existingState);
         }
 
@@ -54,7 +54,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     }],
                     'set-cookie': [
                         { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.nonceSigningSecret))}; ${CONFIG.cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.secret))}; ${CONFIG.cookieSettings.nonce}` },
                     ],
                     ...CONFIG.cloudFrontHeaders,
                 }
@@ -79,15 +79,15 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         // Users being users, may open the sign-in page in one browser tab, do something else,
         // open the sign-in page in another tab, do something else, come back to the first tab and complete the sign-in (etc.)
         let state: State;
-        const { pkce, pkceHash } = generatePkceVerifier();
-        if (existingState && stateIsValid(existingState, CONFIG.nonceSigningSecret)) {
-            state = existingState;
+        if (existingState && stateIsValid(existingState, CONFIG.secret)) {
+            state = { ...existingState, ...generatePkceVerifier(existingState.pkce) };
             logger.debug('Reusing existing state\n', state);
         } else {
             const nonce = generateNonce();
             state = {
                 nonce,
-                nonceHmac: signNonce(nonce, CONFIG.nonceSigningSecret),
+                nonceHmac: signNonce(nonce, CONFIG.secret),
+                ...generatePkceVerifier()
             }
             logger.debug('Using new state\n', state);
         }
@@ -101,7 +101,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             state: urlSafe.stringify(Buffer.from(JSON.stringify({ nonce: state.nonce, requestedUri })).toString('base64')),
             scope: CONFIG.oauthScopes.join(' '),
             code_challenge_method: 'S256',
-            code_challenge: pkceHash,
+            code_challenge: state.pkceHash,
         });
 
         // Return redirect to Cognito Hosted UI for sign-in
@@ -116,7 +116,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 'set-cookie': [
                     { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(state.nonce)}; ${CONFIG.cookieSettings.nonce}` },
                     { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(state.nonceHmac)}; ${CONFIG.cookieSettings.nonce}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(pkce)}; ${CONFIG.cookieSettings.nonce}` }
+                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(state.pkce)}; ${CONFIG.cookieSettings.nonce}` }
                 ],
                 ...CONFIG.cloudFrontHeaders,
             }
@@ -126,8 +126,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     }
 }
 
-function generatePkceVerifier() {
-    const pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+function generatePkceVerifier(pkce?: string) {
+    if (!pkce) {
+        pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+    }
     const verifier = {
         pkce,
         pkceHash: urlSafe.stringify(createHash('sha256')
@@ -170,7 +172,7 @@ function signNonce(nonce: string, secret: string) {
     return signature;
 }
 
-function stateIsValid(state: State, secret: string) {
+function stateIsValid(state: ExistingState, secret: string) {
     const nonceTimestamp = parseInt(state.nonce.slice(0, state.nonce.indexOf('T')));
     if ((timestampInSeconds() - nonceTimestamp) > NONCE_MAX_AGE) {
         logger.debug('Nonce is too old to reuse:', nonceTimestamp, new Date(nonceTimestamp * 1000).toISOString());
@@ -186,7 +188,12 @@ function stateIsValid(state: State, secret: string) {
     return true;
 }
 
-interface State {
+interface State extends ExistingState {
+    pkceHash: string;
+}
+
+interface ExistingState {
     nonce: string;
     nonceHmac: string;
+    pkce: string;
 }

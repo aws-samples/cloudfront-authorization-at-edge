@@ -5,15 +5,18 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler, CloudFrontRequest } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe } from '../shared/shared';
 
-const CONFIG = getConfig();
+const { logger, ...CONFIG } = getConfig();
+const COGNITO_TOKEN_ENDPOINT = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
+    logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
 
     try {
         const { code, pkce, requestedUri } = validateQueryStringAndCookies(request);
+        logger.debug('Query string and cookies are valid');
         redirectedFromUri += requestedUri;
 
         const body = stringifyQueryString({
@@ -31,8 +34,16 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             headers.Authorization = `Basic ${encodedSecret}`;
         }
 
-        const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers });
-        return {
+        logger.debug('HTTP POST to Cognito token endpoint:\n', {
+            uri: COGNITO_TOKEN_ENDPOINT,
+            body,
+            headers
+        });
+        const tokenResponse = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, { headers }, logger);
+        logger.info('Successfully exchanged authorization code for tokens');
+        logger.debug('Response from Cognito token endpoint:\n', tokenResponse);
+
+        const response = {
             status: '307',
             statusDescription: 'Temporary Redirect',
             headers: {
@@ -41,12 +52,16 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     value: redirectedFromUri,
                 }],
                 'set-cookie': generateCookieHeaders.newTokens({
-                    tokens: res.data, domainName, ...CONFIG
+                    tokens: tokenResponse.data, domainName, ...CONFIG
                 }),
                 ...CONFIG.cloudFrontHeaders,
             }
         };
+
+        logger.debug('Returning response:\n', response);
+        return response;
     } catch (err) {
+        logger.error(err, err.stack);
         return {
             body: createErrorHtml('Bad Request', err.toString(), redirectedFromUri),
             status: '400',

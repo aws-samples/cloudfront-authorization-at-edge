@@ -139,6 +139,7 @@ setenvs.sh
 .aws-sam
 build
 *.LICENSE
+*.LICENSE.*
 CD.sh
 PUB.sh
 CREATE.sh

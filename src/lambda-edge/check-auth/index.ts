@@ -5,15 +5,15 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes, createHmac } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from './validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe, defaultCookieSettings } from '../shared/shared';
+import { getConfig, extractAndParseCookies, decodeToken, urlSafe } from '../shared/shared';
+import { parse } from 'cookie';
 
+const { logger, ...CONFIG } = getConfig();
 // Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
 const SECRET_ALLOWED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 const PKCE_LENGTH = 43; // Should be between 43 and 128 - per spec
 const NONCE_LENGTH = 16; // how many characters should your nonces be?
-const { logger, ...CONFIG } = getConfig();
-const COOKIE_SETTING = CONFIG.cookieSettings.nonce || defaultCookieSettings[CONFIG.mode].nonce;
-const NONCE_MAX_AGE_IN_SECONDS = 60 * 60 * 24; // 1 DAY, TODO: if a Max Age is provided in the cookie settings, use that
+const NONCE_MAX_AGE = parseInt(parse(CONFIG.cookieSettings.nonce.toLowerCase())['max-age']) || 60 * 60 * 24;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     logger.debug(event);
@@ -24,11 +24,11 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     try {
         const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
         logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
-        
+
         // Reuse existing nonce and pkce to be more lenient to users doing parallel sign-in's
         if (nonce && nonceHmac) {
             existingState = { nonce, nonceHmac };
-            logger.info('Existing state found:\n', existingState);
+            logger.debug('Existing state found:\n', existingState);
         }
 
         // If there's no ID token in your cookies then you are not signed in yet
@@ -42,7 +42,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         const { exp } = decodeToken(idToken);
         logger.debug('ID token exp:', exp, new Date(exp * 1000).toISOString());
         if ((Date.now() / 1000) > exp - (60 * 10) && refreshToken) {
-            logger.debug('Will redirect to refresh endpoint for refreshing tokens using refresh token');
+            logger.info('Will redirect to refresh endpoint for refreshing tokens using refresh token');
             const nonce = generateNonce();
             const response = {
                 status: '307',
@@ -53,8 +53,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                         value: `https://${domainName}${CONFIG.redirectPathAuthRefresh}?${stringifyQueryString({ requestedUri, nonce })}`
                     }],
                     'set-cookie': [
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${COOKIE_SETTING}` },
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.nonceSigningSecret))}; ${COOKIE_SETTING}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.nonceSigningSecret))}; ${CONFIG.cookieSettings.nonce}` },
                     ],
                     ...CONFIG.cloudFrontHeaders,
                 }
@@ -64,16 +64,16 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         }
 
         // Check that the ID token is valid. This throws an error if it's not
-        logger.debug('Validating JWT ...');
+        logger.info('Validating JWT ...');
         await validate(idToken, CONFIG.tokenJwksUri, CONFIG.tokenIssuer, CONFIG.clientId);
-        logger.debug('JWT is valid');
-        
+        logger.info('JWT is valid');
+
         // Return the request unaltered to allow access to the resource:
         logger.debug('Returning request:\n', request);
         return request;
 
     } catch (err) {
-        logger.debug(`Will redirect to Cognito for sign-in because: ${err}`);
+        logger.info(`Will redirect to Cognito for sign-in because: ${err}`);
 
         // Reuse existing state if possible, to be more lenient to users doing parallel sign-in's
         // Users being users, may open the sign-in page in one browser tab, do something else,
@@ -114,9 +114,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     value: `https://${CONFIG.cognitoAuthDomain}/oauth2/authorize?${loginQueryString}`
                 }],
                 'set-cookie': [
-                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(state.nonce)}; ${COOKIE_SETTING}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(state.nonceHmac)}; ${COOKIE_SETTING}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(pkce)}; ${COOKIE_SETTING}` }
+                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(state.nonce)}; ${CONFIG.cookieSettings.nonce}` },
+                    { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(state.nonceHmac)}; ${CONFIG.cookieSettings.nonce}` },
+                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(pkce)}; ${CONFIG.cookieSettings.nonce}` }
                 ],
                 ...CONFIG.cloudFrontHeaders,
             }
@@ -172,7 +172,7 @@ function signNonce(nonce: string, secret: string) {
 
 function stateIsValid(state: State, secret: string) {
     const nonceTimestamp = parseInt(state.nonce.slice(0, state.nonce.indexOf('T')));
-    if ((timestampInSeconds() - nonceTimestamp) > NONCE_MAX_AGE_IN_SECONDS) {
+    if ((timestampInSeconds() - nonceTimestamp) > NONCE_MAX_AGE) {
         logger.debug('Nonce is too old to reuse:', nonceTimestamp, new Date(nonceTimestamp * 1000).toISOString());
         return false;
     }
@@ -182,7 +182,7 @@ function stateIsValid(state: State, secret: string) {
         logger.warn('Nonce signature mismatch:', calculatedHmac, '!=', state.nonceHmac);
         return false;
     }
-    logger.debug('Nonce is valid');
+    logger.debug('State is valid');
     return true;
 }
 

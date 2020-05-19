@@ -14,7 +14,7 @@ export interface CookieSettings {
     nonce: string;
 }
 
-export const defaultCookieSettings: { [key: string]: CookieSettings } = {
+const defaultCookieSettings: { [key: string]: CookieSettings } = {
     spaMode: {
         idToken: "Path=/; Secure; SameSite=Lax",
         accessToken: "Path=/; Secure; SameSite=Lax",
@@ -113,11 +113,19 @@ export function getConfig(): Config {
     const tokenIssuer = `https://cognito-idp.${userPoolRegion}.amazonaws.com/${config.userPoolId}`;
     const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
 
+    // Derive cookie settings by merging the defaults with the explicitly provided values
+    // Default cookies settings depend on the deployment mode (SPA or Static Site)
+    const cookieSettings = Object.fromEntries(
+        Object
+            .entries(config.cookieSettings)
+            .map(([k, v]) => [k, v || defaultCookieSettings[config.mode][k as keyof CookieSettings]])
+    ) as CookieSettings;
+
     // Setup logger
     const logger = new Logger(LogLevel[config.logLevel]);
 
     return {
-        ...config, tokenIssuer, tokenJwksUri, cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders), logger
+        ...config, tokenIssuer, tokenJwksUri, cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders), cookieSettings, logger
     };
 }
 
@@ -241,23 +249,15 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
         Username: tokenUserName
     });
 
-    // Derive cookie settings by merging the defaults with the explicitly provided values
-    // Default cookies settings depend on the deployment mode (SPA or Static Site)
-    const cookieSettings = Object.fromEntries(
-        Object
-            .entries(param.cookieSettings)
-            .map(([k, v]) => [k, v || defaultCookieSettings[param.mode][k as keyof CookieSettings]])
-    ) as CookieSettings;
-
     // Construct object with the cookies
     const cookies = {
-        [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
-        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
-        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, cookieSettings.refreshToken)}`,
-        [lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
-        [scopeKey]: `${scopesString}; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
-        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, cookieSettings.idToken)}`,
-        'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, cookieSettings.accessToken)}`,
+        [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+        [lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+        [scopeKey]: `${scopesString}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+        'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
     };
 
     if (param.event === 'signOut') {
@@ -295,21 +295,24 @@ const AXIOS_INSTANCE = axios.create({
 });
 
 
-export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig): Promise<AxiosResponse<any>> {
+export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig, logger: Logger): Promise<AxiosResponse<any>> {
     let attempts = 0;
     while (++attempts) {
         try {
             return await AXIOS_INSTANCE.post(url, data, config);
         } catch (err) {
-            console.error(`HTTP POST to ${url} failed (attempt ${attempts}):`);
-            console.error(err.response && err.response.data || err);
+            logger.debug(`HTTP POST to ${url} failed (attempt ${attempts}):`);
+            logger.debug(err.response && err.response.data || err);
             if (attempts >= 5) {
                 // Try 5 times at most
+                logger.error(`No success after ${attempts} attempts, seizing further attempts`);
                 break;
             }
             if (attempts >= 2) {
                 // After attempting twice immediately, do some exponential backoff with jitter
+                logger.debug('Doing exponential backoff with jitter, before attempting HTTP POST again ...');
                 await new Promise(resolve => setTimeout(resolve, 25 * (Math.pow(2, attempts) + Math.random() * attempts)));
+                logger.debug('Done waiting, will try HTTP POST again now');
             }
         }
     }

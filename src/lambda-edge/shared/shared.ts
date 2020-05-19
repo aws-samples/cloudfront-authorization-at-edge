@@ -47,7 +47,7 @@ interface ConfigFromDisk {
     mode: Mode,
     httpHeaders: HttpHeaders;
     clientSecret: string;
-    nonceSigningSecret: string;
+    secret: string;
     logLevel: keyof typeof LogLevel;
 }
 

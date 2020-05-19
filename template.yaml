@@ -501,6 +501,7 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt CheckAuthHandler.Arn
       Version: !Ref Version
+      AddSecret: true
       Configuration:
         Fn::Sub:
           - >

@@ -48,13 +48,59 @@ interface ConfigFromDisk {
     httpHeaders: HttpHeaders;
     clientSecret: string;
     nonceSigningSecret: string;
+    logLevel: keyof typeof LogLevel;
 }
 
+enum LogLevel {
+    'none' = 0,
+    'info' = 10,
+    'warn' = 20,
+    'error' = 30,
+    'debug' = 40,
+}
+
+class Logger {
+    constructor(private logLevel: LogLevel) { }
+
+    private jsonify(args: any[]) {
+        return args.map((arg: any) => {
+            if (typeof arg === 'object') {
+                try {
+                    return JSON.stringify(arg);
+                } catch {
+                    return arg;
+                }
+            };
+            return arg;
+        });
+    }
+    public info(...args: any) {
+        if (this.logLevel >= LogLevel.info) {
+            console.log(...this.jsonify(args));
+        }
+    }
+    public warn(...args: any) {
+        if (this.logLevel >= LogLevel.warn) {
+            console.warn(...this.jsonify(args));
+        }
+    }
+    public error(...args: any) {
+        if (this.logLevel >= LogLevel.error) {
+            console.error(...this.jsonify(args));
+        }
+    }
+    public debug(...args: any) {
+        if (this.logLevel >= LogLevel.debug) {
+            console.trace(...this.jsonify(args));
+        }
+    }
+}
 
 export interface Config extends ConfigFromDisk {
     tokenIssuer: string;
     tokenJwksUri: string;
     cloudFrontHeaders: CloudFrontHeaders;
+    logger: Logger;
 }
 
 
@@ -67,8 +113,11 @@ export function getConfig(): Config {
     const tokenIssuer = `https://cognito-idp.${userPoolRegion}.amazonaws.com/${config.userPoolId}`;
     const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
 
+    // Setup logger
+    const logger = new Logger(LogLevel[config.logLevel]);
+
     return {
-        ...config, tokenIssuer, tokenJwksUri, cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders)
+        ...config, tokenIssuer, tokenJwksUri, cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders), logger
     };
 }
 
@@ -277,7 +326,7 @@ export function createErrorHtml(title: string, message: string, proceedAnywayHre
     <body>
         <h1>${title}</h1>
         <p><b>ERROR:</b> ${message}</p>
-        <a href="${proceedAnywayHref}">Proceed anyway</a>
+        <a href="${proceedAnywayHref}">Try to proceed anyway</a>
     </body>
 </html>`;
 }

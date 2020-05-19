@@ -100,6 +100,16 @@ Parameters:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
     Default: ""
+  LogLevel:
+    Type: String
+    Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
+    Default: "none"
+    AllowedValues:
+      - "none"
+      - "info"
+      - "warn"
+      - "error"
+      - "debug"
 
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
@@ -471,7 +481,8 @@ Resources:
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
-              "httpHeaders": ${HttpHeaders}
+              "httpHeaders": ${HttpHeaders},
+              "logLevel": "${LogLevel}"
             }
           - Mode:
               !If
@@ -504,7 +515,8 @@ Resources:
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
-              "httpHeaders": ${HttpHeaders}
+              "httpHeaders": ${HttpHeaders},
+              "logLevel": "${LogLevel}"
             }
           - Mode:
               !If
@@ -545,7 +557,8 @@ Resources:
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
-              "httpHeaders": ${HttpHeaders}
+              "httpHeaders": ${HttpHeaders},
+              "logLevel": "${LogLevel}"
             }
           - Mode:
               !If
@@ -578,7 +591,8 @@ Resources:
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
-              "httpHeaders": ${HttpHeaders}
+              "httpHeaders": ${HttpHeaders},
+              "logLevel": "${LogLevel}"
             }
           - Mode:
               !If
@@ -616,33 +630,51 @@ Outputs:
     Description: The S3 Bucket where the SPA (React, Angular, Vue, ...) is uploaded to
     Condition: CreateCloudFrontDistribution
     Value: !Ref S3Bucket
+    Export:
+      Name: !Sub "${AWS::StackName}-S3Bucket"
   WebsiteUrl:
     Description: URL of the CloudFront distribution that serves your SPA from S3
     Condition: CreateCloudFrontDistribution
     Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteUrl"
   CloudFrontDistribution:
     Description: ID of the CloudFront distribution that serves your SPA from S3
     Condition: CreateCloudFrontDistribution
     Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudFrontDistribution"
   UserPoolId:
     Description: The ID of the Cognito User Pool
     Value: !Ref UserPool
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolId"
   ClientId:
     Description: Client ID to use to interact with the User Pool
     Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-ClientId"
   ClientSecret:
     Description: The client secret associated with the User Pool Client. This will be empty in SPA mode.
     Condition: StaticSiteMode
     Value: !GetAtt ClientSecretRetrieval.ClientSecret
+    Export:
+      Name: !Sub "${AWS::StackName}-ClientSecret"
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
     Value: !GetAtt UserPoolDomain.DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-CognitoAuthDomain"
   RedirectUrisSignIn:
     Description: The URI(s) that will handle the redirect from Cognito after successfull sign-in
     Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignIn
+    Export:
+      Name: !Sub "${AWS::StackName}-RedirectUrisSignIn"
   RedirectUrisSignOut:
     Description: The URI(s) that will handle the redirect from Cognito after successfull sign-out
     Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignOut
+    Export:
+      Name: !Sub "${AWS::StackName}-RedirectUrisSignOut"
   ParseAuthHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for parsing the URL of the redirect from the Cognito hosted UI after succesful sign-in
     Value: !GetAtt ParseAuthHandlerCodeUpdate.FunctionArn

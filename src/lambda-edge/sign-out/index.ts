@@ -14,8 +14,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
     if (!idToken) {
         return {
-            body: createErrorHtml('Bad Request', "You are already signed out", `https://${domainName}`),
-            status: '400',
+            body: createErrorHtml({
+                title: 'Signed out',
+                messageStart: 'You are already signed out',
+                linkUri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
+                linkText: 'Proceed',
+            }),
+            status: '200',
             headers: {
                 ...CONFIG.cloudFrontHeaders,
                 'content-type': [{

@@ -22,7 +22,15 @@ module.exports = {
         test: /\.ts$/,
         use: 'ts-loader',
         exclude: /node_modules/
-      }
+      },
+      {
+        test: /\.html$/i,
+        loader: 'html-loader',
+        options: {
+          attributes: false,
+          minimize: true,
+        },
+      },
     ]
   },
   resolve: {

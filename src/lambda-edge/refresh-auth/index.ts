@@ -58,8 +58,15 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         };
     } catch (err) {
         return {
-            body: createErrorHtml('Bad Request', err.toString(), redirectedFromUri),
-            status: '400',
+            body: createErrorHtml({
+                title: 'Refresh issue',
+                messageStart: 'We can\'t refresh your sign-in because of a',
+                expandText: 'technical problem',
+                details: err.toString(),
+                linkUri: redirectedFromUri,
+                linkText: 'Try again',
+            }),
+            status: '200',
             headers: {
                 ...CONFIG.cloudFrontHeaders,
                 'content-type': [{

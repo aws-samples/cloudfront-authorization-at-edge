@@ -6,6 +6,7 @@ import { readFileSync } from 'fs';
 import { parse } from 'cookie';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
+import html from './error-template.html';
 
 export interface CookieSettings {
     idToken: string;
@@ -320,19 +321,15 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
     throw new Error(`HTTP POST to ${url} failed`);
 }
 
-export function createErrorHtml(title: string, message: string, proceedAnywayHref: string) {
-    return `<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <title>${title}</title>
-    </head>
-    <body>
-        <h1>${title}</h1>
-        <p><b>ERROR:</b> ${message}</p>
-        <a href="${proceedAnywayHref}">Try to proceed anyway</a>
-    </body>
-</html>`;
+export function createErrorHtml(props: {
+    title: string;
+    messageStart: string;
+    expandText?: string;
+    details?: string;
+    linkUri: string;
+    linkText: string;
+}) {
+    return html.replace(/\${([^}]*)}/g, (_, v: keyof typeof props) => props[v] || '');
 }
 
 export const urlSafe = {
@@ -351,4 +348,12 @@ export const urlSafe = {
     */
     stringify: (b64encodedString: string) => b64encodedString.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
     parse: (b64encodedString: string) => b64encodedString.replace(/-/g, '+').replace(/_/g, '/'),
+}
+
+export class RequiresConfirmationError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = this.constructor.name;
+        Error.captureStackTrace(this, this.constructor);
+    }
 }

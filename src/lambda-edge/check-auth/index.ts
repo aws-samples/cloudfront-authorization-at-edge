@@ -2,34 +2,21 @@
 // SPDX-License-Identifier: MIT-0
 
 import { stringify as stringifyQueryString } from 'querystring';
-import { createHash, randomBytes, createHmac } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { validate } from './validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe } from '../shared/shared';
-import { parse } from 'cookie';
+import { validate } from '../shared/validate-jwt';
+import { getConfig, extractAndParseCookies, decodeToken, urlSafe, signNonce, timestampInSeconds } from '../shared/shared';
 
 const { logger, ...CONFIG } = getConfig();
-// Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
-const SECRET_ALLOWED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-const PKCE_LENGTH = 43; // Should be between 43 and 128 - per spec
-const NONCE_LENGTH = 16; // how many characters should your nonces be?
-const NONCE_MAX_AGE = parseInt(parse(CONFIG.cookieSettings.nonce.toLowerCase())['max-age']) || 60 * 60 * 24;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const requestedUri = `${request.uri}${request.querystring ? '?' + request.querystring : ''}`;
-    let existingState: ExistingState | undefined = undefined;
     try {
-        const { idToken, refreshToken, nonce, nonceHmac, pkce } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
         logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
-
-        // Reuse existing nonce and pkce to be more lenient to users doing parallel sign-in's
-        if (nonce && nonceHmac && pkce) {
-            existingState = { nonce, nonceHmac, pkce };
-            logger.debug('Existing state found:\n', existingState);
-        }
 
         // If there's no ID token in your cookies then you are not signed in yet
         if (!idToken) {
@@ -54,7 +41,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     }],
                     'set-cookie': [
                         { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.secret))}; ${CONFIG.cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.secret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
                     ],
                     ...CONFIG.cloudFrontHeaders,
                 }
@@ -78,19 +65,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         // Reuse existing state if possible, to be more lenient to users doing parallel sign-in's
         // Users being users, may open the sign-in page in one browser tab, do something else,
         // open the sign-in page in another tab, do something else, come back to the first tab and complete the sign-in (etc.)
-        let state: State;
-        if (existingState && stateIsValid(existingState, CONFIG.secret)) {
-            state = { ...existingState, ...generatePkceVerifier(existingState.pkce) };
-            logger.debug('Reusing existing state\n', state);
-        } else {
-            const nonce = generateNonce();
-            state = {
-                nonce,
-                nonceHmac: signNonce(nonce, CONFIG.secret),
-                ...generatePkceVerifier()
-            }
-            logger.debug('Using new state\n', state);
+        const nonce = generateNonce();
+        const state = {
+            nonce,
+            nonceHmac: signNonce(nonce, CONFIG.secret, CONFIG.nonceLength),
+            ...generatePkceVerifier()
         }
+        logger.debug('Using new state\n', state);
 
         // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
         // Cognito decodes the URL, causing a malformed link due to the JSON string, and results in an empty 400 response from Cognito.
@@ -128,7 +109,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
 function generatePkceVerifier(pkce?: string) {
     if (!pkce) {
-        pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+        pkce = [...new Array(CONFIG.pkceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
     }
     const verifier = {
         pkce,
@@ -141,14 +122,10 @@ function generatePkceVerifier(pkce?: string) {
 }
 
 function generateNonce() {
-    const randomString = [...new Array(NONCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+    const randomString = [...new Array(CONFIG.nonceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
     const nonce = `${timestampInSeconds()}T${randomString}`;
     logger.debug('Generated new nonce:', nonce);
     return nonce;
-}
-
-function timestampInSeconds() {
-    return Date.now() / 1000 | 0;
 }
 
 function randomChoiceFromIndexable(indexable: string) {
@@ -163,37 +140,4 @@ function randomChoiceFromIndexable(indexable: string) {
     } while (randomNumber >= firstBiassedIndex)
     const index = randomNumber % indexable.length;
     return indexable[index];
-}
-
-function signNonce(nonce: string, secret: string) {
-    const digest = createHmac('sha256', secret).update(nonce).digest('base64').slice(0, NONCE_LENGTH);
-    const signature = urlSafe.stringify(digest);
-    logger.debug('Nonce signature:', signature);
-    return signature;
-}
-
-function stateIsValid(state: ExistingState, secret: string) {
-    const nonceTimestamp = parseInt(state.nonce.slice(0, state.nonce.indexOf('T')));
-    if ((timestampInSeconds() - nonceTimestamp) > NONCE_MAX_AGE) {
-        logger.debug('Nonce is too old to reuse:', nonceTimestamp, new Date(nonceTimestamp * 1000).toISOString());
-        return false;
-    }
-    // Nonce should have the right signature: proving we were the ones generating it
-    const calculatedHmac = signNonce(state.nonce, secret);
-    if (calculatedHmac !== state.nonceHmac) {
-        logger.warn('Nonce signature mismatch:', calculatedHmac, '!=', state.nonceHmac);
-        return false;
-    }
-    logger.debug('State is valid');
-    return true;
-}
-
-interface State extends ExistingState {
-    pkceHash: string;
-}
-
-interface ExistingState {
-    nonce: string;
-    nonceHmac: string;
-    pkce: string;
 }

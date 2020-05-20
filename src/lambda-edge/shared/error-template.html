@@ -12,7 +12,7 @@
       integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
       crossorigin="anonymous"
     />
-    <title>Auth@Edge: ${title}</title>
+    <title>Authorization@Edge</title>
     <style>
       html {
         min-height: 100vh;
@@ -36,8 +36,11 @@
   </head>
   <body>
     <div class="card message-card">
+      <h5 class="card-header">
+        Authorization@Edge
+      </h5>
       <div class="card-body">
-        <h5 class="card-title">Auth@Edge: ${title}</h5>
+        <h5 class="card-title">${title}</h5>
         <p>
           ${messageStart}
           <a
@@ -50,7 +53,6 @@
           >
             ${expandText}
           </a>
-          .
         </p>
         <p class="collapse blockquote-footer" id="details">
           ${details}

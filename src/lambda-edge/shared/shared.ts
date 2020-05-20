@@ -3,6 +3,7 @@
 
 import { CloudFrontHeaders } from 'aws-lambda';
 import { readFileSync } from 'fs';
+import { createHmac } from 'crypto';
 import { parse } from 'cookie';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
@@ -50,6 +51,10 @@ interface ConfigFromDisk {
     clientSecret: string;
     secret: string;
     logLevel: keyof typeof LogLevel;
+    secretAllowedCharacters?: string;
+    pkceLength?: number;
+    nonceLength?: number;
+    nonceMaxAge?: number;
 }
 
 enum LogLevel {
@@ -102,10 +107,22 @@ export interface Config extends ConfigFromDisk {
     tokenJwksUri: string;
     cloudFrontHeaders: CloudFrontHeaders;
     logger: Logger;
+    secretAllowedCharacters: string;
+    pkceLength: number;
+    nonceLength: number;
+    nonceMaxAge: number;
 }
 
+let CONFIG: Config | undefined = undefined;
+
+export function setConfig(config?: Config) {
+    CONFIG = config;
+}
 
 export function getConfig(): Config {
+    if (CONFIG) {
+        return CONFIG;
+    }
 
     const config = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as ConfigFromDisk;
 
@@ -125,8 +142,22 @@ export function getConfig(): Config {
     // Setup logger
     const logger = new Logger(LogLevel[config.logLevel]);
 
+    // Defaults for nonce and PKCE
+    const defaults = {
+        secretAllowedCharacters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',
+        pkceLength: 43, // Should be between 43 and 128 - per spec
+        nonceLength: 16,
+        nonceMaxAge: parseInt(parse(cookieSettings.nonce.toLowerCase())['max-age']) || 60 * 60 * 24,
+    };
+
     return {
-        ...config, tokenIssuer, tokenJwksUri, cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders), cookieSettings, logger
+        ...defaults,
+        ...config,
+        cookieSettings,
+        tokenIssuer,
+        tokenJwksUri,
+        cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
+        logger,
     };
 }
 
@@ -323,7 +354,7 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
 
 export function createErrorHtml(props: {
     title: string;
-    messageStart: string;
+    message: string;
     expandText?: string;
     details?: string;
     linkUri: string;
@@ -356,4 +387,14 @@ export class RequiresConfirmationError extends Error {
         this.name = this.constructor.name;
         Error.captureStackTrace(this, this.constructor);
     }
+}
+
+export function signNonce(nonce: string, secret: string, length: number) {
+    const digest = createHmac('sha256', secret).update(nonce).digest('base64').slice(0, length);
+    const signature = urlSafe.stringify(digest);
+    return signature;
+}
+
+export function timestampInSeconds() {
+    return Date.now() / 1000 | 0;
 }

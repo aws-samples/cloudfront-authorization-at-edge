@@ -16,7 +16,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         return {
             body: createErrorHtml({
                 title: 'Signed out',
-                messageStart: 'You are already signed out',
+                message: 'You are already signed out',
                 linkUri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
                 linkText: 'Proceed',
             }),

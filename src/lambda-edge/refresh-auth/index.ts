@@ -60,7 +60,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         return {
             body: createErrorHtml({
                 title: 'Refresh issue',
-                messageStart: 'We can\'t refresh your sign-in because of a',
+                message: 'We can\'t refresh your sign-in because of a',
                 expandText: 'technical problem',
                 details: err.toString(),
                 linkUri: redirectedFromUri,

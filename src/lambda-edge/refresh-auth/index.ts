@@ -35,7 +35,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 client_id: CONFIG.clientId,
                 refresh_token: refreshToken,
             });
-            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers }, logger);
+            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers }, logger)
+                .catch((err) => { throw new Error(`Failed to refresh tokens: ${err}`) });
             tokens.id_token = res.data.id_token;
             tokens.access_token = res.data.access_token;
             cookieHeadersEventType = 'newTokens';

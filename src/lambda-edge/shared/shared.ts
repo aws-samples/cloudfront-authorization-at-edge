@@ -7,7 +7,7 @@ import { createHmac } from 'crypto';
 import { parse } from 'cookie';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
-import html from './error-template.html';
+import html from './error-page/template.html';
 
 export interface CookieSettings {
     idToken: string;
@@ -339,7 +339,7 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
             if (attempts >= 5) {
                 // Try 5 times at most
                 logger.error(`No success after ${attempts} attempts, seizing further attempts`);
-                break;
+                throw err;
             }
             if (attempts >= 2) {
                 // After attempting twice immediately, do some exponential backoff with jitter
@@ -349,7 +349,6 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
             }
         }
     }
-    throw new Error(`HTTP POST to ${url} failed`);
 }
 
 export function createErrorHtml(props: {

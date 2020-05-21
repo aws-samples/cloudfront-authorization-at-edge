@@ -330,7 +330,8 @@ const AXIOS_INSTANCE = axios.create({
 
 export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig, logger: Logger): Promise<AxiosResponse<any>> {
     let attempts = 0;
-    while (++attempts) {
+    while (true) {
+        ++attempts;
         try {
             return await AXIOS_INSTANCE.post(url, data, config);
         } catch (err) {

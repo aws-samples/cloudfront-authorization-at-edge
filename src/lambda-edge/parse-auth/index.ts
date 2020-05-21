@@ -95,11 +95,11 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         if (err instanceof RequiresConfirmationError) {
             htmlParams = {
                 title: 'Confirm sign-in',
-                message: 'To ensure your safety, we need your confirmation to sign you in',
-                expandText: '(reason)',
+                message: 'To ensure your safety, we need your confirmation to sign you in.',
+                expandText: '(We encountered something unexpected)',
                 details: err.toString(),
                 linkUri: redirectedFromUri,
-                linkText: 'Confirm sign-in',
+                linkText: 'Confirm',
             }
         } else {
             htmlParams = {
@@ -182,3 +182,5 @@ function validateQueryStringAndCookies(props: {
 
     return { code, pkce, requestedUri: parsedState.requestedUri || '' };
 }
+
+class RequiresConfirmationError extends Error { }

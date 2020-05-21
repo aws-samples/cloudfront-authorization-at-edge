@@ -381,14 +381,6 @@ export const urlSafe = {
     parse: (b64encodedString: string) => b64encodedString.replace(/-/g, '+').replace(/_/g, '/'),
 }
 
-export class RequiresConfirmationError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = this.constructor.name;
-        Error.captureStackTrace(this, this.constructor);
-    }
-}
-
 export function signNonce(nonce: string, secret: string, length: number) {
     const digest = createHmac('sha256', secret).update(nonce).digest('base64').slice(0, length);
     const signature = urlSafe.stringify(digest);

@@ -12,23 +12,17 @@ import Lambda from 'aws-sdk/clients/lambda';
 import Zip from 'adm-zip';
 import { writeFileSync, mkdtempSync } from 'fs'
 import { resolve } from 'path';
-import { randomBytes } from 'crypto';
 
 const LAMBDA_CLIENT = new Lambda({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
 
-async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFunction: string, stringifiedConfig: string, addSecret?: boolean, physicalResourceId?: string) {
+async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFunction: string, stringifiedConfig: string, physicalResourceId?: string) {
     if (action === 'Delete') {
         // Deletes aren't executed; the Lambda Resource should just be deleted
         return { physicalResourceId: physicalResourceId!, Data: {} };
     }
     console.log(`Adding configuration to Lambda function ${lambdaFunction}:\n${stringifiedConfig}`);
-
+    // Parse the JSON to ensure it's validity (and avoid ugly errors at runtime)
     const config = JSON.parse(stringifiedConfig);
-    if (addSecret) {
-        // Generate a secret and add this to the configuration
-        config.secret = randomBytes(16).toString('base64');
-    }
-
     // Fetch and extract Lambda zip contents to temporary folder, add configuration.json, and rezip
     const { Code } = await LAMBDA_CLIENT.getFunction({ FunctionName: lambdaFunction }).promise();
     const { data } = await axios.get(Code!.Location!, { responseType: 'arraybuffer' });
@@ -65,11 +59,11 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
     const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
 
-    const { LambdaFunction, Configuration, AddSecret } = ResourceProperties;
+    const { LambdaFunction, Configuration } = ResourceProperties;
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const { physicalResourceId, Data } = await updateLambdaCode(RequestType, LambdaFunction, Configuration, AddSecret, PhysicalResourceId);
+        const { physicalResourceId, Data } = await updateLambdaCode(RequestType, LambdaFunction, Configuration, PhysicalResourceId);
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId,

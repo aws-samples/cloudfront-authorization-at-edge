@@ -170,13 +170,13 @@ function validateQueryStringAndCookies(props: {
     // Nonce should not be too old
     const nonceTimestamp = parseInt(parsedState.nonce.slice(0, parsedState.nonce.indexOf('T')));
     if ((timestampInSeconds() - nonceTimestamp) > CONFIG.nonceMaxAge) {
-        throw new Error(`Nonce is too old (nonce is from ${new Date(nonceTimestamp * 1000).toISOString()})`);
+        throw new RequiresConfirmationError(`Nonce is too old (nonce is from ${new Date(nonceTimestamp * 1000).toISOString()})`);
     }
 
     // Nonce should have the right signature: proving we were the ones generating it (and e.g. not malicious JS on a subdomain)
-    const calculatedHmac = signNonce(parsedState.nonce, CONFIG.secret, CONFIG.nonceLength);
+    const calculatedHmac = signNonce(parsedState.nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength);
     if (calculatedHmac !== nonceHmac) {
-        throw new Error(`Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`);
+        throw new RequiresConfirmationError(`Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`);
     }
 
     return { code, pkce, requestedUri: parsedState.requestedUri || '' };

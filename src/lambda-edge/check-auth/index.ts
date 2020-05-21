@@ -41,7 +41,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     }],
                     'set-cookie': [
                         { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.secret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
                     ],
                     ...CONFIG.cloudFrontHeaders,
                 }
@@ -68,7 +68,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         const nonce = generateNonce();
         const state = {
             nonce,
-            nonceHmac: signNonce(nonce, CONFIG.secret, CONFIG.nonceLength),
+            nonceHmac: signNonce(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
             ...generatePkceVerifier()
         }
         logger.debug('Using new state\n', state);

@@ -49,7 +49,7 @@ interface ConfigFromDisk {
     mode: Mode,
     httpHeaders: HttpHeaders;
     clientSecret: string;
-    secret: string;
+    nonceSigningSecret: string;
     logLevel: keyof typeof LogLevel;
     secretAllowedCharacters?: string;
     pkceLength?: number;

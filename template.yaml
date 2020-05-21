@@ -467,7 +467,6 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt ParseAuthHandler.Arn
       Version: !Ref Version
-      AddSecret: true
       Configuration:
         Fn::Sub:
           - >
@@ -483,7 +482,8 @@ Resources:
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
-              "logLevel": "${LogLevel}"
+              "logLevel": "${LogLevel}",
+              "nonceSigningSecret": "${NonceSigningSecret}"
             }
           - Mode:
               !If
@@ -502,7 +502,6 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt CheckAuthHandler.Arn
       Version: !Ref Version
-      AddSecret: true
       Configuration:
         Fn::Sub:
           - >
@@ -518,7 +517,8 @@ Resources:
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
-              "logLevel": "${LogLevel}"
+              "logLevel": "${LogLevel}",
+              "nonceSigningSecret": "${NonceSigningSecret}"
             }
           - Mode:
               !If
@@ -626,6 +626,19 @@ Resources:
                 - !GetAtt HttpHeadersHandler.Arn
                 - !GetAtt RefreshAuthHandler.Arn
                 - !GetAtt SignOutHandler.Arn
+
+  NonceSigningSecret:
+    Type: Custom::NonceSigningSecret
+    Properties:
+      ServiceToken: !GetAtt NonceSigningSecretHandler.Arn
+      Length: 16
+
+  NonceSigningSecretHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/cfn-custom-resources/generate-secret/
+      Handler: index.handler
+      Runtime: nodejs12.x
 
 Outputs:
   S3Bucket:

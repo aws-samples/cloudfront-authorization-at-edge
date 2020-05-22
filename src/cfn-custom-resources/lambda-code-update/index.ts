@@ -40,10 +40,17 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
         {
             FunctionName: lambdaFunction,
             ZipFile: newLambdaZip.toBuffer(),
-            Publish: true
+            Publish: true,
         }
     ).promise();
     console.log({ CodeSha256, Version, FunctionArn });
+    await LAMBDA_CLIENT.createAlias(
+        {
+            FunctionName: FunctionArn!,
+            FunctionVersion: Version!,
+            Name: 'live'
+        }
+    ).promise();
     return { physicalResourceId: lambdaFunction, Data: { CodeSha256, Version, FunctionArn } };
 }
 

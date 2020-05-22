@@ -26,7 +26,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const physicalResourceId = PhysicalResourceId || [...new Array(Length)].map(() => randomChoiceFromIndexable(AllowedCharacters)).join('');;
+        const physicalResourceId = PhysicalResourceId || [...new Array(parseInt(Length))].map(() => randomChoiceFromIndexable(AllowedCharacters)).join('');;
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId!,

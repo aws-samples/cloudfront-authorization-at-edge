@@ -26,12 +26,22 @@ Parameters:
     Type: String
     Description: A legal bucket name.  Must not exist.
 
+  PriceClass:
+    Type: String
+    Description: CloudFront price class, e.g. PriceClass_200 for most regions (default), PriceClass_All for all regions (the default), PriceClass_100 least expensive (US, Canada, Europe), or PriceClass_All
+    Default: PriceClass_200
+
+  SemanticVersion:
+    Type: String
+    Description: Semantic version of the back end
+    Default: 1.1.0
+
   HttpHeaders:
     Type: String
-    Description: The HTTP headers to set on all responses from CloudFront. To be provided as a JSON object
+    Description: The HTTP headers to set on all responses from CloudFront. Defaults are illustrations only and contain a report-only Cloud Security Policy -- adjust for your application
     Default: >-
       {
-        "Content-Security-Policy": "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
+        "Content-Security-Policy-Report-Only": "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; connect-src 'self' https://*.amazonaws.com https://*.amazoncognito.com",
         "Strict-Transport-Security": "max-age=31536000; includeSubdomains; preload",
         "Referrer-Policy": "same-origin",
         "X-XSS-Protection": "1; mode=block",
@@ -127,7 +137,7 @@ Resources:
             - ErrorCode: 403
               ResponseCode: 200
               ResponsePagePath: /index.html
-        PriceClass: PriceClass_100
+        PriceClass: !Ref PriceClass
         DefaultRootObject: index.html
 
   LambdaEdgeProtection:
@@ -135,7 +145,7 @@ Resources:
     Properties:
       Location:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge
-        SemanticVersion: 1.1.0
+        SemanticVersion: !Ref SemanticVersion
       Parameters:
         CreateCloudFrontDistribution: "false"
         HttpHeaders: !Ref HttpHeaders

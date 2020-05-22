@@ -9,6 +9,7 @@ const { logger, ...CONFIG } = getConfig();
 
 
 export const handler: CloudFrontRequestHandler = async (event) => {
+    logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
@@ -43,7 +44,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         } catch (err) {
             cookieHeadersEventType = 'refreshFailed';
         }
-        return {
+        const response = {
             status: '307',
             statusDescription: 'Temporary Redirect',
             headers: {
@@ -57,8 +58,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 ...CONFIG.cloudFrontHeaders,
             }
         };
+        logger.debug('Returning response:\n', response);
+        return response;
     } catch (err) {
-        return {
+        const response = {
             body: createErrorHtml({
                 title: 'Refresh issue',
                 message: 'We can\'t refresh your sign-in because of a',
@@ -76,6 +79,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 }]
             },
         };
+        logger.debug('Returning response:\n', response);
+        return response;
     }
 }
 

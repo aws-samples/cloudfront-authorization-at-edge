@@ -537,7 +537,12 @@ Resources:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !GetAtt HttpHeadersHandler.Arn
       Version: !Ref Version
-      Configuration: !Ref HttpHeaders
+      Configuration:
+        Fn::Sub: >
+          {
+            "httpHeaders": ${HttpHeaders},
+            "logLevel": "${LogLevel}"
+          }
 
   RefreshAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate

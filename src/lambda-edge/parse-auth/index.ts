@@ -61,11 +61,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 ...CONFIG.cloudFrontHeaders,
             }
         };
-
         logger.debug('Returning response:\n', response);
         return response;
     } catch (err) {
-        logger.error(err, err.stack);
+        logger.error(err.stack || err);
         if (idToken) {
             // There is an ID token - maybe the user signed in already (e.g. in another browser tab)
             logger.debug('ID token found, will check if it is valid');
@@ -111,7 +110,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 linkText: 'Try again',
             }
         }
-        return {
+        const response = {
             body: createErrorHtml(htmlParams),
             status: '200',
             headers: {
@@ -122,6 +121,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 }]
             }
         };
+        logger.debug('Returning response:\n', response);
+        return response;
     }
 }
 

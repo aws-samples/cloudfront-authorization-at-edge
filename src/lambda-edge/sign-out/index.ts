@@ -5,15 +5,16 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, generateCookieHeaders, createErrorHtml } from '../shared/shared';
 
-const CONFIG = getConfig();
+const { logger, ...CONFIG } = getConfig();
 
 export const handler: CloudFrontRequestHandler = async (event) => {
+    logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, CONFIG.clientId);
 
     if (!idToken) {
-        return {
+        const response = {
             body: createErrorHtml({
                 title: 'Signed out',
                 message: 'You are already signed out',
@@ -29,6 +30,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 }]
             },
         };
+        logger.debug('Returning response:\n', response);
+        return response;
     }
 
     let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
@@ -37,7 +40,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         client_id: CONFIG.clientId,
     };
 
-    return {
+    const response = {
         status: '307',
         statusDescription: 'Temporary Redirect',
         headers: {
@@ -51,4 +54,6 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             ...CONFIG.cloudFrontHeaders,
         }
     };
+    logger.debug('Returning response:\n', response);
+    return response;
 }

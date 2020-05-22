@@ -150,7 +150,7 @@ export function getConfig(): Config {
         secretAllowedCharacters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',
         pkceLength: 43, // Should be between 43 and 128 - per spec
         nonceLength: 16,
-        nonceMaxAge: cookieSettings.nonce && parseInt(parse(cookieSettings.nonce.toLowerCase())['max-age']) || 60 * 60 * 24,
+        nonceMaxAge: cookieSettings?.nonce && parseInt(parse(cookieSettings.nonce.toLowerCase())['max-age']) || 60 * 60 * 24,
     };
 
     return {

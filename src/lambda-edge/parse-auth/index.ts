@@ -7,7 +7,6 @@ import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithR
 import { validate } from '../shared/validate-jwt';
 
 let CONFIG: ReturnType<typeof getConfig>;
-const COGNITO_TOKEN_ENDPOINT = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     if (!CONFIG || process.env.IS_TEST_MODE) {
@@ -16,6 +15,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
+    const cognitoTokenEndpoint = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
     let redirectedFromUri = `https://${domainName}`;
     let idToken: string | undefined = undefined;
     try {
@@ -43,9 +43,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             requestConfig.headers.Authorization = `Basic ${encodedSecret}`;
         }
         CONFIG.logger.debug('HTTP POST to Cognito token endpoint:\n', {
-            uri: COGNITO_TOKEN_ENDPOINT, body, requestConfig
+            uri: cognitoTokenEndpoint, body, requestConfig
         });
-        const { status, headers, data: tokens } = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, requestConfig, CONFIG.logger)
+        const { status, headers, data: tokens } = await httpPostWithRetry(cognitoTokenEndpoint, body, requestConfig, CONFIG.logger)
             .catch((err) => { throw new Error(`Failed to exchange authorization code for tokens: ${err}`) });
         CONFIG.logger.info('Successfully exchanged authorization code for tokens');
         CONFIG.logger.debug('Response from Cognito token endpoint:\n', { status, headers, tokens });

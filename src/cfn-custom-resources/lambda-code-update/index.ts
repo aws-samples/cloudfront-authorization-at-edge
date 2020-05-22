@@ -44,13 +44,6 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
         }
     ).promise();
     console.log({ CodeSha256, Version, FunctionArn });
-    await LAMBDA_CLIENT.createAlias(
-        {
-            FunctionName: lambdaFunction,
-            FunctionVersion: Version!,
-            Name: 'live'
-        }
-    ).promise();
     return { physicalResourceId: lambdaFunction, Data: { CodeSha256, Version, FunctionArn } };
 }
 

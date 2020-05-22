@@ -625,7 +625,6 @@ Resources:
               Action:
                 - lambda:GetFunction
                 - lambda:UpdateFunctionCode
-                - lambda:CreateAlias
               Resource:
                 - !GetAtt ParseAuthHandler.Arn
                 - !GetAtt CheckAuthHandler.Arn

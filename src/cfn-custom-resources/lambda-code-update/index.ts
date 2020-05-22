@@ -46,7 +46,7 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
     console.log({ CodeSha256, Version, FunctionArn });
     await LAMBDA_CLIENT.createAlias(
         {
-            FunctionName: FunctionArn!,
+            FunctionName: lambdaFunction,
             FunctionVersion: Version!,
             Name: 'live'
         }

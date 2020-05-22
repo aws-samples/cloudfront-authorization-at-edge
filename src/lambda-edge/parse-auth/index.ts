@@ -3,7 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, RequiresConfirmationError, signNonce, timestampInSeconds } from '../shared/shared';
+import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 import { validate } from '../shared/validate-jwt';
 
 const { logger, ...CONFIG } = getConfig();
@@ -95,8 +95,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         if (err instanceof RequiresConfirmationError) {
             htmlParams = {
                 title: 'Confirm sign-in',
-                message: 'To ensure your safety, we need your confirmation to sign you in.',
-                expandText: '(We encountered something unexpected)',
+                message: 'We need your confirmation to sign you in –– to ensure',
+                expandText: 'your safety',
                 details: err.toString(),
                 linkUri: redirectedFromUri,
                 linkText: 'Confirm',
@@ -175,7 +175,7 @@ function validateQueryStringAndCookies(props: {
     }
 
     // Nonce should have the right signature: proving we were the ones generating it (and e.g. not malicious JS on a subdomain)
-    const calculatedHmac = signNonce(parsedState.nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength);
+    const calculatedHmac = sign(parsedState.nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength);
     if (calculatedHmac !== nonceHmac) {
         throw new RequiresConfirmationError(`Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`);
     }

@@ -381,8 +381,8 @@ export const urlSafe = {
     parse: (b64encodedString: string) => b64encodedString.replace(/-/g, '+').replace(/_/g, '/'),
 }
 
-export function signNonce(nonce: string, secret: string, length: number) {
-    const digest = createHmac('sha256', secret).update(nonce).digest('base64').slice(0, length);
+export function sign(stringToSign: string, secret: string, signatureLength: number) {
+    const digest = createHmac('sha256', secret).update(stringToSign).digest('base64').slice(0, signatureLength);
     const signature = urlSafe.stringify(digest);
     return signature;
 }

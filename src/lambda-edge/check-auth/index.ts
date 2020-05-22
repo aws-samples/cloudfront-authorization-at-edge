@@ -5,7 +5,7 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from '../shared/validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe, signNonce, timestampInSeconds } from '../shared/shared';
+import { getConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 
 const { logger, ...CONFIG } = getConfig();
 
@@ -41,7 +41,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     }],
                     'set-cookie': [
                         { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(signNonce(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
                     ],
                     ...CONFIG.cloudFrontHeaders,
                 }
@@ -68,7 +68,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         const nonce = generateNonce();
         const state = {
             nonce,
-            nonceHmac: signNonce(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
+            nonceHmac: sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
             ...generatePkceVerifier()
         }
         logger.debug('Using new state\n', state);

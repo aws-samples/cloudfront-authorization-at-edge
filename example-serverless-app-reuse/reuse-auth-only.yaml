@@ -34,7 +34,7 @@ Parameters:
   SemanticVersion:
     Type: String
     Description: Semantic version of the back end
-    Default: 1.1.0
+    Default: 1.1.1
 
   HttpHeaders:
     Type: String
@@ -132,9 +132,6 @@ Resources:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
         CustomErrorResponses:
             - ErrorCode: 404
-              ResponseCode: 200
-              ResponsePagePath: /index.html
-            - ErrorCode: 403
               ResponseCode: 200
               ResponsePagePath: /index.html
         PriceClass: !Ref PriceClass

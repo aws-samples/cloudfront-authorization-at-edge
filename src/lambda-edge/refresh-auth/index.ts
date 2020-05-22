@@ -5,11 +5,13 @@ import { parse as parseQueryString, stringify as stringifyQueryString } from 'qu
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
-const { logger, ...CONFIG } = getConfig();
-
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
-    logger.debug(event);
+    if (!CONFIG || process.env.IS_TEST_MODE) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
@@ -36,7 +38,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 client_id: CONFIG.clientId,
                 refresh_token: refreshToken,
             });
-            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers }, logger)
+            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers }, CONFIG.logger)
                 .catch((err) => { throw new Error(`Failed to refresh tokens: ${err}`) });
             tokens.id_token = res.data.id_token;
             tokens.access_token = res.data.access_token;
@@ -58,7 +60,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 ...CONFIG.cloudFrontHeaders,
             }
         };
-        logger.debug('Returning response:\n', response);
+        CONFIG.logger.debug('Returning response:\n', response);
         return response;
     } catch (err) {
         const response = {
@@ -79,7 +81,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 }]
             },
         };
-        logger.debug('Returning response:\n', response);
+        CONFIG.logger.debug('Returning response:\n', response);
         return response;
     }
 }

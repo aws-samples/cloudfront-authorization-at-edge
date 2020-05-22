@@ -5,12 +5,15 @@ import { CloudFrontResponseHandler } from 'aws-lambda';
 import { getConfig } from '../shared/shared';
 
 
-const { logger, ...CONFIG } = getConfig();
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontResponseHandler = async (event) => {
-    logger.debug(event);
+    if (!CONFIG || process.env.IS_TEST_MODE) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const response = event.Records[0].cf.response;
     Object.assign(response.headers, CONFIG.cloudFrontHeaders);
-    logger.debug('Returning response:\n', response);
+    CONFIG.logger.debug('Returning response:\n', response);
     return response;
 }

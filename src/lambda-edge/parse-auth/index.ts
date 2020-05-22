@@ -6,11 +6,14 @@ import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 import { validate } from '../shared/validate-jwt';
 
-const { logger, ...CONFIG } = getConfig();
+let CONFIG: ReturnType<typeof getConfig>;
 const COGNITO_TOKEN_ENDPOINT = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
-    logger.debug(event);
+    if (!CONFIG || process.env.IS_TEST_MODE) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
@@ -19,7 +22,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         const cookies = extractAndParseCookies(request.headers, CONFIG.clientId);
         ({ idToken } = cookies);
         const { code, pkce, requestedUri } = validateQueryStringAndCookies({ querystring: request.querystring, cookies });
-        logger.debug('Query string and cookies are valid');
+        CONFIG.logger.debug('Query string and cookies are valid');
         redirectedFromUri += requestedUri;
 
         const body = stringifyQueryString({
@@ -39,13 +42,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             const encodedSecret = Buffer.from(`${CONFIG.clientId}:${CONFIG.clientSecret}`).toString('base64');
             requestConfig.headers.Authorization = `Basic ${encodedSecret}`;
         }
-        logger.debug('HTTP POST to Cognito token endpoint:\n', {
+        CONFIG.logger.debug('HTTP POST to Cognito token endpoint:\n', {
             uri: COGNITO_TOKEN_ENDPOINT, body, requestConfig
         });
-        const { status, headers, data: tokens } = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, requestConfig, logger)
+        const { status, headers, data: tokens } = await httpPostWithRetry(COGNITO_TOKEN_ENDPOINT, body, requestConfig, CONFIG.logger)
             .catch((err) => { throw new Error(`Failed to exchange authorization code for tokens: ${err}`) });
-        logger.info('Successfully exchanged authorization code for tokens');
-        logger.debug('Response from Cognito token endpoint:\n', { status, headers, tokens });
+        CONFIG.logger.info('Successfully exchanged authorization code for tokens');
+        CONFIG.logger.debug('Response from Cognito token endpoint:\n', { status, headers, tokens });
 
         const response = {
             status: '307',
@@ -61,17 +64,17 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 ...CONFIG.cloudFrontHeaders,
             }
         };
-        logger.debug('Returning response:\n', response);
+        CONFIG.logger.debug('Returning response:\n', response);
         return response;
     } catch (err) {
-        logger.error(err.stack || err);
+        CONFIG.logger.error(err.stack || err);
         if (idToken) {
             // There is an ID token - maybe the user signed in already (e.g. in another browser tab)
-            logger.debug('ID token found, will check if it is valid');
+            CONFIG.logger.debug('ID token found, will check if it is valid');
             try {
-                logger.info('Validating JWT ...');
+                CONFIG.logger.info('Validating JWT ...');
                 await validate(idToken, CONFIG.tokenJwksUri, CONFIG.tokenIssuer, CONFIG.clientId);
-                logger.info('JWT is valid');
+                CONFIG.logger.info('JWT is valid');
                 // Return user to where he/she came from
                 const response = {
                     status: '307',
@@ -84,10 +87,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                         ...CONFIG.cloudFrontHeaders,
                     }
                 };
-                logger.debug('Returning response:\n', response);
+                CONFIG.logger.debug('Returning response:\n', response);
                 return response;
             } catch (err) {
-                logger.debug('ID token not valid:', err.toString());
+                CONFIG.logger.debug('ID token not valid:', err.toString());
             }
         }
         let htmlParams: Parameters<typeof createErrorHtml>[0];
@@ -121,7 +124,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 }]
             }
         };
-        logger.debug('Returning response:\n', response);
+        CONFIG.logger.debug('Returning response:\n', response);
         return response;
     }
 }

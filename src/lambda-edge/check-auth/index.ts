@@ -7,16 +7,19 @@ import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from '../shared/validate-jwt';
 import { getConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 
-const { logger, ...CONFIG } = getConfig();
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
-    logger.debug(event);
+    if (!CONFIG || process.env.IS_TEST_MODE) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const requestedUri = `${request.uri}${request.querystring ? '?' + request.querystring : ''}`;
     try {
         const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
-        logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
+        CONFIG.logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
 
         // If there's no ID token in your cookies then you are not signed in yet
         if (!idToken) {
@@ -27,9 +30,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         // This is done by redirecting the user to the refresh endpoint
         // After the tokens are refreshed the user is redirected back here (probably without even noticing this double redirect)
         const { exp } = decodeToken(idToken);
-        logger.debug('ID token exp:', exp, new Date(exp * 1000).toISOString());
+        CONFIG.logger.debug('ID token exp:', exp, new Date(exp * 1000).toISOString());
         if ((Date.now() / 1000) > exp - (60 * 10) && refreshToken) {
-            logger.info('Will redirect to refresh endpoint for refreshing tokens using refresh token');
+            CONFIG.logger.info('Will redirect to refresh endpoint for refreshing tokens using refresh token');
             const nonce = generateNonce();
             const response = {
                 status: '307',
@@ -46,21 +49,21 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     ...CONFIG.cloudFrontHeaders,
                 }
             };
-            logger.debug('Returning response:\n', response);
+            CONFIG.logger.debug('Returning response:\n', response);
             return response;
         }
 
         // Check that the ID token is valid. This throws an error if it's not
-        logger.info('Validating JWT ...');
+        CONFIG.logger.info('Validating JWT ...');
         await validate(idToken, CONFIG.tokenJwksUri, CONFIG.tokenIssuer, CONFIG.clientId);
-        logger.info('JWT is valid');
+        CONFIG.logger.info('JWT is valid');
 
         // Return the request unaltered to allow access to the resource:
-        logger.debug('Returning request:\n', request);
+        CONFIG.logger.debug('Returning request:\n', request);
         return request;
 
     } catch (err) {
-        logger.info(`Will redirect to Cognito for sign-in because: ${err}`);
+        CONFIG.logger.info(`Will redirect to Cognito for sign-in because: ${err}`);
 
         // Reuse existing state if possible, to be more lenient to users doing parallel sign-in's
         // Users being users, may open the sign-in page in one browser tab, do something else,
@@ -71,7 +74,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             nonceHmac: sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
             ...generatePkceVerifier()
         }
-        logger.debug('Using new state\n', state);
+        CONFIG.logger.debug('Using new state\n', state);
 
         // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
         // Cognito decodes the URL, causing a malformed link due to the JSON string, and results in an empty 400 response from Cognito.
@@ -102,7 +105,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 ...CONFIG.cloudFrontHeaders,
             }
         }
-        logger.debug('Returning response:\n', response);
+        CONFIG.logger.debug('Returning response:\n', response);
         return response;
     }
 }
@@ -117,14 +120,14 @@ function generatePkceVerifier(pkce?: string) {
             .update(pkce, 'utf8')
             .digest('base64')),
     };
-    logger.debug('Generated PKCE verifier:\n', verifier);
+    CONFIG.logger.debug('Generated PKCE verifier:\n', verifier);
     return verifier;
 }
 
 function generateNonce() {
     const randomString = [...new Array(CONFIG.nonceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
     const nonce = `${timestampInSeconds()}T${randomString}`;
-    logger.debug('Generated new nonce:', nonce);
+    CONFIG.logger.debug('Generated new nonce:', nonce);
     return nonce;
 }
 

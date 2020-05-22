@@ -116,6 +116,9 @@ export interface Config extends ConfigFromDisk {
 let CONFIG: Config | undefined = undefined;
 
 export function setConfig(config?: Config) {
+    if (!process.env.IS_TEST_MODE) {
+        throw new Error('This method is intended to be used in test mode only: env var IS_TEST_MODE needs to be set');
+    }
     CONFIG = config;
 }
 
@@ -133,11 +136,11 @@ export function getConfig(): Config {
 
     // Derive cookie settings by merging the defaults with the explicitly provided values
     // Default cookies settings depend on the deployment mode (SPA or Static Site)
-    const cookieSettings = Object.fromEntries(
+    const cookieSettings = config.cookieSettings ? Object.fromEntries(
         Object
             .entries(config.cookieSettings)
             .map(([k, v]) => [k, v || defaultCookieSettings[config.mode][k as keyof CookieSettings]])
-    ) as CookieSettings;
+    ) as CookieSettings : defaultCookieSettings[config.mode];
 
     // Setup logger
     const logger = new Logger(LogLevel[config.logLevel]);

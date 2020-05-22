@@ -5,10 +5,13 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { getConfig, extractAndParseCookies, generateCookieHeaders, createErrorHtml } from '../shared/shared';
 
-const { logger, ...CONFIG } = getConfig();
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
-    logger.debug(event);
+    if (!CONFIG || process.env.IS_TEST_MODE) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, CONFIG.clientId);
@@ -30,7 +33,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 }]
             },
         };
-        logger.debug('Returning response:\n', response);
+        CONFIG.logger.debug('Returning response:\n', response);
         return response;
     }
 
@@ -54,6 +57,6 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             ...CONFIG.cloudFrontHeaders,
         }
     };
-    logger.debug('Returning response:\n', response);
+    CONFIG.logger.debug('Returning response:\n', response);
     return response;
 }

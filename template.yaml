@@ -637,6 +637,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt NonceSigningSecretHandler.Arn
       Length: 16
+      Version: !Ref Version
 
   NonceSigningSecretHandler:
     Type: AWS::Serverless::Function

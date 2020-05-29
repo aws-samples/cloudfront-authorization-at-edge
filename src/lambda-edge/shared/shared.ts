@@ -59,9 +59,9 @@ interface ConfigFromDisk {
 
 enum LogLevel {
     'none' = 0,
-    'info' = 10,
+    'error' = 10,
     'warn' = 20,
-    'error' = 30,
+    'info' = 30,
     'debug' = 40,
 }
 

@@ -31,7 +31,7 @@ async function updateLambdaCode(action: 'Create' | 'Update' | 'Delete', lambdaFu
     console.log('Adding (fresh) configuration.json ...');
     const tempDir = mkdtempSync('/tmp/lambda-package');
     lambdaZip.extractAllTo(tempDir, true);
-    writeFileSync(resolve(tempDir, 'configuration.json'), Buffer.from(JSON.stringify(config)));
+    writeFileSync(resolve(tempDir, 'configuration.json'), Buffer.from(JSON.stringify(config, null, 2)));
     const newLambdaZip = new Zip();
     newLambdaZip.addLocalFolder(tempDir);
     console.log('New Lambda zip contents:', newLambdaZip.getEntries().map(entry => entry.name));

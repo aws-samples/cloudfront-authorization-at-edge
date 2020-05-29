@@ -9,7 +9,7 @@ import { validate } from '../shared/validate-jwt';
 let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
-    if (!CONFIG || process.env.IS_TEST_MODE) {
+    if (!CONFIG) {
         CONFIG = getConfig();
     }
     CONFIG.logger.debug(event);

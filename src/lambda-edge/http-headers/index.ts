@@ -8,7 +8,7 @@ import { getConfig } from '../shared/shared';
 let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontResponseHandler = async (event) => {
-    if (!CONFIG || process.env.IS_TEST_MODE) {
+    if (!CONFIG) {
         CONFIG = getConfig();
     }
     CONFIG.logger.debug(event);

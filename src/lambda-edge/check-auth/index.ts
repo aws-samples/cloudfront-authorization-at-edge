@@ -10,7 +10,7 @@ import { getConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestam
 let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
-    if (!CONFIG || process.env.IS_TEST_MODE) {
+    if (!CONFIG) {
         CONFIG = getConfig();
     }
     CONFIG.logger.debug(event);

@@ -113,20 +113,7 @@ export interface Config extends ConfigFromDisk {
     nonceMaxAge: number;
 }
 
-let CONFIG: Config | undefined = undefined;
-
-export function setConfig(config?: Config) {
-    if (!process.env.IS_TEST_MODE) {
-        throw new Error('This method is intended to be used in test mode only: env var IS_TEST_MODE needs to be set');
-    }
-    CONFIG = config;
-}
-
 export function getConfig(): Config {
-    if (CONFIG) {
-        return CONFIG;
-    }
-
     const config = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as ConfigFromDisk;
 
     // Derive the issuer and JWKS uri all JWT's will be signed with from the User Pool's ID and region:

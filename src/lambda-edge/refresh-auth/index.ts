@@ -3,12 +3,15 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
+import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, mode, cloudFrontHeaders, clientSecret } = getConfig();
-
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
+    if (!CONFIG) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
@@ -16,31 +19,34 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     try {
         const { requestedUri, nonce: currentNonce } = parseQueryString(request.querystring);
         redirectedFromUri += requestedUri || '';
-        const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, clientId);
+        const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, CONFIG.clientId);
 
         validateRefreshRequest(currentNonce, originalNonce, idToken, accessToken, refreshToken);
 
         let headers: { 'Content-Type': string, Authorization?: string } = { 'Content-Type': 'application/x-www-form-urlencoded' }
 
-        if (clientSecret !== '') {
-            const encodedSecret = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+        if (CONFIG.clientSecret !== '') {
+            const encodedSecret = Buffer.from(`${CONFIG.clientId}:${CONFIG.clientSecret}`).toString('base64');
             headers['Authorization'] = `Basic ${encodedSecret}`
         }
 
         let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
+        let cookieHeadersEventType: keyof typeof generateCookieHeaders;
         try {
             const body = stringifyQueryString({
                 grant_type: 'refresh_token',
-                client_id: clientId,
+                client_id: CONFIG.clientId,
                 refresh_token: refreshToken,
             });
-            const res = await httpPostWithRetry(`https://${cognitoAuthDomain}/oauth2/token`, body, { headers });
+            const res = await httpPostWithRetry(`https://${CONFIG.cognitoAuthDomain}/oauth2/token`, body, { headers }, CONFIG.logger)
+                .catch((err) => { throw new Error(`Failed to refresh tokens: ${err}`) });
             tokens.id_token = res.data.id_token;
             tokens.access_token = res.data.access_token;
+            cookieHeadersEventType = 'newTokens';
         } catch (err) {
-            tokens.refresh_token = '';
+            cookieHeadersEventType = 'refreshFailed';
         }
-        return {
+        const response = {
             status: '307',
             statusDescription: 'Temporary Redirect',
             headers: {
@@ -48,24 +54,35 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                     key: 'location',
                     value: redirectedFromUri,
                 }],
-                'set-cookie': getCookieHeaders({
-                    clientId, oauthScopes, tokens, domainName, explicitCookieSettings: cookieSettings, mode
+                'set-cookie': generateCookieHeaders[cookieHeadersEventType]({
+                    tokens, domainName, ...CONFIG
                 }),
-                ...cloudFrontHeaders,
+                ...CONFIG.cloudFrontHeaders,
             }
         };
+        CONFIG.logger.debug('Returning response:\n', response);
+        return response;
     } catch (err) {
-        return {
-            body: createErrorHtml('Bad Request', err.toString(), redirectedFromUri),
-            status: '400',
+        const response = {
+            body: createErrorHtml({
+                title: 'Refresh issue',
+                message: 'We can\'t refresh your sign-in because of a',
+                expandText: 'technical problem',
+                details: err.toString(),
+                linkUri: redirectedFromUri,
+                linkText: 'Try again',
+            }),
+            status: '200',
             headers: {
-                ...cloudFrontHeaders,
+                ...CONFIG.cloudFrontHeaders,
                 'content-type': [{
                     key: 'Content-Type',
                     value: 'text/html; charset=UTF-8',
                 }]
             },
         };
+        CONFIG.logger.debug('Returning response:\n', response);
+        return response;
     }
 }
 

@@ -4,95 +4,131 @@
 import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { validate } from './validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe, defaultCookieSettings } from '../shared/shared';
+import { validate } from '../shared/validate-jwt';
+import { getConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 
-// Allowed characters per https://tools.ietf.org/html/rfc7636#section-4.1
-const SECRET_ALLOWED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-const PKCE_LENGTH = 43; // Should be between 43 and 128 - per spec
-const NONCE_LENGTH = 16; // how many characters should your nonces be?
-
-const { clientId, oauthScopes, cognitoAuthDomain, redirectPathSignIn, redirectPathAuthRefresh,
-    tokenIssuer, tokenJwksUri, cookieSettings, mode, cloudFrontHeaders } = getConfig();
-
-const COOKIE_SETTING = cookieSettings.nonce || defaultCookieSettings[mode].nonce;
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
+    if (!CONFIG) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const requestedUri = `${request.uri}${request.querystring ? '?' + request.querystring : ''}`;
-    const nonce = generateNonce();
     try {
-        const { tokenUserName, idToken, refreshToken } = extractAndParseCookies(request.headers, clientId);
-        if (!tokenUserName || !idToken) {
-            throw new Error('No valid credentials present in cookies');
+        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        CONFIG.logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
+
+        // If there's no ID token in your cookies then you are not signed in yet
+        if (!idToken) {
+            throw new Error('No ID token present in cookies');
         }
-        // If the token has expired or expires in less than 5 minutes and there is a refreshToken: refresh tokens
+
+        // If the ID token has expired or expires in less than 10 minutes and there is a refreshToken: refresh tokens
+        // This is done by redirecting the user to the refresh endpoint
+        // After the tokens are refreshed the user is redirected back here (probably without even noticing this double redirect)
         const { exp } = decodeToken(idToken);
-        if ((Date.now() / 1000) > exp - (60 * 5) && refreshToken) {
-            return {
+        CONFIG.logger.debug('ID token exp:', exp, new Date(exp * 1000).toISOString());
+        if ((Date.now() / 1000) > exp - (60 * 10) && refreshToken) {
+            CONFIG.logger.info('Will redirect to refresh endpoint for refreshing tokens using refresh token');
+            const nonce = generateNonce();
+            const response = {
                 status: '307',
                 statusDescription: 'Temporary Redirect',
                 headers: {
                     'location': [{
                         key: 'location',
-                        value: `https://${domainName}${redirectPathAuthRefresh}?${stringifyQueryString({ requestedUri, nonce })}`
+                        value: `https://${domainName}${CONFIG.redirectPathAuthRefresh}?${stringifyQueryString({ requestedUri, nonce })}`
                     }],
                     'set-cookie': [
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${COOKIE_SETTING}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
+                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
                     ],
-                    ...cloudFrontHeaders,
+                    ...CONFIG.cloudFrontHeaders,
                 }
-            }
+            };
+            CONFIG.logger.debug('Returning response:\n', response);
+            return response;
         }
-        // Check for valid a JWT. This throws an error if there's no valid JWT:
-        await validate(idToken, tokenJwksUri, tokenIssuer, clientId);
+
+        // Check that the ID token is valid. This throws an error if it's not
+        CONFIG.logger.info('Validating JWT ...');
+        await validate(idToken, CONFIG.tokenJwksUri, CONFIG.tokenIssuer, CONFIG.clientId);
+        CONFIG.logger.info('JWT is valid');
+
         // Return the request unaltered to allow access to the resource:
+        CONFIG.logger.debug('Returning request:\n', request);
         return request;
 
     } catch (err) {
+        CONFIG.logger.info(`Will redirect to Cognito for sign-in because: ${err}`);
+
+        // Reuse existing state if possible, to be more lenient to users doing parallel sign-in's
+        // Users being users, may open the sign-in page in one browser tab, do something else,
+        // open the sign-in page in another tab, do something else, come back to the first tab and complete the sign-in (etc.)
+        const nonce = generateNonce();
+        const state = {
+            nonce,
+            nonceHmac: sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
+            ...generatePkceVerifier()
+        }
+        CONFIG.logger.debug('Using new state\n', state);
+
         // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
         // Cognito decodes the URL, causing a malformed link due to the JSON string, and results in an empty 400 response from Cognito.
-        const { pkce, pkceHash } = generatePkceVerifier();
         const loginQueryString = stringifyQueryString({
-            redirect_uri: `https://${domainName}${redirectPathSignIn}`,
+            redirect_uri: `https://${domainName}${CONFIG.redirectPathSignIn}`,
             response_type: 'code',
-            client_id: clientId,
-            state: urlSafe.stringify(Buffer.from(JSON.stringify({ nonce, requestedUri })).toString('base64')),
-            scope: oauthScopes.join(' '),
+            client_id: CONFIG.clientId,
+            state: urlSafe.stringify(Buffer.from(JSON.stringify({ nonce: state.nonce, requestedUri })).toString('base64')),
+            scope: CONFIG.oauthScopes.join(' '),
             code_challenge_method: 'S256',
-            code_challenge: pkceHash,
+            code_challenge: state.pkceHash,
         });
-        return {
+
+        // Return redirect to Cognito Hosted UI for sign-in
+        const response = {
             status: '307',
             statusDescription: 'Temporary Redirect',
             headers: {
                 'location': [{
                     key: 'location',
-                    value: `https://${cognitoAuthDomain}/oauth2/authorize?${loginQueryString}`
+                    value: `https://${CONFIG.cognitoAuthDomain}/oauth2/authorize?${loginQueryString}`
                 }],
                 'set-cookie': [
-                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${COOKIE_SETTING}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(pkce)}; ${COOKIE_SETTING}` }
+                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(state.nonce)}; ${CONFIG.cookieSettings.nonce}` },
+                    { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(state.nonceHmac)}; ${CONFIG.cookieSettings.nonce}` },
+                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(state.pkce)}; ${CONFIG.cookieSettings.nonce}` }
                 ],
-                ...cloudFrontHeaders,
+                ...CONFIG.cloudFrontHeaders,
             }
         }
+        CONFIG.logger.debug('Returning response:\n', response);
+        return response;
     }
 }
 
-function generatePkceVerifier() {
-    const pkce = [...new Array(PKCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
-    return {
+function generatePkceVerifier(pkce?: string) {
+    if (!pkce) {
+        pkce = [...new Array(CONFIG.pkceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
+    }
+    const verifier = {
         pkce,
         pkceHash: urlSafe.stringify(createHash('sha256')
             .update(pkce, 'utf8')
             .digest('base64')),
     };
+    CONFIG.logger.debug('Generated PKCE verifier:\n', verifier);
+    return verifier;
 }
 
 function generateNonce() {
-    return [...new Array(NONCE_LENGTH)].map(() => randomChoiceFromIndexable(SECRET_ALLOWED_CHARS)).join('');
+    const randomString = [...new Array(CONFIG.nonceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
+    const nonce = `${timestampInSeconds()}T${randomString}`;
+    CONFIG.logger.debug('Generated new nonce:', nonce);
+    return nonce;
 }
 
 function randomChoiceFromIndexable(indexable: string) {
@@ -100,10 +136,11 @@ function randomChoiceFromIndexable(indexable: string) {
         throw new Error(`indexable is too large: ${indexable.length}`);
     }
     const chunks = Math.floor(256 / indexable.length);
+    const firstBiassedIndex = indexable.length * chunks;
     let randomNumber: number;
     do {
         randomNumber = randomBytes(1)[0];
-    } while (randomNumber >= indexable.length * chunks)
+    } while (randomNumber >= firstBiassedIndex)
     const index = randomNumber % indexable.length;
     return indexable[index];
 }

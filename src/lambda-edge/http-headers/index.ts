@@ -1,20 +1,19 @@
 // Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { readFileSync } from 'fs';
-import { CloudFrontResponseHandler, CloudFrontHeaders } from 'aws-lambda';
-import { HttpHeaders, asCloudFrontHeaders } from '../shared/shared';
+import { CloudFrontResponseHandler } from 'aws-lambda';
+import { getConfig } from '../shared/shared';
 
 
-const configuredHeaders = getConfiguredHeaders();
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontResponseHandler = async (event) => {
-    const resp = event.Records[0].cf.response;
-    Object.assign(resp.headers, configuredHeaders);
-    return resp;
-}
-
-function getConfiguredHeaders(): CloudFrontHeaders {
-    const headers = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as HttpHeaders;
-    return asCloudFrontHeaders(headers);
+    if (!CONFIG) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
+    const response = event.Records[0].cf.response;
+    Object.assign(response.headers, CONFIG.cloudFrontHeaders);
+    CONFIG.logger.debug('Returning response:\n', response);
+    return response;
 }

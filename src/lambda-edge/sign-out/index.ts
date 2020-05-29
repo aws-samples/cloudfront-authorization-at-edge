@@ -3,42 +3,60 @@
 
 import { stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, getCookieHeaders } from '../shared/shared';
+import { getConfig, extractAndParseCookies, generateCookieHeaders, createErrorHtml } from '../shared/shared';
 
-const { clientId, oauthScopes, cognitoAuthDomain, cookieSettings, mode, cloudFrontHeaders, redirectPathSignOut } = getConfig();
+let CONFIG: ReturnType<typeof getConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
+    if (!CONFIG) {
+        CONFIG = getConfig();
+    }
+    CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
-    const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, clientId);
+    const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, CONFIG.clientId);
 
     if (!idToken) {
-        return {
-            body: 'Bad Request',
-            status: '400',
-            statusDescription: 'Bad Request',
-            headers: cloudFrontHeaders,
+        const response = {
+            body: createErrorHtml({
+                title: 'Signed out',
+                message: 'You are already signed out',
+                linkUri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
+                linkText: 'Proceed',
+            }),
+            status: '200',
+            headers: {
+                ...CONFIG.cloudFrontHeaders,
+                'content-type': [{
+                    key: 'Content-Type',
+                    value: 'text/html; charset=UTF-8',
+                }]
+            },
         };
+        CONFIG.logger.debug('Returning response:\n', response);
+        return response;
     }
 
-    let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken };
+    let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
     const qs = {
-        logout_uri: `https://${domainName}${redirectPathSignOut}`,
-        client_id: clientId,
+        logout_uri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
+        client_id: CONFIG.clientId,
     };
 
-    return {
+    const response = {
         status: '307',
         statusDescription: 'Temporary Redirect',
         headers: {
             'location': [{
                 key: 'location',
-                value: `https://${cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
+                value: `https://${CONFIG.cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
             }],
-            'set-cookie': getCookieHeaders({
-                clientId, oauthScopes, tokens, domainName, explicitCookieSettings: cookieSettings, mode, expireAllTokens: true
+            'set-cookie': generateCookieHeaders.signOut({
+                tokens, domainName, ...CONFIG
             }),
-            ...cloudFrontHeaders,
+            ...CONFIG.cloudFrontHeaders,
         }
     };
+    CONFIG.logger.debug('Returning response:\n', response);
+    return response;
 }

@@ -22,6 +22,7 @@
     "@types/jsonwebtoken": "^8.3.9",
     "@types/ncp": "^2.0.3",
     "@types/node": "^13.13.0",
+    "html-loader": "^1.1.0",
     "terser-webpack-plugin": "^2.3.5",
     "ts-loader": "^7.0.0",
     "typescript": "^3.8.3",

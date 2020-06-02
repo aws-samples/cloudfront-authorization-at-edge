@@ -4,13 +4,15 @@
   "description": "Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Sorry, there aren't any tests\"; exit 1",
     "tsc": "tsc -b",
     "webpack": "webpack --progress",
     "analyze": "webpack --profile --json > stats.json && webpack-bundle-analyzer ./stats.json",
     "build": "npm run tsc && npm run webpack",
     "update-dependencies": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [[ ! -f ${DIR}/package.json ]] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && rm -rf node_modules package-lock.json && npm update --dev); done; npm i",
-    "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [[ ! -f ${DIR}/package.json ]] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --ignore-scripts); done"
+    "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [[ ! -f ${DIR}/package.json ]] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --ignore-scripts); done",
+    "clean": "rm -rf node_modules/ build/* coverage/",
+    "test": "npm run coverage",
+    "coverage": "jest --coverage --verbose --silent"
   },
   "keywords": [],
   "author": "",
@@ -19,11 +21,17 @@
     "@types/aws-lambda": "^8.10.50",
     "@types/cookie": "^0.3.3",
     "@types/fs-extra": "^8.1.0",
+    "@types/jest": "^25.2.1",
     "@types/jsonwebtoken": "^8.3.9",
     "@types/ncp": "^2.0.3",
     "@types/node": "^13.13.0",
+    "aws-sdk-mock": "^5.1.0",
     "html-loader": "^1.1.0",
+    "jest": "^25.2.7",
+    "jest-transform-stub": "^2.0.0",
+    "jszip": "^3.4.0",
     "terser-webpack-plugin": "^2.3.5",
+    "ts-jest": "^25.3.1",
     "ts-loader": "^7.0.0",
     "typescript": "^3.8.3",
     "webpack": "^4.42.1",
@@ -39,5 +47,19 @@
     "jwks-rsa": "^1.8.0",
     "ncp": "^2.0.0",
     "s3-spa-upload": "^1.1.6"
+  },
+  "files": [
+    "src/**/*.ts",
+    "src/**/*.json"
+  ],
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }

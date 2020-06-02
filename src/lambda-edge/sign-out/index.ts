@@ -27,17 +27,19 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             status: '200',
             headers: {
                 ...CONFIG.cloudFrontHeaders,
-                'content-type': [{
-                    key: 'Content-Type',
-                    value: 'text/html; charset=UTF-8',
-                }]
+                'content-type': [
+                    {
+                        key: 'Content-Type',
+                        value: 'text/html; charset=UTF-8',
+                    },
+                ],
             },
         };
         CONFIG.logger.debug('Returning response:\n', response);
         return response;
     }
 
-    let tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
+    const tokens = { id_token: idToken!, access_token: accessToken!, refresh_token: refreshToken! };
     const qs = {
         logout_uri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
         client_id: CONFIG.clientId,
@@ -47,16 +49,20 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         status: '307',
         statusDescription: 'Temporary Redirect',
         headers: {
-            'location': [{
-                key: 'location',
-                value: `https://${CONFIG.cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
-            }],
+            location: [
+                {
+                    key: 'location',
+                    value: `https://${CONFIG.cognitoAuthDomain}/logout?${stringifyQueryString(qs)}`,
+                },
+            ],
             'set-cookie': generateCookieHeaders.signOut({
-                tokens, domainName, ...CONFIG
+                tokens,
+                domainName,
+                ...CONFIG,
             }),
             ...CONFIG.cloudFrontHeaders,
-        }
+        },
     };
     CONFIG.logger.debug('Returning response:\n', response);
     return response;
-}
+};

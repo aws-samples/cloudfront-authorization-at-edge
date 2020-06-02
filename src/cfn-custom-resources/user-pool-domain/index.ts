@@ -6,14 +6,20 @@ import {
     CloudFormationCustomResourceHandler,
     CloudFormationCustomResourceResponse,
     CloudFormationCustomResourceDeleteEvent,
-    CloudFormationCustomResourceUpdateEvent
+    CloudFormationCustomResourceUpdateEvent,
 } from 'aws-lambda';
 import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
-const COGNITO_CLIENT = new CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
+const COGNITO_CLIENT = new CognitoIdentityServiceProvider({
+    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION,
+});
 
-async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete', newUserPoolId: string, physicalResourceId?: string) {
+async function ensureCognitoUserPoolDomain(
+    action: 'Create' | 'Update' | 'Delete',
+    newUserPoolId: string,
+    physicalResourceId?: string,
+) {
     const decodedPhysicalResourceId = decodePhysicalResourceId(physicalResourceId!);
     let returnPhysicalResourceId: string;
     let domainName: string | undefined;
@@ -30,10 +36,15 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
         }
         returnPhysicalResourceId = physicalResourceId!;
     } else if (action === 'Create' || action === 'Update') {
-        const randomValue = decodedPhysicalResourceId && decodedPhysicalResourceId.randomValue || randomBytes(4).toString('hex');
+        const randomValue =
+            (decodedPhysicalResourceId && decodedPhysicalResourceId.randomValue) || randomBytes(4).toString('hex');
         const domainPrefix = `auth-${randomValue}`;
         const existingDomain = await COGNITO_CLIENT.describeUserPoolDomain({ Domain: domainPrefix }).promise();
-        if (action === 'Create' || !existingDomain.DomainDescription || !existingDomain.DomainDescription!.CustomDomainConfig!) {
+        if (
+            action === 'Create' ||
+            !existingDomain.DomainDescription ||
+            !existingDomain.DomainDescription!.CustomDomainConfig!
+        ) {
             const input: CognitoIdentityServiceProvider.CreateUserPoolDomainRequest = {
                 Domain: domainPrefix,
                 UserPoolId: newUserPoolId,
@@ -47,20 +58,19 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
-    const {
-        LogicalResourceId,
-        RequestId,
-        StackId,
-        ResponseURL,
-        ResourceProperties,
-        RequestType,
-    } = event;
+    const { LogicalResourceId, RequestId, StackId, ResponseURL, ResourceProperties, RequestType } = event;
 
-    const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
+    const { PhysicalResourceId } = event as
+        | CloudFormationCustomResourceDeleteEvent
+        | CloudFormationCustomResourceUpdateEvent;
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const { domainName, physicalResourceId } = await ensureCognitoUserPoolDomain(RequestType, ResourceProperties.UserPoolId, PhysicalResourceId);
+        const { domainName, physicalResourceId } = await ensureCognitoUserPoolDomain(
+            RequestType,
+            ResourceProperties.UserPoolId,
+            PhysicalResourceId,
+        );
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId,
@@ -69,7 +79,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
             StackId,
             Data: {
                 DomainName: domainName,
-            }
+            },
         };
     } catch (err) {
         response = {
@@ -82,7 +92,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
         };
     }
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
-}
+};
 
 function encodePhysicalResourceId(userPoolId: string, domainPrefix: string, randomValue: string) {
     const obj = { userPoolId, domainPrefix, randomValue };
@@ -91,7 +101,7 @@ function encodePhysicalResourceId(userPoolId: string, domainPrefix: string, rand
 
 function decodePhysicalResourceId(physicalResourceId: string) {
     try {
-        return JSON.parse(physicalResourceId) as { userPoolId: string; domainPrefix: string; randomValue: string; };
+        return JSON.parse(physicalResourceId) as { userPoolId: string; domainPrefix: string; randomValue: string };
     } catch (err) {
         console.error(`Can't parse physicalResourceId: ${physicalResourceId}`);
     }

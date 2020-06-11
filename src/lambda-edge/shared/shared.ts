@@ -1,5 +1,6 @@
 // Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
+/* istanbul ignore file */
 
 import { CloudFrontHeaders } from 'aws-lambda';
 import { readFileSync } from 'fs';
@@ -8,6 +9,7 @@ import { parse } from 'cookie';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
 import html from './error-page/template.html';
+import Logger, { LogLevel } from './logger';
 
 export interface CookieSettings {
     idToken: string;
@@ -18,18 +20,18 @@ export interface CookieSettings {
 
 const defaultCookieSettings: { [key: string]: CookieSettings } = {
     spaMode: {
-        idToken: "Path=/; Secure; SameSite=Lax",
-        accessToken: "Path=/; Secure; SameSite=Lax",
-        refreshToken: "Path=/; Secure; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+        idToken: 'Path=/; Secure; SameSite=Lax',
+        accessToken: 'Path=/; Secure; SameSite=L:qax',
+        refreshToken: 'Path=/; Secure; SameSite=Lax',
+        nonce: 'Path=/; Secure; HttpOnly; SameSite=Lax',
     },
     staticSiteMode: {
-        idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+        idToken: 'Path=/; Secure; HttpOnly; SameSite=Lax',
+        accessToken: 'Path=/; Secure; HttpOnly; SameSite=Lax',
+        refreshToken: 'Path=/; Secure; HttpOnly; SameSite=Lax',
+        nonce: 'Path=/; Secure; HttpOnly; SameSite=Lax',
     },
-}
+};
 
 export interface HttpHeaders {
     [key: string]: string;
@@ -46,7 +48,7 @@ interface ConfigFromDisk {
     redirectPathSignOut: string;
     redirectPathAuthRefresh: string;
     cookieSettings: CookieSettings;
-    mode: Mode,
+    mode: Mode;
     httpHeaders: HttpHeaders;
     clientSecret: string;
     nonceSigningSecret: string;
@@ -55,51 +57,6 @@ interface ConfigFromDisk {
     pkceLength?: number;
     nonceLength?: number;
     nonceMaxAge?: number;
-}
-
-enum LogLevel {
-    'none' = 0,
-    'error' = 10,
-    'warn' = 20,
-    'info' = 30,
-    'debug' = 40,
-}
-
-class Logger {
-    constructor(private logLevel: LogLevel) { }
-
-    private jsonify(args: any[]) {
-        return args.map((arg: any) => {
-            if (typeof arg === 'object') {
-                try {
-                    return JSON.stringify(arg);
-                } catch {
-                    return arg;
-                }
-            };
-            return arg;
-        });
-    }
-    public info(...args: any) {
-        if (this.logLevel >= LogLevel.info) {
-            console.log(...this.jsonify(args));
-        }
-    }
-    public warn(...args: any) {
-        if (this.logLevel >= LogLevel.warn) {
-            console.warn(...this.jsonify(args));
-        }
-    }
-    public error(...args: any) {
-        if (this.logLevel >= LogLevel.error) {
-            console.error(...this.jsonify(args));
-        }
-    }
-    public debug(...args: any) {
-        if (this.logLevel >= LogLevel.debug) {
-            console.trace(...this.jsonify(args));
-        }
-    }
 }
 
 export interface Config extends ConfigFromDisk {
@@ -123,11 +80,14 @@ export function getConfig(): Config {
 
     // Derive cookie settings by merging the defaults with the explicitly provided values
     // Default cookies settings depend on the deployment mode (SPA or Static Site)
-    const cookieSettings = config.cookieSettings ? Object.fromEntries(
-        Object
-            .entries(config.cookieSettings)
-            .map(([k, v]) => [k, v || defaultCookieSettings[config.mode][k as keyof CookieSettings]])
-    ) as CookieSettings : defaultCookieSettings[config.mode];
+    const cookieSettings = config.cookieSettings
+        ? (Object.fromEntries(
+              Object.entries(config.cookieSettings).map(([k, v]) => [
+                  k,
+                  v || defaultCookieSettings[config.mode][k as keyof CookieSettings],
+              ]),
+          ) as CookieSettings)
+        : defaultCookieSettings[config.mode];
 
     // Setup logger
     const logger = new Logger(LogLevel[config.logLevel]);
@@ -137,7 +97,8 @@ export function getConfig(): Config {
         secretAllowedCharacters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',
         pkceLength: 43, // Should be between 43 and 128 - per spec
         nonceLength: 16,
-        nonceMaxAge: cookieSettings?.nonce && parseInt(parse(cookieSettings.nonce.toLowerCase())['max-age']) || 60 * 60 * 24,
+        nonceMaxAge:
+            (cookieSettings?.nonce && parseInt(parse(cookieSettings.nonce.toLowerCase())['max-age'])) || 60 * 60 * 24,
     };
 
     return {
@@ -160,7 +121,10 @@ function extractCookiesFromHeaders(headers: CloudFrontHeaders) {
     if (!headers['cookie']) {
         return {};
     }
-    const cookies = headers['cookie'].reduce((reduced, header) => Object.assign(reduced, parse(header.value)), {} as Cookies);
+    const cookies = headers['cookie'].reduce(
+        (reduced, header) => Object.assign(reduced, parse(header.value)),
+        {} as Cookies,
+    );
 
     return cookies;
 }
@@ -174,14 +138,18 @@ function withCookieDomain(distributionDomainName: string, cookieSettings: string
 }
 
 export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
-    return Object.entries(headers).reduce((reduced, [key, value]) => (
-        Object.assign(reduced, {
-            [key.toLowerCase()]: [{
-                key,
-                value
-            }]
-        })
-    ), {} as CloudFrontHeaders);
+    return Object.entries(headers).reduce(
+        (reduced, [key, value]) =>
+            Object.assign(reduced, {
+                [key.toLowerCase()]: [
+                    {
+                        key,
+                        value,
+                    },
+                ],
+            }),
+        {} as CloudFrontHeaders,
+    );
 }
 
 export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: string) {
@@ -215,7 +183,7 @@ export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: str
         nonce: cookies['spa-auth-edge-nonce'],
         nonceHmac: cookies['spa-auth-edge-nonce-hmac'],
         pkce: cookies['spa-auth-edge-pkce'],
-    }
+    };
 }
 
 export function decodeToken(jwt: string) {
@@ -225,18 +193,17 @@ export function decodeToken(jwt: string) {
 }
 
 interface GenerateCookieHeadersParam {
-    clientId: string,
-    oauthScopes: string[],
-    domainName: string,
-    cookieSettings: CookieSettings,
-    mode: Mode,
+    clientId: string;
+    oauthScopes: string[];
+    domainName: string;
+    cookieSettings: CookieSettings;
+    mode: Mode;
     tokens: {
         id_token: string;
         access_token: string;
         refresh_token: string;
-    }
+    };
 }
-
 
 export const generateCookieHeaders = {
     newTokens: (param: GenerateCookieHeadersParam) => _generateCookieHeaders({ ...param, event: 'newTokens' }),
@@ -244,8 +211,9 @@ export const generateCookieHeaders = {
     refreshFailed: (param: GenerateCookieHeadersParam) => _generateCookieHeaders({ ...param, event: 'refreshFailed' }),
 };
 
-
-function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'newTokens' | 'signOut' | 'refreshFailed' }) {
+function _generateCookieHeaders(
+    param: GenerateCookieHeadersParam & { event: 'newTokens' | 'signOut' | 'refreshFailed' },
+) {
     // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
     const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
@@ -261,30 +229,39 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
         UserAttributes: [
             {
                 Name: 'sub',
-                Value: decodedIdToken['sub']
+                Value: decodedIdToken['sub'],
             },
             {
                 Name: 'email',
-                Value: decodedIdToken['email']
-            }
+                Value: decodedIdToken['email'],
+            },
         ],
-        Username: tokenUserName
+        Username: tokenUserName,
     });
 
     // Construct object with the cookies
     const cookies = {
         [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(
+            param.domainName,
+            param.cookieSettings.accessToken,
+        )}`,
+        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(
+            param.domainName,
+            param.cookieSettings.refreshToken,
+        )}`,
         [lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
         [scopeKey]: `${scopesString}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(
+            param.domainName,
+            param.cookieSettings.idToken,
+        )}`,
         'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
     };
 
     if (param.event === 'signOut') {
         // Expire all cookies
-        Object.keys(cookies).forEach(key => cookies[key] = expireCookie(cookies[key]));
+        Object.keys(cookies).forEach((key) => (cookies[key] = expireCookie(cookies[key])));
     } else if (param.event === 'refreshFailed') {
         // Expire refresh token (so the browser will not send it in vain again)
         cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
@@ -294,7 +271,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     // * event === 'newTokens' --> you just signed in and used your nonce and pkce successfully, don't need them no more
     // * event === 'refreshFailed' --> you are signed in already, why do you still have a nonce?
     // * event === 'signOut' --> clear ALL cookies anyway
-    ['spa-auth-edge-nonce', 'spa-auth-edge-nonce-hmac', 'spa-auth-edge-pkce'].forEach(key => {
+    ['spa-auth-edge-nonce', 'spa-auth-edge-nonce-hmac', 'spa-auth-edge-pkce'].forEach((key) => {
         cookies[key] = expireCookie(cookies[key]);
     });
 
@@ -302,12 +279,12 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
 
-function expireCookie(cookie: string = '') {
+function expireCookie(cookie = '') {
     const cookieParts = cookie
         .split(';')
-        .map(part => part.trim())
-        .filter(part => !part.toLowerCase().startsWith('max-age'))
-        .filter(part => !part.toLowerCase().startsWith('expires'));
+        .map((part) => part.trim())
+        .filter((part) => !part.toLowerCase().startsWith('max-age'))
+        .filter((part) => !part.toLowerCase().startsWith('expires'));
     const expires = `Expires=${new Date(0).toUTCString()}`;
     const [, ...settings] = cookieParts; // first part is the cookie value, which we'll clear
     return ['', ...settings, expires].join('; ');
@@ -317,8 +294,12 @@ const AXIOS_INSTANCE = axios.create({
     httpsAgent: new Agent({ keepAlive: true }),
 });
 
-
-export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig, logger: Logger): Promise<AxiosResponse<any>> {
+export async function httpPostWithRetry(
+    url: string,
+    data: any,
+    config: AxiosRequestConfig,
+    logger: Logger,
+): Promise<AxiosResponse<any>> {
     let attempts = 0;
     while (true) {
         ++attempts;
@@ -326,16 +307,19 @@ export async function httpPostWithRetry(url: string, data: any, config: AxiosReq
             return await AXIOS_INSTANCE.post(url, data, config);
         } catch (err) {
             logger.debug(`HTTP POST to ${url} failed (attempt ${attempts}):`);
-            logger.debug(err.response && err.response.data || err);
+            logger.debug((err.response && err.response.data) || err);
             if (attempts >= 5) {
                 // Try 5 times at most
                 logger.error(`No success after ${attempts} attempts, seizing further attempts`);
                 throw err;
+                // throw new Error(`Failed to exchange authorization code for tokens: ${err}`)
             }
             if (attempts >= 2) {
                 // After attempting twice immediately, do some exponential backoff with jitter
                 logger.debug('Doing exponential backoff with jitter, before attempting HTTP POST again ...');
-                await new Promise(resolve => setTimeout(resolve, 25 * (Math.pow(2, attempts) + Math.random() * attempts)));
+                await new Promise((resolve) =>
+                    setTimeout(resolve, 25 * (Math.pow(2, attempts) + Math.random() * attempts)),
+                );
                 logger.debug('Done waiting, will try HTTP POST again now');
             }
         }
@@ -370,7 +354,7 @@ export const urlSafe = {
     */
     stringify: (b64encodedString: string) => b64encodedString.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_'),
     parse: (b64encodedString: string) => b64encodedString.replace(/-/g, '+').replace(/_/g, '/'),
-}
+};
 
 export function sign(stringToSign: string, secret: string, signatureLength: number) {
     const digest = createHmac('sha256', secret).update(stringToSign).digest('base64').slice(0, signatureLength);
@@ -379,5 +363,5 @@ export function sign(stringToSign: string, secret: string, signatureLength: numb
 }
 
 export function timestampInSeconds() {
-    return Date.now() / 1000 | 0;
+    return (Date.now() / 1000) | 0;
 }

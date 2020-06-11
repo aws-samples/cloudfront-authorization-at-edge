@@ -31,23 +31,36 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         // After the tokens are refreshed the user is redirected back here (probably without even noticing this double redirect)
         const { exp } = decodeToken(idToken);
         CONFIG.logger.debug('ID token exp:', exp, new Date(exp * 1000).toISOString());
-        if ((Date.now() / 1000) > exp - (60 * 10) && refreshToken) {
+        if (Date.now() / 1000 > exp - 60 * 10 && refreshToken) {
             CONFIG.logger.info('Will redirect to refresh endpoint for refreshing tokens using refresh token');
             const nonce = generateNonce();
             const response = {
                 status: '307',
                 statusDescription: 'Temporary Redirect',
                 headers: {
-                    'location': [{
-                        key: 'location',
-                        value: `https://${domainName}${CONFIG.redirectPathAuthRefresh}?${stringifyQueryString({ requestedUri, nonce })}`
-                    }],
+                    location: [
+                        {
+                            key: 'location',
+                            value: `https://${domainName}${CONFIG.redirectPathAuthRefresh}?${stringifyQueryString({
+                                requestedUri,
+                                nonce,
+                            })}`,
+                        },
+                    ],
                     'set-cookie': [
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}` },
-                        { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength))}; ${CONFIG.cookieSettings.nonce}` },
+                        {
+                            key: 'set-cookie',
+                            value: `spa-auth-edge-nonce=${encodeURIComponent(nonce)}; ${CONFIG.cookieSettings.nonce}`,
+                        },
+                        {
+                            key: 'set-cookie',
+                            value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(
+                                sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
+                            )}; ${CONFIG.cookieSettings.nonce}`,
+                        },
                     ],
                     ...CONFIG.cloudFrontHeaders,
-                }
+                },
             };
             CONFIG.logger.debug('Returning response:\n', response);
             return response;
@@ -61,7 +74,6 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         // Return the request unaltered to allow access to the resource:
         CONFIG.logger.debug('Returning request:\n', request);
         return request;
-
     } catch (err) {
         CONFIG.logger.info(`Will redirect to Cognito for sign-in because: ${err}`);
 
@@ -72,8 +84,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         const state = {
             nonce,
             nonceHmac: sign(nonce, CONFIG.nonceSigningSecret, CONFIG.nonceLength),
-            ...generatePkceVerifier()
-        }
+            ...generatePkceVerifier(),
+        };
         CONFIG.logger.debug('Using new state\n', state);
 
         // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
@@ -82,7 +94,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             redirect_uri: `https://${domainName}${CONFIG.redirectPathSignIn}`,
             response_type: 'code',
             client_id: CONFIG.clientId,
-            state: urlSafe.stringify(Buffer.from(JSON.stringify({ nonce: state.nonce, requestedUri })).toString('base64')),
+            state: urlSafe.stringify(
+                Buffer.from(JSON.stringify({ nonce: state.nonce, requestedUri })).toString('base64'),
+            ),
             scope: CONFIG.oauthScopes.join(' '),
             code_challenge_method: 'S256',
             code_challenge: state.pkceHash,
@@ -93,39 +107,54 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             status: '307',
             statusDescription: 'Temporary Redirect',
             headers: {
-                'location': [{
-                    key: 'location',
-                    value: `https://${CONFIG.cognitoAuthDomain}/oauth2/authorize?${loginQueryString}`
-                }],
+                location: [
+                    {
+                        key: 'location',
+                        value: `https://${CONFIG.cognitoAuthDomain}/oauth2/authorize?${loginQueryString}`,
+                    },
+                ],
                 'set-cookie': [
-                    { key: 'set-cookie', value: `spa-auth-edge-nonce=${encodeURIComponent(state.nonce)}; ${CONFIG.cookieSettings.nonce}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(state.nonceHmac)}; ${CONFIG.cookieSettings.nonce}` },
-                    { key: 'set-cookie', value: `spa-auth-edge-pkce=${encodeURIComponent(state.pkce)}; ${CONFIG.cookieSettings.nonce}` }
+                    {
+                        key: 'set-cookie',
+                        value: `spa-auth-edge-nonce=${encodeURIComponent(state.nonce)}; ${CONFIG.cookieSettings.nonce}`,
+                    },
+                    {
+                        key: 'set-cookie',
+                        value: `spa-auth-edge-nonce-hmac=${encodeURIComponent(state.nonceHmac)}; ${
+                            CONFIG.cookieSettings.nonce
+                        }`,
+                    },
+                    {
+                        key: 'set-cookie',
+                        value: `spa-auth-edge-pkce=${encodeURIComponent(state.pkce)}; ${CONFIG.cookieSettings.nonce}`,
+                    },
                 ],
                 ...CONFIG.cloudFrontHeaders,
-            }
-        }
+            },
+        };
         CONFIG.logger.debug('Returning response:\n', response);
         return response;
     }
-}
+};
 
 function generatePkceVerifier(pkce?: string) {
     if (!pkce) {
-        pkce = [...new Array(CONFIG.pkceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
+        pkce = [...new Array(CONFIG.pkceLength)]
+            .map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters))
+            .join('');
     }
     const verifier = {
         pkce,
-        pkceHash: urlSafe.stringify(createHash('sha256')
-            .update(pkce, 'utf8')
-            .digest('base64')),
+        pkceHash: urlSafe.stringify(createHash('sha256').update(pkce, 'utf8').digest('base64')),
     };
     CONFIG.logger.debug('Generated PKCE verifier:\n', verifier);
     return verifier;
 }
 
 function generateNonce() {
-    const randomString = [...new Array(CONFIG.nonceLength)].map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters)).join('');
+    const randomString = [...new Array(CONFIG.nonceLength)]
+        .map(() => randomChoiceFromIndexable(CONFIG.secretAllowedCharacters))
+        .join('');
     const nonce = `${timestampInSeconds()}T${randomString}`;
     CONFIG.logger.debug('Generated new nonce:', nonce);
     return nonce;
@@ -140,7 +169,7 @@ function randomChoiceFromIndexable(indexable: string) {
     let randomNumber: number;
     do {
         randomNumber = randomBytes(1)[0];
-    } while (randomNumber >= firstBiassedIndex)
+    } while (randomNumber >= firstBiassedIndex);
     const index = randomNumber % indexable.length;
     return indexable[index];
 }

@@ -5,17 +5,15 @@ import {
     CloudFormationCustomResourceHandler,
     CloudFormationCustomResourceResponse,
     CloudFormationCustomResourceDeleteEvent,
-    CloudFormationCustomResourceUpdateEvent
+    CloudFormationCustomResourceUpdateEvent,
 } from 'aws-lambda';
 import axios from 'axios';
 import staticSiteUpload from 's3-spa-upload';
 import { mkdirSync } from 'fs';
 
-
 interface Configuration {
     BucketName: string;
 }
-
 
 async function uploadPages(action: 'Create' | 'Update' | 'Delete', config: Configuration, physicalResourceId?: string) {
     if (action === 'Create' || action === 'Update') {
@@ -25,30 +23,27 @@ async function uploadPages(action: 'Create' | 'Update' | 'Delete', config: Confi
         mkdirSync('/tmp/empty_directory', { recursive: true });
         await staticSiteUpload('/tmp/empty_directory', config.BucketName, { delete: true });
     }
-    return physicalResourceId || "StaticSite";
+    return physicalResourceId || 'StaticSite';
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event, context) => {
     console.log(JSON.stringify(event, undefined, 4));
 
-    const {
-        LogicalResourceId,
-        RequestId,
-        StackId,
-        ResponseURL,
-        ResourceProperties,
-        RequestType,
-    } = event;
+    const { LogicalResourceId, RequestId, StackId, ResponseURL, ResourceProperties, RequestType } = event;
 
     const { ServiceToken, ...config } = ResourceProperties;
 
-    const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
+    const { PhysicalResourceId } = event as
+        | CloudFormationCustomResourceDeleteEvent
+        | CloudFormationCustomResourceUpdateEvent;
 
     let response: CloudFormationCustomResourceResponse;
     try {
         const physicalResourceId = await Promise.race([
             uploadPages(RequestType, config as Configuration, PhysicalResourceId),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Task timeout')), context.getRemainingTimeInMillis() - 500))
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Task timeout')), context.getRemainingTimeInMillis() - 500),
+            ),
         ]);
         response = {
             LogicalResourceId,
@@ -56,7 +51,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event, contex
             Status: 'SUCCESS',
             RequestId,
             StackId,
-            Data: {}
+            Data: {},
         };
     } catch (err) {
         console.error(err);
@@ -70,4 +65,4 @@ export const handler: CloudFormationCustomResourceHandler = async (event, contex
         };
     }
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
-}
+};

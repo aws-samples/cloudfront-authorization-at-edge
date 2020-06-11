@@ -5,12 +5,14 @@ import {
     CloudFormationCustomResourceHandler,
     CloudFormationCustomResourceResponse,
     CloudFormationCustomResourceDeleteEvent,
-    CloudFormationCustomResourceUpdateEvent
+    CloudFormationCustomResourceUpdateEvent,
 } from 'aws-lambda';
 import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
-const COGNITO_CLIENT = new CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
+const COGNITO_CLIENT = new CognitoIdentityServiceProvider({
+    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION,
+});
 
 async function ensureCognitoUserPoolClient(
     action: 'Create' | 'Update' | 'Delete',
@@ -21,19 +23,20 @@ async function ensureCognitoUserPoolClient(
     redirectPathSignIn: string,
     redirectPathSignOut: string,
     alternateDomainNames: string[],
-    physicalResourceId?: string) {
+    physicalResourceId?: string,
+) {
     if (action === 'Delete') {
         // Deletes aren't executed; the standard UserPool client CFN Resource should just be deleted
         return { physicalResourceId: physicalResourceId! };
     }
-    const redirectDomains = [cloudFrontDistributionDomainName, ...alternateDomainNames].filter(domain => !!domain);
+    const redirectDomains = [cloudFrontDistributionDomainName, ...alternateDomainNames].filter((domain) => !!domain);
     if (!redirectDomains.length) {
         // Provide dummy value to be able to proceed
         // Should be obvious to user to update this later
         redirectDomains.push('example.org');
     }
-    const RedirectUrisSignIn = redirectDomains.map(domain => `https://${domain}${redirectPathSignIn}`);
-    const RedirectUrisSignOut = redirectDomains.map(domain => `https://${domain}${redirectPathSignOut}`);
+    const RedirectUrisSignIn = redirectDomains.map((domain) => `https://${domain}${redirectPathSignIn}`);
+    const RedirectUrisSignOut = redirectDomains.map((domain) => `https://${domain}${redirectPathSignOut}`);
     const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest = {
         AllowedOAuthFlows: ['code'],
         AllowedOAuthFlowsUserPoolClient: true,
@@ -50,29 +53,41 @@ async function ensureCognitoUserPoolClient(
         Data: {
             RedirectUrisSignIn: RedirectUrisSignIn.join(','),
             RedirectUrisSignOut: RedirectUrisSignOut.join(','),
-        }
+        },
     };
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
     console.log(JSON.stringify(event, undefined, 4));
+    const { LogicalResourceId, RequestId, StackId, ResponseURL, ResourceProperties, RequestType } = event;
+
+    const { PhysicalResourceId } = event as
+        | CloudFormationCustomResourceDeleteEvent
+        | CloudFormationCustomResourceUpdateEvent;
+
     const {
-        LogicalResourceId,
-        RequestId,
-        StackId,
-        ResponseURL,
-        ResourceProperties,
-        RequestType,
-    } = event;
-
-    const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
-
-    const { UserPoolId, UserPoolClientId, OAuthScopes, CloudFrontDistributionDomainName, RedirectPathSignIn, RedirectPathSignOut, AlternateDomainNames } = ResourceProperties;
+        UserPoolId,
+        UserPoolClientId,
+        OAuthScopes,
+        CloudFrontDistributionDomainName,
+        RedirectPathSignIn,
+        RedirectPathSignOut,
+        AlternateDomainNames,
+    } = ResourceProperties;
 
     let response: CloudFormationCustomResourceResponse;
     try {
         const { physicalResourceId, Data } = await ensureCognitoUserPoolClient(
-            RequestType, UserPoolId, UserPoolClientId, OAuthScopes, CloudFrontDistributionDomainName, RedirectPathSignIn, RedirectPathSignOut, AlternateDomainNames, PhysicalResourceId);
+            RequestType,
+            UserPoolId,
+            UserPoolClientId,
+            OAuthScopes,
+            CloudFrontDistributionDomainName,
+            RedirectPathSignIn,
+            RedirectPathSignOut,
+            AlternateDomainNames,
+            PhysicalResourceId,
+        );
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId,
@@ -92,4 +107,4 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
         };
     }
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
-}
+};

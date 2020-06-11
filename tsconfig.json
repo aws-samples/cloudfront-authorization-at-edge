@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "sourceMap": false,                        /* Generates corresponding '.map' file. */
+    "incremental": true,                      /* Enable incremental compilation */
     "target": "ES2019",                       /* Specify ECMAScript target version: 'ES3' (default), 'ES5', 'ES2015', 'ES2016', 'ES2017', 'ES2018', 'ES2019' or 'ESNEXT'. */
     "module": "commonjs",                     /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', or 'ESNext'. */
     "strict": true,                           /* Enable all strict type-checking options. */
@@ -15,9 +17,9 @@
     "esModuleInterop": true                   /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */
   },
   "include": [ /* Specify files to transpile explicitly because other ts files in this project are transpiled directly by webpack */
-    "src/cfn-custom-resources/*/*",
+    "src/**/*"
   ],
   "exclude": [
-    "src/cfn-custom-resources/react-app/*",
+    "src/cfn-custom-resources/react-app/*"
   ]
 }

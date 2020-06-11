@@ -1,5 +1,6 @@
 // Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
+/* istanbul ignore file */
 
 import { decode, verify } from 'jsonwebtoken';
 import jwksClient, { SigningKey, RsaSigningKey } from 'jwks-rsa';
@@ -18,14 +19,13 @@ async function getSigningKey(jwksUri: string, kid: string) {
         jwksRsa = jwksClient({ cache: true, rateLimit: true, jwksUri });
     }
     return new Promise<string>((resolve, reject) =>
-        jwksRsa.getSigningKey(
-            kid,
-            (err, jwk) => err ? reject(err) : resolve(isRsaSigningKey(jwk) ? jwk.rsaPublicKey : jwk.publicKey))
+        jwksRsa.getSigningKey(kid, (err, jwk) =>
+            err ? reject(err) : resolve(isRsaSigningKey(jwk) ? jwk.rsaPublicKey : jwk.publicKey),
+        ),
     );
 }
 
 export async function validate(jwtToken: string, jwksUri: string, issuer: string, audience: string) {
-
     const decodedToken = decode(jwtToken, { complete: true }) as { [key: string]: any };
     if (!decodedToken) {
         throw new Error('Cannot parse JWT token');
@@ -42,9 +42,7 @@ export async function validate(jwtToken: string, jwksUri: string, issuer: string
         issuer,
         ignoreExpiration: false,
     };
-    return new Promise((resolve, reject) => verify(
-        jwtToken,
-        jwk,
-        verificationOptions,
-        (err) => err ? reject(err) : resolve()));
+    return new Promise((resolve, reject) =>
+        verify(jwtToken, jwk, verificationOptions, (err) => (err ? reject(err) : resolve())),
+    );
 }

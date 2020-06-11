@@ -6,27 +6,28 @@ import {
     CloudFormationCustomResourceHandler,
     CloudFormationCustomResourceResponse,
     CloudFormationCustomResourceDeleteEvent,
-    CloudFormationCustomResourceUpdateEvent
+    CloudFormationCustomResourceUpdateEvent,
 } from 'aws-lambda';
 import axios from 'axios';
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
     console.log(JSON.stringify(event, undefined, 4));
+    const { LogicalResourceId, RequestId, StackId, ResponseURL, ResourceProperties } = event;
+
+    const { PhysicalResourceId } = event as
+        | CloudFormationCustomResourceDeleteEvent
+        | CloudFormationCustomResourceUpdateEvent;
+
     const {
-        LogicalResourceId,
-        RequestId,
-        StackId,
-        ResponseURL,
-        ResourceProperties
-    } = event;
-
-    const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
-
-    const { Length = 16, AllowedCharacters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~' } = ResourceProperties;
+        Length = 16,
+        AllowedCharacters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',
+    } = ResourceProperties;
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const physicalResourceId = PhysicalResourceId || [...new Array(parseInt(Length))].map(() => randomChoiceFromIndexable(AllowedCharacters)).join('');;
+        const physicalResourceId =
+            PhysicalResourceId ||
+            [...new Array(parseInt(Length))].map(() => randomChoiceFromIndexable(AllowedCharacters)).join('');
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId!,
@@ -45,7 +46,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
         };
     }
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
-}
+};
 
 function randomChoiceFromIndexable(indexable: string) {
     if (indexable.length > 256) {
@@ -56,7 +57,7 @@ function randomChoiceFromIndexable(indexable: string) {
     let randomNumber: number;
     do {
         randomNumber = randomBytes(1)[0];
-    } while (randomNumber >= firstBiassedIndex)
+    } while (randomNumber >= firstBiassedIndex);
     const index = randomNumber % indexable.length;
     return indexable[index];
 }

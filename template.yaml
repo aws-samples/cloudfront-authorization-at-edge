@@ -13,8 +13,8 @@ Metadata:
       Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWT's and handle OAuth2 redirects.
     Author: AWS Samples
     SpdxLicenseId: MIT-0
-    LicenseUrl: LICENSE
-    ReadmeUrl: SERVERLESS-REPO.md
+    # LicenseUrl: LICENSE
+    # ReadmeUrl: SERVERLESS-REPO.md doesn't work unless we move it to S3
     Labels:
       [
         "cognito",
@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.1
+    SemanticVersion: 1.4.1
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -60,7 +60,7 @@ Parameters:
     Description: The settings for the cookies holding e.g. the JWT's. To be provided as a JSON object, mapping cookie type to setting. Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax". If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
     Default: >-
       {
-        "idToken": null,
+        "idToken": null,UserPoolClientUpdate
         "accessToken": null,
         "refreshToken": null,
         "nonce": null
@@ -201,6 +201,8 @@ Resources:
     Condition: CreateCloudFrontDistribution
     Properties:
       DistributionConfig:
+        Aliases:
+          Ref: AlternateDomainNames
         CacheBehaviors:
           - PathPattern: !Ref RedirectPathSignIn
             Compress: true
@@ -286,7 +288,7 @@ Resources:
             Resource: !GetAtt S3Bucket.Arn
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
-
+    
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -342,6 +344,7 @@ Resources:
       ServiceToken: !GetAtt UserPoolClientUpdateHandler.Arn
       UserPoolId: !Ref UserPool
       UserPoolClientId: !Ref UserPoolClient
+      IdentityProviders: ['COGNITO']
       CloudFrontDistributionDomainName:
         !If [
           CreateCloudFrontDistribution,
@@ -612,25 +615,64 @@ Resources:
                 - !GetAtt ClientSecretRetrieval.ClientSecret
                 - ""
 
+  LambdaCodeUpdateHandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - edgelambda.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies: 
+        - PolicyName: MyCustomPolicy2
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunction
+                  - lambda:UpdateFunctionCode
+                Resource:
+                  - !GetAtt ParseAuthHandler.Arn
+                  - !GetAtt CheckAuthHandler.Arn
+                  - !GetAtt HttpHeadersHandler.Arn
+                  - !GetAtt RefreshAuthHandler.Arn
+                  - !GetAtt SignOutHandler.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  MyCustomPolicy: 
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - lambda:GetFunction
+              - lambda:UpdateFunctionCode
+            Resource:
+              - !GetAtt ParseAuthHandler.Arn
+      PolicyName: MyCustomPolicy1
+      Roles: 
+        - !Ref LambdaCodeUpdateHandlerRole
+
+
+
+
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
       Runtime: nodejs12.x
-      Policies:
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - lambda:GetFunction
-                - lambda:UpdateFunctionCode
-              Resource:
-                - !GetAtt ParseAuthHandler.Arn
-                - !GetAtt CheckAuthHandler.Arn
-                - !GetAtt HttpHeadersHandler.Arn
-                - !GetAtt RefreshAuthHandler.Arn
-                - !GetAtt SignOutHandler.Arn
+      Role: !GetAtt LambdaCodeUpdateHandlerRole.Arn
+
 
   NonceSigningSecret:
     Type: Custom::NonceSigningSecret
@@ -726,3 +768,23 @@ Outputs:
     Value: !GetAtt LambdaCodeUpdateHandler.Arn
     Export:
       Name: !Sub "${AWS::StackName}-CodeUpdateHandler"
+  UserPoolClientUpdateHandler:
+    Description: The User Pool clinet update handler's function ARN of the custom resource that adds updates the User Pool Configuration
+    Value: !GetAtt UserPoolClientUpdateHandler.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientUpdateHandler"  
+  LambdaEdgeExecutionRole:
+    Description: The ARN of the lambda execution role associated with the edge functions. 
+    Value: !GetAtt LambdaEdgeExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaEdgeExecutionRole"          
+  LambdaCodeUpdateHandlerRole:
+    Description: The ARN of the lambda execution role associated with the edge functions. 
+    Value: !Ref LambdaCodeUpdateHandlerRole
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaCodeUpdateHandlerRole"          
+  LambdaCodeUpdateHandlerFunction:
+    Description: The ARN of the lambda execution role associated with the edge functions. 
+    Value: !GetAtt LambdaCodeUpdateHandler.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaCodeUpdateHandlerFunction"          

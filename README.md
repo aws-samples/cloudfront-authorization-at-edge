@@ -1,4 +1,5 @@
 ## CloudFront authorization@edge
+https://github.com/aws-samples/cloudfront-authorization-at-edge/
 
 This repo accompanies the [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/authorizationedge-using-cookies-protect-your-amazon-cloudfront-content-from-being-downloaded-by-unauthenticated-users/).
 

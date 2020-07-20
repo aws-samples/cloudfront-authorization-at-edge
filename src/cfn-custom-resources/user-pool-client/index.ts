@@ -21,7 +21,9 @@ async function ensureCognitoUserPoolClient(
     redirectPathSignIn: string,
     redirectPathSignOut: string,
     alternateDomainNames: string[],
-    physicalResourceId?: string) {
+    physicalResourceId?: string,
+    supportedIdentityProviders?: string[]
+    ) {
     if (action === 'Delete') {
         // Deletes aren't executed; the standard UserPool client CFN Resource should just be deleted
         return { physicalResourceId: physicalResourceId! };
@@ -32,12 +34,14 @@ async function ensureCognitoUserPoolClient(
         // Should be obvious to user to update this later
         redirectDomains.push('example.org');
     }
+    console.log("Received redirect domains: "+JSON.stringify(redirectDomains))
     const RedirectUrisSignIn = redirectDomains.map(domain => `https://${domain}${redirectPathSignIn}`);
     const RedirectUrisSignOut = redirectDomains.map(domain => `https://${domain}${redirectPathSignOut}`);
+    console.log("Transformed redirect domains: "+JSON.stringify(redirectDomains))
     const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest = {
         AllowedOAuthFlows: ['code'],
         AllowedOAuthFlowsUserPoolClient: true,
-        SupportedIdentityProviders: ['COGNITO'],
+        SupportedIdentityProviders: supportedIdentityProviders,
         AllowedOAuthScopes: JSON.parse(oAuthScopes),
         ClientId: clientId,
         CallbackURLs: RedirectUrisSignIn,
@@ -67,12 +71,12 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
     const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
 
-    const { UserPoolId, UserPoolClientId, OAuthScopes, CloudFrontDistributionDomainName, RedirectPathSignIn, RedirectPathSignOut, AlternateDomainNames } = ResourceProperties;
+    const { UserPoolId, UserPoolClientId, OAuthScopes, CloudFrontDistributionDomainName, RedirectPathSignIn, RedirectPathSignOut, AlternateDomainNames, IdentityProviders } = ResourceProperties;
 
     let response: CloudFormationCustomResourceResponse;
     try {
         const { physicalResourceId, Data } = await ensureCognitoUserPoolClient(
-            RequestType, UserPoolId, UserPoolClientId, OAuthScopes, CloudFrontDistributionDomainName, RedirectPathSignIn, RedirectPathSignOut, AlternateDomainNames, PhysicalResourceId);
+            RequestType, UserPoolId, UserPoolClientId, OAuthScopes, CloudFrontDistributionDomainName, RedirectPathSignIn, RedirectPathSignOut, AlternateDomainNames, PhysicalResourceId,IdentityProviders);
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId,

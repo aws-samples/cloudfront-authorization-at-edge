@@ -14,7 +14,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
-    const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, CONFIG.clientId);
+    const { idToken, accessToken, refreshToken } = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
 
     if (!idToken) {
         const response = {

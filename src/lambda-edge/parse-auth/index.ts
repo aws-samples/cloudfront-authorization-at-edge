@@ -19,7 +19,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     let redirectedFromUri = `https://${domainName}`;
     let idToken: string | undefined = undefined;
     try {
-        const cookies = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const cookies = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
         ({ idToken } = cookies);
         const { code, pkce, requestedUri } = validateQueryStringAndCookies({ querystring: request.querystring, cookies });
         CONFIG.logger.debug('Query string and cookies are valid');

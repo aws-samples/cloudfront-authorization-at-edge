@@ -18,7 +18,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const domainName = request.headers['host'][0].value;
     const requestedUri = `${request.uri}${request.querystring ? '?' + request.querystring : ''}`;
     try {
-        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
         CONFIG.logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
 
         // If there's no ID token in your cookies then you are not signed in yet

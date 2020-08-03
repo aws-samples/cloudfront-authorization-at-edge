@@ -19,7 +19,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     try {
         const { requestedUri, nonce: currentNonce } = parseQueryString(request.querystring);
         redirectedFromUri += requestedUri || '';
-        const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
 
         validateRefreshRequest(currentNonce, originalNonce, idToken, accessToken, refreshToken);
 

@@ -100,6 +100,13 @@ Parameters:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
     Default: ""
+  CookieCompatibilty:
+    Type: String
+    Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service"
+    Default: "amplify"
+    AllowedValues:
+      - "amplify"
+      - "elasticsearch"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -483,7 +490,8 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
-              "nonceSigningSecret": "${NonceSigningSecret}"
+              "nonceSigningSecret": "${NonceSigningSecret}",
+              "cookieCompatibility": "${CookieCompatibilty}"
             }
           - Mode:
               !If
@@ -518,7 +526,8 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
-              "nonceSigningSecret": "${NonceSigningSecret}"
+              "nonceSigningSecret": "${NonceSigningSecret}",
+              "cookieCompatibility": "${CookieCompatibilty}"
             }
           - Mode:
               !If
@@ -565,7 +574,8 @@ Resources:
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
-              "logLevel": "${LogLevel}"
+              "logLevel": "${LogLevel}",
+              "cookieCompatibility": "${CookieCompatibilty}"
             }
           - Mode:
               !If
@@ -599,7 +609,8 @@ Resources:
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
-              "logLevel": "${LogLevel}"
+              "logLevel": "${LogLevel}",
+              "cookieCompatibility": "${CookieCompatibilty}"
             }
           - Mode:
               !If

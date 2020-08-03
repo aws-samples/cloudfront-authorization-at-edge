@@ -55,6 +55,7 @@ interface ConfigFromDisk {
     pkceLength?: number;
     nonceLength?: number;
     nonceMaxAge?: number;
+    cookieCompatibility: 'amplify' | 'elasticsearch';
 }
 
 enum LogLevel {
@@ -184,34 +185,54 @@ export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
     ), {} as CloudFrontHeaders);
 }
 
-export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: string) {
+export function getAmplifyCookieNames(clientId: string, cookiesOrUserName: Cookies | string) {
+    const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`;
+    const lastUserKey = `${keyPrefix}.LastAuthUser`;
+    let tokenUserName: string;
+    if (typeof cookiesOrUserName === 'string') {
+        tokenUserName = cookiesOrUserName;
+    } else {
+        tokenUserName = cookiesOrUserName[lastUserKey];
+    }
+    return {
+        lastUserKey,
+        userDataKey: `${keyPrefix}.${tokenUserName}.userData`,
+        scopeKey: `${keyPrefix}.${tokenUserName}.tokenScopesString`,
+        idTokenKey: `${keyPrefix}.${tokenUserName}.idToken`,
+        accessTokenKey: `${keyPrefix}.${tokenUserName}.accessToken`,
+        refreshTokenKey: `${keyPrefix}.${tokenUserName}.refreshToken`,
+    }
+}
+
+export function getElasticsearchCookieNames() {
+    return {
+        idTokenKey: 'ID-TOKEN',
+        accessTokenKey: 'ACCESS-TOKEN',
+        refreshTokenKey: 'REFRESH-TOKEN',      
+        cognitoEnabledKey: 'COGNITO-ENABLED',
+    }
+}
+
+
+export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: string, cookieCompatibility: 'amplify' | 'elasticsearch') {
     const cookies = extractCookiesFromHeaders(headers);
     if (!cookies) {
         return {};
     }
 
-    const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`;
-    const lastUserKey = `${keyPrefix}.LastAuthUser`;
-    const tokenUserName = cookies[lastUserKey];
-
-    const scopeKey = `${keyPrefix}.${tokenUserName}.tokenScopesString`;
-    const scopes = cookies[scopeKey];
-
-    const idTokenKey = `${keyPrefix}.${tokenUserName}.idToken`;
-    const idToken = cookies[idTokenKey];
-
-    const accessTokenKey = `${keyPrefix}.${tokenUserName}.accessToken`;
-    const accessToken = cookies[accessTokenKey];
-
-    const refreshTokenKey = `${keyPrefix}.${tokenUserName}.refreshToken`;
-    const refreshToken = cookies[refreshTokenKey];
+    let cookieNames: { [name: string]: string };
+    if (cookieCompatibility === 'amplify') {
+        cookieNames = getAmplifyCookieNames(clientId, cookies);
+    } else {
+        cookieNames = getElasticsearchCookieNames();
+    }
 
     return {
-        tokenUserName,
-        idToken,
-        accessToken,
-        refreshToken,
-        scopes,
+        tokenUserName: cookies[cookieNames.lastUserKey],
+        idToken: cookies[cookieNames.idTokenKey],
+        accessToken: cookies[cookieNames.accessTokenKey],
+        refreshToken: cookies[cookieNames.refreshTokenKey],
+        scopes: cookies[cookieNames.scopeKey],
         nonce: cookies['spa-auth-edge-nonce'],
         nonceHmac: cookies['spa-auth-edge-nonce-hmac'],
         pkce: cookies['spa-auth-edge-pkce'],
@@ -230,6 +251,7 @@ interface GenerateCookieHeadersParam {
     domainName: string,
     cookieSettings: CookieSettings,
     mode: Mode,
+    cookieCompatibility: 'amplify' | 'elasticsearch';
     tokens: {
         id_token: string;
         access_token: string;
@@ -249,45 +271,51 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
     const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
-    const keyPrefix = `CognitoIdentityServiceProvider.${param.clientId}`;
-    const idTokenKey = `${keyPrefix}.${tokenUserName}.idToken`;
-    const accessTokenKey = `${keyPrefix}.${tokenUserName}.accessToken`;
-    const refreshTokenKey = `${keyPrefix}.${tokenUserName}.refreshToken`;
-    const lastUserKey = `${keyPrefix}.LastAuthUser`;
-    const scopeKey = `${keyPrefix}.${tokenUserName}.tokenScopesString`;
-    const scopesString = param.oauthScopes.join(' ');
-    const userDataKey = `${keyPrefix}.${tokenUserName}.userData`;
-    const userData = JSON.stringify({
-        UserAttributes: [
-            {
-                Name: 'sub',
-                Value: decodedIdToken['sub']
-            },
-            {
-                Name: 'email',
-                Value: decodedIdToken['email']
-            }
-        ],
-        Username: tokenUserName
-    });
-
-    // Construct object with the cookies
-    const cookies = {
-        [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
-        [lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        [scopeKey]: `${scopesString}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-    };
+    
+    let cookies: Cookies;
+    let cookieNames: { [name: string]: string };
+    if (param.cookieCompatibility === 'amplify') {
+        cookieNames = getAmplifyCookieNames(param.clientId, tokenUserName);
+        const userData = JSON.stringify({
+            UserAttributes: [
+                {
+                    Name: 'sub',
+                    Value: decodedIdToken['sub']
+                },
+                {
+                    Name: 'email',
+                    Value: decodedIdToken['email']
+                }
+            ],
+            Username: tokenUserName
+        });
+    
+        // Construct object with the cookies
+        cookies = {
+            [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+            [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+            [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+            [cookieNames.lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+            [cookieNames.scopeKey]: `${param.oauthScopes.join(' ')}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+            [cookieNames.userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+            'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+        };
+    } else {
+        cookieNames = getElasticsearchCookieNames();
+        cookies = {
+            [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+            [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+            [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+            [cookieNames.cognitoEnabledKey]: 'True',
+        };        
+    }
 
     if (param.event === 'signOut') {
         // Expire all cookies
         Object.keys(cookies).forEach(key => cookies[key] = expireCookie(cookies[key]));
     } else if (param.event === 'refreshFailed') {
         // Expire refresh token (so the browser will not send it in vain again)
-        cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
+        cookies[cookieNames.refreshTokenKey] = expireCookie(cookies[cookieNames.refreshTokenKey]);
     }
 
     // Always expire nonce, nonceHmac and pkce - this is valid in all scenario's:

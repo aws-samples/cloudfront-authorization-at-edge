@@ -51,11 +51,12 @@ interface ConfigFromDisk {
     clientSecret: string;
     nonceSigningSecret: string;
     logLevel: keyof typeof LogLevel;
+    cookieCompatibility: 'amplify' | 'elasticsearch';
+    additionalCookies: { [name: string]: string };
     secretAllowedCharacters?: string;
     pkceLength?: number;
     nonceLength?: number;
     nonceMaxAge?: number;
-    cookieCompatibility: 'amplify' | 'elasticsearch';
 }
 
 enum LogLevel {
@@ -208,7 +209,7 @@ export function getElasticsearchCookieNames() {
     return {
         idTokenKey: 'ID-TOKEN',
         accessTokenKey: 'ACCESS-TOKEN',
-        refreshTokenKey: 'REFRESH-TOKEN',      
+        refreshTokenKey: 'REFRESH-TOKEN',
         cognitoEnabledKey: 'COGNITO-ENABLED',
     }
 }
@@ -252,6 +253,7 @@ interface GenerateCookieHeadersParam {
     cookieSettings: CookieSettings,
     mode: Mode,
     cookieCompatibility: 'amplify' | 'elasticsearch';
+    additionalCookies: { [name: string]: string };
     tokens: {
         id_token: string;
         access_token: string;
@@ -271,7 +273,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
     const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
-    
+
     let cookies: Cookies;
     let cookieNames: { [name: string]: string };
     if (param.cookieCompatibility === 'amplify') {
@@ -289,7 +291,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
             ],
             Username: tokenUserName
         });
-    
+
         // Construct object with the cookies
         cookies = {
             [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
@@ -307,7 +309,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
             [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
             [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
             [cookieNames.cognitoEnabledKey]: 'True',
-        };        
+        };
     }
 
     if (param.event === 'signOut') {
@@ -327,7 +329,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     });
 
     // Return cookie object in format of CloudFront headers
-    return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
+    return Object.entries({ ...param.additionalCookies, ...cookies }).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
 
 function expireCookie(cookie: string = '') {

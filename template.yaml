@@ -107,6 +107,11 @@ Parameters:
     AllowedValues:
       - "amplify"
       - "elasticsearch"
+  AdditionalCookies:
+    Type: String
+    Description: "Specify one or more additional cookies, as a JSON object––mapping cookie names to values and settings: {\"cookieName1\": \"cookieValue1; HttpOnly; Secure\"}"
+    Default: >-
+      {}
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -491,7 +496,8 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibilty}"
+              "cookieCompatibility": "${CookieCompatibilty}",
+              "additionalCookies": ${AdditionalCookies}
             }
           - Mode:
               !If
@@ -527,7 +533,8 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibilty}"
+              "cookieCompatibility": "${CookieCompatibilty}",
+              "additionalCookies": ${AdditionalCookies}
             }
           - Mode:
               !If
@@ -575,7 +582,8 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
-              "cookieCompatibility": "${CookieCompatibilty}"
+              "cookieCompatibility": "${CookieCompatibilty}",
+              "additionalCookies": ${AdditionalCookies}
             }
           - Mode:
               !If
@@ -610,7 +618,8 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
-              "cookieCompatibility": "${CookieCompatibilty}"
+              "cookieCompatibility": "${CookieCompatibilty}",
+              "additionalCookies": ${AdditionalCookies}
             }
           - Mode:
               !If

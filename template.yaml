@@ -7,7 +7,7 @@ Description: >
   Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge
 Metadata:
   AWS::ServerlessRepo::Application:
-    Name: cloudfront-authorization-at-edge
+    Name: cloudfront-authorization-at-edge-dev
     Description: >
       Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge.
       Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWT's and handle OAuth2 redirects.
@@ -109,9 +109,17 @@ Parameters:
       - "elasticsearch"
   AdditionalCookies:
     Type: String
-    Description: "Specify one or more additional cookies, as a JSON object––mapping cookie names to values and settings: {\"cookieName1\": \"cookieValue1; HttpOnly; Secure\"}"
+    Description: 'Specify one or more additional cookies, as a JSON object––mapping cookie names to values and settings: {"cookieName1": "cookieValue1; HttpOnly; Secure"}'
     Default: >-
       {}
+  UserPoolArn:
+    Type: String
+    Description: "Specify the ARN fn an existing user pool to use that one instead of creating a new one. If specified, then ClientId must also be specified."
+    Default: ""
+  UserPoolClientId:
+    Type: String
+    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified."
+    Default: ""
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -124,7 +132,10 @@ Parameters:
       - "debug"
 
 Conditions:
-  CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
+  CreateUser: !And
+    - !Not [!Equals [!Ref EmailAddress, ""]]
+    - !Equals [!Ref UserPoolArn, ""]
+    - !Equals [!Ref UserPoolClientId, ""]
   CreateCloudFrontDistribution:
     !Equals [!Ref CreateCloudFrontDistribution, "true"]
   SPAMode: !Equals [!Ref EnableSPAMode, "true"]
@@ -135,6 +146,7 @@ Conditions:
   CreateCloudFrontDistributionSpaMode: !And
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+  CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
 
 Globals:
   Function:
@@ -301,6 +313,7 @@ Resources:
 
   UserPool:
     Type: AWS::Cognito::UserPool
+    Condition: CreateUserPoolAndClient
     Properties:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
@@ -317,6 +330,7 @@ Resources:
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
+    Condition: CreateUserPoolAndClient
     Properties:
       UserPoolId: !Ref UserPool
       GenerateSecret: !If
@@ -328,7 +342,10 @@ Resources:
     Type: Custom::UserPoolDomain
     Properties:
       ServiceToken: !GetAtt UserPoolDomainHandler.Arn
-      UserPoolId: !Ref UserPool
+      UserPoolArn: !If:
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
 
   UserPoolDomainHandler:
     Type: AWS::Serverless::Function
@@ -346,14 +363,23 @@ Resources:
               Action:
                 - cognito-idp:CreateUserPoolDomain
                 - cognito-idp:DeleteUserPoolDomain
-              Resource: !GetAtt UserPool.Arn
+              Resource: !If:
+                - CreateUserPoolAndClient
+                - !GetAtt UserPool.Arn
+                - !Ref UserPoolArn
 
   UserPoolClientUpdate:
     Type: Custom::UserPoolClientUpdate
     Properties:
       ServiceToken: !GetAtt UserPoolClientUpdateHandler.Arn
-      UserPoolId: !Ref UserPool
-      UserPoolClientId: !Ref UserPoolClient
+      UserPoolArn: !If:
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+      UserPoolClientId: !If
+        - CreateUserPoolAndClient
+        - !Ref UserPoolClient
+        - !Ref UserPoolClientId
       CloudFrontDistributionDomainName:
         !If [
           CreateCloudFrontDistribution,
@@ -377,15 +403,24 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:UpdateUserPoolClient
-              Resource: !GetAtt UserPool.Arn
+              Resource: !If
+                - CreateUserPoolAndClient
+                - !GetAtt UserPool.Arn
+                - !Ref UserPoolArn
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval
     Condition: StaticSiteMode
     Properties:
       ServiceToken: !GetAtt ClientSecretRetrievalHandler.Arn
-      UserPoolId: !Ref UserPool
-      UserPoolClientId: !Ref UserPoolClient
+      UserPoolArn: !If:
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+      UserPoolClientId: !If
+        - CreateUserPoolAndClient
+        - !Ref UserPoolClient
+        - !Ref UserPoolClientId
 
   ClientSecretRetrievalHandler:
     Type: AWS::Serverless::Function
@@ -400,7 +435,10 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:DescribeUserPoolClient
-              Resource: !GetAtt UserPool.Arn
+              Resource: !If
+                - CreateUserPoolAndClient
+                - !GetAtt UserPool.Arn
+                - !Ref UserPoolArn
 
   StaticSite:
     Type: Custom::StaticSite
@@ -440,8 +478,14 @@ Resources:
     Properties:
       ServiceToken: !GetAtt ReactAppHandler.Arn
       BucketName: !Ref S3Bucket
-      UserPoolId: !Ref UserPool
-      ClientId: !Ref UserPoolClient
+      UserPoolArn: !If
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+      ClientId: !If
+        - CreateUserPoolAndClient
+        - !Ref UserPoolClient
+        - !Ref UserPoolClientId
       CognitoAuthDomain: !GetAtt UserPoolDomain.DomainName
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
@@ -499,16 +543,14 @@ Resources:
               "cookieCompatibility": "${CookieCompatibilty}",
               "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -536,16 +578,14 @@ Resources:
               "cookieCompatibility": "${CookieCompatibilty}",
               "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -585,16 +625,14 @@ Resources:
               "cookieCompatibility": "${CookieCompatibilty}",
               "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -621,16 +659,14 @@ Resources:
               "cookieCompatibility": "${CookieCompatibilty}",
               "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function
@@ -687,11 +723,13 @@ Outputs:
       Name: !Sub "${AWS::StackName}-CloudFrontDistribution"
   UserPoolId:
     Description: The ID of the Cognito User Pool
+    Condition: CreateUserPoolAndClient
     Value: !Ref UserPool
     Export:
       Name: !Sub "${AWS::StackName}-UserPoolId"
   ClientId:
     Description: Client ID to use to interact with the User Pool
+    Condition: CreateUserPoolAndClient
     Value: !Ref UserPoolClient
     Export:
       Name: !Sub "${AWS::StackName}-ClientId"
@@ -703,6 +741,7 @@ Outputs:
       Name: !Sub "${AWS::StackName}-ClientSecret"
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
+    Condition: CreateUserPoolAndClient
     Value: !GetAtt UserPoolDomain.DomainName
     Export:
       Name: !Sub "${AWS::StackName}-CognitoAuthDomain"

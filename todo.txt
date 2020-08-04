@@ -1,0 +1,3 @@
+[ ] User Pool Domain custom resource to lookup domain name of existing user pool if provided
+[ ] All custom resource should handle userPool ARN instead of ID
+[ ] Config files use ARN instead of ID of user pool

@@ -1,7 +1,9 @@
 [x] User Pool Domain custom resource to lookup domain name of existing user pool if provided
 [ ] All custom resource should handle userPool ARN instead of ID
      [x] User Pool Domain custom resource
-     [ ] ClientSecret Retrieval
+     [x] ClientSecret Retrieval
      [ ] React App
-     [ ] User Pool Client
+     [x] User Pool Client
 [ ] Config files use ARN instead of ID of user pool
+     [x] template.yaml code
+     [ ] Lambda@Edge code

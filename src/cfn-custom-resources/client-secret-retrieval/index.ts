@@ -10,22 +10,24 @@ import {
 import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
-const COGNITO_CLIENT = new CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
 
 async function retrieveClientSecret(
     action: 'Create' | 'Update' | 'Delete',
-    userPoolId: string,
+    userPoolArn: string,
     clientId: string,
     physicalResourceId?: string) {
     if (action === 'Delete') {
         // Deletes aren't executed; the standard Resource should just be deleted
         return { physicalResourceId: physicalResourceId };
     }
+    const userPoolId = userPoolArn.split('/')[1];
+    const userPoolRegion = userPoolArn.split(':')[3];
+    const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
     const input: CognitoIdentityServiceProvider.Types.DescribeUserPoolClientRequest = {
         UserPoolId: userPoolId,
         ClientId: clientId,
     };
-    const res = await COGNITO_CLIENT.describeUserPoolClient(input).promise();
+    const res = await cognitoClient.describeUserPoolClient(input).promise();
     return {
         physicalResourceId: `${userPoolId}-${clientId}-retrieved-client-secret`,
         Data: { ClientSecret: res.UserPoolClient!.ClientSecret || '' }
@@ -45,11 +47,11 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
     const { PhysicalResourceId } = event as CloudFormationCustomResourceDeleteEvent | CloudFormationCustomResourceUpdateEvent;
 
-    const { UserPoolId, UserPoolClientId } = ResourceProperties;
+    const { UserPoolArn, UserPoolClientId } = ResourceProperties;
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const { physicalResourceId, Data } = await retrieveClientSecret(RequestType, UserPoolId, UserPoolClientId);
+        const { physicalResourceId, Data } = await retrieveClientSecret(RequestType, UserPoolArn, UserPoolClientId);
         console.log(physicalResourceId)
         console.log(Data)
         response = {

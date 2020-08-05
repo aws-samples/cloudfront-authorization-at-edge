@@ -346,6 +346,10 @@ Resources:
         - CreateUserPoolAndClient
         - !GetAtt UserPool.Arn
         - !Ref UserPoolArn
+      CreateOrLookup: !If:
+        - CreateUserPoolAndClient
+        - Create
+        - Lookup
 
   UserPoolDomainHandler:
     Type: AWS::Serverless::Function
@@ -527,8 +531,8 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopes},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
@@ -551,6 +555,14 @@ Resources:
               - StaticSiteMode
               - !GetAtt ClientSecretRetrieval.ClientSecret
               - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - UserPoolClientId
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -562,8 +574,8 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopes},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
@@ -586,6 +598,14 @@ Resources:
               - StaticSiteMode
               - !GetAtt ClientSecretRetrieval.ClientSecret
               - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - UserPoolClientId
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -610,8 +630,8 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopes},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
@@ -622,6 +642,7 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
+              "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibilty}",
               "additionalCookies": ${AdditionalCookies}
             }
@@ -633,6 +654,14 @@ Resources:
               - StaticSiteMode
               - !GetAtt ClientSecretRetrieval.ClientSecret
               - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - UserPoolClientId
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -644,8 +673,8 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopes},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
@@ -656,6 +685,7 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
+              "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibilty}",
               "additionalCookies": ${AdditionalCookies}
             }
@@ -667,6 +697,14 @@ Resources:
               - StaticSiteMode
               - !GetAtt ClientSecretRetrieval.ClientSecret
               - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - UserPoolClientId
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function

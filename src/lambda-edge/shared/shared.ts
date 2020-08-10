@@ -9,6 +9,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
 import html from './error-page/template.html';
 
+
 export interface CookieSettings {
     idToken: string;
     accessToken: string;
@@ -16,19 +17,33 @@ export interface CookieSettings {
     nonce: string;
 }
 
-const defaultCookieSettings: { [key: string]: CookieSettings } = {
-    spaMode: {
-        idToken: "Path=/; Secure; SameSite=Lax",
-        accessToken: "Path=/; Secure; SameSite=Lax",
-        refreshToken: "Path=/; Secure; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
-    },
-    staticSiteMode: {
-        idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
-    },
+function getDefaultCookieSettings(props: { mode: 'spaMode' | 'staticSiteMode', compatibility: 'amplify' | 'elasticsearch' }): CookieSettings {
+    // Defaults can be overridden by the user (CloudFormation Stack parameter) but should be solid enough for most purposes
+    if (props.compatibility === 'amplify') {
+        if (props.mode === 'spaMode') {
+            return {
+                idToken: "Path=/; Secure; SameSite=Lax",
+                accessToken: "Path=/; Secure; SameSite=Lax",
+                refreshToken: "Path=/; Secure; SameSite=Lax",
+                nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+            }
+        } else if (props.mode === 'staticSiteMode') {
+            return {
+                idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+                accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+                refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+                nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+            }
+        };
+    } else if (props.compatibility === 'elasticsearch') {
+        return {
+            idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+        }
+    }
+    throw new Error(`Cannot determine default cookiesettings for ${props.mode} with compatibility ${props.compatibility}`);
 }
 
 export interface HttpHeaders {
@@ -151,11 +166,15 @@ export function getCompleteConfig(): CompleteConfig {
 
     // Derive cookie settings by merging the defaults with the explicitly provided values
     // Default cookies settings depend on the deployment mode (SPA or Static Site)
+    const defaultCookieSettings = getDefaultCookieSettings({
+        compatibility: config.cookieCompatibility,
+        mode: config.mode
+    });
     const cookieSettings = config.cookieSettings ? Object.fromEntries(
         Object
             .entries(config.cookieSettings)
-            .map(([k, v]) => [k, v || defaultCookieSettings[config.mode][k as keyof CookieSettings]])
-    ) as CookieSettings : defaultCookieSettings[config.mode];
+            .map(([k, v]) => [k, v || defaultCookieSettings[k as keyof CookieSettings]])
+    ) as CookieSettings : defaultCookieSettings;
 
     // Defaults for nonce and PKCE
     const defaults = {
@@ -315,9 +334,6 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
 
         // Construct object with the cookies
         cookies = {
-            [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-            [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-            [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
             [cookieNames.lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
             [cookieNames.scopeKey]: `${param.oauthScopes.join(' ')}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
             [cookieNames.userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
@@ -326,12 +342,14 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     } else {
         cookieNames = getElasticsearchCookieNames();
         cookies = {
-            [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-            [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-            [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
-            [cookieNames.cognitoEnabledKey]: 'True',
+            [cookieNames.cognitoEnabledKey]: `True; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
         };
     }
+    Object.assign(cookies, {
+        [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+        [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+        [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+    });
 
     if (param.event === 'signOut') {
         // Expire all cookies

@@ -100,7 +100,7 @@ Parameters:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
     Default: ""
-  CookieCompatibilty:
+  CookieCompatibility:
     Type: String
     Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service"
     Default: "amplify"
@@ -546,7 +546,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibilty}",
+              "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies}
             }
           - Mode: !If
@@ -589,7 +589,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibilty}",
+              "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies}
             }
           - Mode: !If
@@ -645,7 +645,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibilty}",
+              "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies}
             }
           - Mode: !If
@@ -688,7 +688,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibilty}",
+              "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies}
             }
           - Mode: !If

@@ -7,7 +7,7 @@ Description: >
   Example stack that shows how to reuse the serverless application and include your own resources
 
 Resources:
-  UserPool2:
+  UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
       AdminCreateUserConfig:
@@ -17,12 +17,12 @@ Resources:
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      UserPoolId: !Ref UserPool2
+      UserPoolId: !Ref UserPool
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties: 
-      Domain: !Sub "auth-${AWS::AccountId}-2"
-      UserPoolId: !Ref UserPool2
+      Domain: !Sub "auth-${AWS::AccountId}"
+      UserPoolId: !Ref UserPool
   MyLambdaEdgeProtectedSpaSetup:
     Type: AWS::Serverless::Application
     DependsOn: UserPoolDomain
@@ -31,6 +31,12 @@ Resources:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge-dev
         SemanticVersion: 1.2.5
       Parameters:
-        UserPoolArn: !GetAtt UserPool2.Arn
+        UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient
         LogLevel: debug
+        CookieCompatibility: elasticsearch
+        AdditionalCookies: >-
+          {
+            "cookieName1": "cookieValue1; HttpOnly; Secure",
+            "cookieName2": "cookieValue2; SameSite=Lax; Domain=.dhqmy2fj0cs0z.cloudfront.net"
+          }

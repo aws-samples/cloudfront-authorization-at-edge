@@ -5,13 +5,13 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from '../shared/validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
+import { getCompleteConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 
-let CONFIG: ReturnType<typeof getConfig>;
+let CONFIG: ReturnType<typeof getCompleteConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     if (!CONFIG) {
-        CONFIG = getConfig();
+        CONFIG = getCompleteConfig();
     }
     CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;

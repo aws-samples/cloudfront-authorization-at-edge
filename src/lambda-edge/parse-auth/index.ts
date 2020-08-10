@@ -3,14 +3,14 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
+import { getCompleteConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 import { validate } from '../shared/validate-jwt';
 
-let CONFIG: ReturnType<typeof getConfig>;
+let CONFIG: ReturnType<typeof getCompleteConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     if (!CONFIG) {
-        CONFIG = getConfig();
+        CONFIG = getCompleteConfig();
     }
     CONFIG.logger.debug(event);
     const request = event.Records[0].cf.request;

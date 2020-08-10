@@ -38,6 +38,11 @@ export interface HttpHeaders {
 type Mode = 'spaMode' | 'staticSiteMode';
 
 interface ConfigFromDisk {
+    httpHeaders: HttpHeaders;
+    logLevel: keyof typeof LogLevel;
+}
+
+interface CompleteConfigFromDisk extends ConfigFromDisk {
     userPoolArn: string;
     clientId: string;
     oauthScopes: string[];
@@ -47,16 +52,18 @@ interface ConfigFromDisk {
     redirectPathAuthRefresh: string;
     cookieSettings: CookieSettings;
     mode: Mode,
-    httpHeaders: HttpHeaders;
     clientSecret: string;
     nonceSigningSecret: string;
-    logLevel: keyof typeof LogLevel;
     cookieCompatibility: 'amplify' | 'elasticsearch';
     additionalCookies: { [name: string]: string };
     secretAllowedCharacters?: string;
     pkceLength?: number;
     nonceLength?: number;
     nonceMaxAge?: number;
+}
+
+function isCompleteConfig(c: any): c is CompleteConfigFromDisk {
+    return c["userPoolArn"] !== undefined;
 }
 
 enum LogLevel {
@@ -105,10 +112,14 @@ class Logger {
 }
 
 export interface Config extends ConfigFromDisk {
+    cloudFrontHeaders: CloudFrontHeaders;
+    logger: Logger;
+}
+
+export interface CompleteConfig extends Config, CompleteConfigFromDisk {
     tokenIssuer: string;
     tokenJwksUri: string;
     cloudFrontHeaders: CloudFrontHeaders;
-    logger: Logger;
     secretAllowedCharacters: string;
     pkceLength: number;
     nonceLength: number;
@@ -117,6 +128,20 @@ export interface Config extends ConfigFromDisk {
 
 export function getConfig(): Config {
     const config = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as ConfigFromDisk;
+    return {
+        cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
+        logger: new Logger(LogLevel[config.logLevel]),
+        ...config
+    }
+}
+
+export function getCompleteConfig(): CompleteConfig {
+
+    const config = getConfig();
+
+    if (!isCompleteConfig(config)) {
+        throw new Error("Incomplete config in configuration.json");
+    }
 
     // Derive the issuer and JWKS uri all JWT's will be signed with from the User Pool's ID and region:
     const userPoolId = config.userPoolArn.split('/')[1];
@@ -132,9 +157,6 @@ export function getConfig(): Config {
             .map(([k, v]) => [k, v || defaultCookieSettings[config.mode][k as keyof CookieSettings]])
     ) as CookieSettings : defaultCookieSettings[config.mode];
 
-    // Setup logger
-    const logger = new Logger(LogLevel[config.logLevel]);
-
     // Defaults for nonce and PKCE
     const defaults = {
         secretAllowedCharacters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',
@@ -149,8 +171,6 @@ export function getConfig(): Config {
         cookieSettings,
         tokenIssuer,
         tokenJwksUri,
-        cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
-        logger,
     };
 }
 

@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.3
+    SemanticVersion: 1.2.5
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -560,11 +560,11 @@ Resources:
             UserPoolArn: !If
               - CreateUserPoolAndClient
               - !GetAtt UserPool.Arn
-              - UserPoolArn
+              - !Ref UserPoolArn
             ClientId: !If
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
-              - UserPoolClientId
+              - !Ref UserPoolClientId
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -603,11 +603,11 @@ Resources:
             UserPoolArn: !If
               - CreateUserPoolAndClient
               - !GetAtt UserPool.Arn
-              - UserPoolArn
+              - !Ref UserPoolArn
             ClientId: !If
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
-              - UserPoolClientId
+              - !Ref UserPoolClientId
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -659,11 +659,11 @@ Resources:
             UserPoolArn: !If
               - CreateUserPoolAndClient
               - !GetAtt UserPool.Arn
-              - UserPoolArn
+              - !Ref UserPoolArn
             ClientId: !If
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
-              - UserPoolClientId
+              - !Ref UserPoolClientId
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -702,11 +702,11 @@ Resources:
             UserPoolArn: !If
               - CreateUserPoolAndClient
               - !GetAtt UserPool.Arn
-              - UserPoolArn
+              - !Ref UserPoolArn
             ClientId: !If
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
-              - UserPoolClientId
+              - !Ref UserPoolClientId
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function

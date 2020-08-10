@@ -1,5 +1,15 @@
-// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
+/*
+    Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+    SPDX-License-Identifier: MIT-0
+
+    This is a CloudFormation custom resource. It's purpose is to:
+
+    - Create a User Pool domain for a User Pool (to enable the Cognbito Hosted UI)
+    - Lookup the URL of an existing User Pool Domain
+
+    We need to do this in a custom resource to support the scenario of looking up a pre-existing User Pool Domain
+*/
+
 
 import { randomBytes } from 'crypto';
 import {
@@ -18,7 +28,12 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
     let domainName: string | undefined;
     const newUserPoolId = newUserPoolArn.split('/')[1];
     const newUserPoolRegion = newUserPoolArn.split(':')[3];
+
+
     if (action === 'Delete') {
+
+        // If we created the User Pool Domain earlier (createOrLookup === 'Create'),
+        // then we'll clean up after ourselves and delete it
         if (decodedPhysicalResourceId && decodedPhysicalResourceId.createOrLookup === 'Create') {
             const { userPoolArn: oldUserPoolArn, domainPrefix: oldDomainPrefix } = decodedPhysicalResourceId;
             const oldUserPoolRegion = oldUserPoolArn.split(':')[3];
@@ -35,6 +50,7 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
     } else if (action === 'Create' || action === 'Update') {
         let domainPrefix: string;
         if (createOrLookup === 'Create') {
+            // Create the User Pool Domain
             domainPrefix = decodedPhysicalResourceId?.domainPrefix || `auth-${randomBytes(4).toString('hex')}`;
             const cognitoClient = new CognitoIdentityServiceProvider();
             const existingDomain = await cognitoClient.describeUserPoolDomain({ Domain: domainPrefix }).promise();
@@ -47,6 +63,7 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
             }
             domainName = `${domainPrefix}.auth.${cognitoClient.config.region}.amazoncognito.com`;
         } else {
+            // Lookup the User Pool Domain
             const cognitoClient = new CognitoIdentityServiceProvider({ region: newUserPoolRegion });
             const existingUserPool = await cognitoClient.describeUserPool({ UserPoolId: newUserPoolId }).promise();
             domainPrefix = existingUserPool.UserPool?.Domain || '';

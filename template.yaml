@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.1
+    SemanticVersion: 1.2.3
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -114,7 +114,7 @@ Parameters:
       {}
   UserPoolArn:
     Type: String
-    Description: "Specify the ARN fn an existing user pool to use that one instead of creating a new one. If specified, then ClientId must also be specified."
+    Description: "Specify the ARN fn an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified."
     Default: ""
   UserPoolClientId:
     Type: String
@@ -342,11 +342,11 @@ Resources:
     Type: Custom::UserPoolDomain
     Properties:
       ServiceToken: !GetAtt UserPoolDomainHandler.Arn
-      UserPoolArn: !If:
+      UserPoolArn: !If
         - CreateUserPoolAndClient
         - !GetAtt UserPool.Arn
         - !Ref UserPoolArn
-      CreateOrLookup: !If:
+      CreateOrLookup: !If
         - CreateUserPoolAndClient
         - Create
         - Lookup
@@ -367,7 +367,8 @@ Resources:
               Action:
                 - cognito-idp:CreateUserPoolDomain
                 - cognito-idp:DeleteUserPoolDomain
-              Resource: !If:
+                - cognito-idp:DescribeUserPool
+              Resource: !If
                 - CreateUserPoolAndClient
                 - !GetAtt UserPool.Arn
                 - !Ref UserPoolArn
@@ -376,7 +377,7 @@ Resources:
     Type: Custom::UserPoolClientUpdate
     Properties:
       ServiceToken: !GetAtt UserPoolClientUpdateHandler.Arn
-      UserPoolArn: !If:
+      UserPoolArn: !If
         - CreateUserPoolAndClient
         - !GetAtt UserPool.Arn
         - !Ref UserPoolArn
@@ -407,6 +408,7 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:UpdateUserPoolClient
+                - cognito-idp:DescribeUserPoolClient
               Resource: !If
                 - CreateUserPoolAndClient
                 - !GetAtt UserPool.Arn
@@ -417,7 +419,7 @@ Resources:
     Condition: StaticSiteMode
     Properties:
       ServiceToken: !GetAtt ClientSecretRetrievalHandler.Arn
-      UserPoolArn: !If:
+      UserPoolArn: !If
         - CreateUserPoolAndClient
         - !GetAtt UserPool.Arn
         - !Ref UserPoolArn

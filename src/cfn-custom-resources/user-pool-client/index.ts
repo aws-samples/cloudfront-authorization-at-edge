@@ -1,5 +1,13 @@
-// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
+/*
+    Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+    SPDX-License-Identifier: MIT-0
+
+    This is a CloudFormation custom resource. It's purpose is to:
+
+    - Update a User Pool Client's redirect URL's
+
+    We need to do this in a custom resource, to support the scenario of updating a pre-existing User Pool Client
+*/
 
 import {
     CloudFormationCustomResourceHandler,

@@ -38,7 +38,7 @@ export interface HttpHeaders {
 type Mode = 'spaMode' | 'staticSiteMode';
 
 interface ConfigFromDisk {
-    userPoolId: string;
+    userPoolArn: string;
     clientId: string;
     oauthScopes: string[];
     cognitoAuthDomain: string;
@@ -119,9 +119,10 @@ export function getConfig(): Config {
     const config = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as ConfigFromDisk;
 
     // Derive the issuer and JWKS uri all JWT's will be signed with from the User Pool's ID and region:
-    const userPoolRegion = config.userPoolId && config.userPoolId.match(/^(\S+?)_\S+$/)![1];
-    const tokenIssuer = config.userPoolId && `https://cognito-idp.${userPoolRegion}.amazonaws.com/${config.userPoolId}`;
-    const tokenJwksUri = tokenIssuer && `${tokenIssuer}/.well-known/jwks.json`;
+    const userPoolId = config.userPoolArn.split('/')[1];
+    const userPoolRegion = userPoolId.match(/^(\S+?)_\S+$/)![1];
+    const tokenIssuer = `https://cognito-idp.${userPoolRegion}.amazonaws.com/${userPoolId}`;
+    const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
 
     // Derive cookie settings by merging the defaults with the explicitly provided values
     // Default cookies settings depend on the deployment mode (SPA or Static Site)

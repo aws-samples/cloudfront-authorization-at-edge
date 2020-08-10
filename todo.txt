@@ -2,8 +2,9 @@
 [ ] All custom resource should handle userPool ARN instead of ID
      [x] User Pool Domain custom resource
      [x] ClientSecret Retrieval
-     [ ] React App
+     [x] React App
      [x] User Pool Client
-[ ] Config files use ARN instead of ID of user pool
+[x] Config files use ARN instead of ID of user pool
      [x] template.yaml code
-     [ ] Lambda@Edge code
+     [x] Lambda@Edge code
+[ ] Create example that reuses existing user pool

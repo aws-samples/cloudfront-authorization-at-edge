@@ -29,26 +29,35 @@ async function ensureCognitoUserPoolClient(
     const userPoolRegion = userPoolArn.split(':')[3];
     const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
     const redirectDomains = [cloudFrontDistributionDomainName, ...alternateDomainNames].filter(domain => !!domain);
-    if (!redirectDomains.length) {
-        // Provide dummy value to be able to proceed
-        // Should be obvious to user to update this later
-        redirectDomains.push('example.org');
-    }
-    // Fetch existing callback URL's -- we want to keep them
+
+    // Fetch existing callback URLs.
+    // We want to keep them to achieve compatibility with Amazon Elasticsearch Service (special case)
+    // This is because Amazon Elasticsearch Service integrates with Cognito, but creates it's own
+    // User Pool Clien then, and needs the callback URL's to remain the same (so that it can refresh tokens)
     const { UserPoolClient } = await cognitoClient.describeUserPoolClient({
         ClientId: clientId, UserPoolId: userPoolId
     }).promise();
-    const existingRedirectUrisSignIn = UserPoolClient?.CallbackURLs || [];
-    const exitsingRedirectUrisSignOut = UserPoolClient?.LogoutURLs || [];
+    const existingRedirectUrisSignIn = (UserPoolClient?.CallbackURLs || []).filter(url => url.includes("es.amazonaws.com"));
+    const exitsingRedirectUrisSignOut = (UserPoolClient?.LogoutURLs || []).filter(url => url.includes("es.amazonaws.com"));
 
-    // Combine existing callback URL's with the one we calculated
+    // Combine existing callback URL's with the ones we calculated
     const RedirectUrisSignIn = [...redirectDomains.map(domain => `https://${domain}${redirectPathSignIn}`), ...existingRedirectUrisSignIn];
     const RedirectUrisSignOut = [...redirectDomains.map(domain => `https://${domain}${redirectPathSignOut}`), ...exitsingRedirectUrisSignOut];
 
-    // Deduplicate
+    // Deduplicate entries
     const RedirectUrisSignInDeduplicated = [...new Set(RedirectUrisSignIn)];
     const RedirectUrisSignOutDeduplicated = [...new Set(RedirectUrisSignOut)];
 
+    // Provide dummy value if needed, to be able to proceed
+    // Should be obvious to user to update this later
+    if (!RedirectUrisSignInDeduplicated.length) {
+        RedirectUrisSignInDeduplicated.push(`https://example.org/${redirectPathSignIn}`);
+    }
+    if (!RedirectUrisSignOutDeduplicated.length) {
+        RedirectUrisSignOutDeduplicated.push(`https://example.org/${redirectPathSignOut}`);
+    }
+
+    // And finally, update the user ppol client
     const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest = {
         AllowedOAuthFlows: ['code'],
         AllowedOAuthFlowsUserPoolClient: true,

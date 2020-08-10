@@ -4,7 +4,7 @@
 
     This is a CloudFormation custom resource. It's purpose is to:
 
-    - Create a User Pool domain for a User Pool (to enable the Cognbito Hosted UI)
+    - Create a User Pool domain for a User Pool (to enable the Cognito Hosted UI)
     - Lookup the URL of an existing User Pool Domain
 
     We need to do this in a custom resource to support the scenario of looking up a pre-existing User Pool Domain
@@ -22,20 +22,18 @@ import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
 
-async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete', newUserPoolArn: string, createOrLookup: 'Create' | 'Lookup', physicalResourceId?: string) {
-    const decodedPhysicalResourceId = decodePhysicalResourceId(physicalResourceId!);
+async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete', newUserPoolArn: string, physicalResourceId?: string) {
+    const createdPhysicalResource = decodePhysicalResourceId(physicalResourceId!);
     let returnPhysicalResourceId: string;
     let domainName: string | undefined;
     const newUserPoolId = newUserPoolArn.split('/')[1];
     const newUserPoolRegion = newUserPoolArn.split(':')[3];
 
-
     if (action === 'Delete') {
-
-        // If we created the User Pool Domain earlier (createOrLookup === 'Create'),
+        // If we created the User Pool Domain earlier,
         // then we'll clean up after ourselves and delete it
-        if (decodedPhysicalResourceId && decodedPhysicalResourceId.createOrLookup === 'Create') {
-            const { userPoolArn: oldUserPoolArn, domainPrefix: oldDomainPrefix } = decodedPhysicalResourceId;
+        if (createdPhysicalResource) {
+            const { userPoolArn: oldUserPoolArn, domainPrefix: oldDomainPrefix } = createdPhysicalResource;
             const oldUserPoolRegion = oldUserPoolArn.split(':')[3];
             const oldUserPoolId = oldUserPoolArn.split('/')[1];
             const input: CognitoIdentityServiceProvider.CreateUserPoolDomainRequest = {
@@ -48,33 +46,27 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
         }
         returnPhysicalResourceId = physicalResourceId!;
     } else if (action === 'Create' || action === 'Update') {
-        let domainPrefix: string;
-        if (createOrLookup === 'Create') {
-            // Create the User Pool Domain
-            domainPrefix = decodedPhysicalResourceId?.domainPrefix || `auth-${randomBytes(4).toString('hex')}`;
-            const cognitoClient = new CognitoIdentityServiceProvider();
-            const existingDomain = await cognitoClient.describeUserPoolDomain({ Domain: domainPrefix }).promise();
-            if (action === 'Create' || !existingDomain.DomainDescription || !existingDomain.DomainDescription!.CustomDomainConfig!) {
-                const input: CognitoIdentityServiceProvider.CreateUserPoolDomainRequest = {
-                    Domain: domainPrefix,
-                    UserPoolId: newUserPoolId,
-                };
-                await cognitoClient.createUserPoolDomain(input).promise();
-            }
-            domainName = `${domainPrefix}.auth.${cognitoClient.config.region}.amazoncognito.com`;
+        const cognitoClient = new CognitoIdentityServiceProvider({ region: newUserPoolRegion });
+        const existingUserPool = await cognitoClient.describeUserPool({ UserPoolId: newUserPoolId }).promise();
+        const domainPrefix = existingUserPool.UserPool?.Domain;
+        const customDomain = existingUserPool.UserPool?.CustomDomain;
+        if (customDomain) {
+            returnPhysicalResourceId = domainName = customDomain;
+        } else if (domainPrefix) {
+            returnPhysicalResourceId = domainName = `${domainPrefix}.auth.${newUserPoolRegion}.amazoncognito.com`;
         } else {
-            // Lookup the User Pool Domain
+            const domainPrefix = `auth-${randomBytes(4).toString('hex')}`;
             const cognitoClient = new CognitoIdentityServiceProvider({ region: newUserPoolRegion });
-            const existingUserPool = await cognitoClient.describeUserPool({ UserPoolId: newUserPoolId }).promise();
-            domainPrefix = existingUserPool.UserPool?.Domain || '';
-            if (!domainPrefix) {
-                throw new Error('When using an existing user pool, that user pool should have a domain set up already');
-            }
-            domainName = `${domainPrefix}.auth.${newUserPoolRegion}.amazoncognito.com`;
+            const input: CognitoIdentityServiceProvider.CreateUserPoolDomainRequest = {
+                Domain: domainPrefix,
+                UserPoolId: newUserPoolId,
+            };
+            await cognitoClient.createUserPoolDomain(input).promise();
+            domainName = `${domainPrefix}.auth.${cognitoClient.config.region}.amazoncognito.com`;
+            returnPhysicalResourceId = encodePhysicalResourceId({
+                domainPrefix, userPoolArn: newUserPoolArn
+            });
         }
-        returnPhysicalResourceId = encodePhysicalResourceId({
-            createOrLookup, domainPrefix, userPoolArn: newUserPoolArn
-        });
     }
     return { domainName, physicalResourceId: returnPhysicalResourceId! };
 }
@@ -93,7 +85,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const { domainName, physicalResourceId } = await ensureCognitoUserPoolDomain(RequestType, ResourceProperties.UserPoolArn, ResourceProperties.CreateOrLookup, PhysicalResourceId);
+        const { domainName, physicalResourceId } = await ensureCognitoUserPoolDomain(RequestType, ResourceProperties.UserPoolArn, PhysicalResourceId);
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId,
@@ -117,13 +109,18 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
 }
 
-function encodePhysicalResourceId(obj: { userPoolArn: string, domainPrefix: string, createOrLookup: 'Create' | 'Lookup' }) {
+interface CreatedPhysicalResourceId {
+    userPoolArn: string;
+    domainPrefix: string;
+}
+
+function encodePhysicalResourceId(obj: CreatedPhysicalResourceId) {
     return JSON.stringify(obj, Object.keys(obj).sort());
 }
 
 function decodePhysicalResourceId(physicalResourceId: string) {
     try {
-        return JSON.parse(physicalResourceId) as { userPoolArn: string; domainPrefix: string; createOrLookup: 'Create' | 'Lookup' };
+        return JSON.parse(physicalResourceId) as CreatedPhysicalResourceId
     } catch (err) {
         console.error(`Can't parse physicalResourceId: ${physicalResourceId}`);
     }

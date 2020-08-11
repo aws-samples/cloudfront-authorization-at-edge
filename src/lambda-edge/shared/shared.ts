@@ -15,6 +15,7 @@ export interface CookieSettings {
     accessToken: string;
     refreshToken: string;
     nonce: string;
+    [key: string]: string;
 }
 
 function getDefaultCookieSettings(props: { mode: 'spaMode' | 'staticSiteMode', compatibility: 'amplify' | 'elasticsearch' }): CookieSettings {
@@ -40,7 +41,8 @@ function getDefaultCookieSettings(props: { mode: 'spaMode' | 'staticSiteMode', c
             idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
             accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
             refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-            nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+            nonce: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            cognitoEnabled: "Path=/; Secure; SameSite=Lax"
         }
     }
     throw new Error(`Cannot determine default cookiesettings for ${props.mode} with compatibility ${props.compatibility}`);
@@ -77,8 +79,8 @@ interface CompleteConfigFromDisk extends ConfigFromDisk {
     nonceMaxAge?: number;
 }
 
-function isCompleteConfig(c: any): c is CompleteConfigFromDisk {
-    return c["userPoolArn"] !== undefined;
+function isCompleteConfig(config: any): config is CompleteConfigFromDisk {
+    return config["userPoolArn"] !== undefined;
 }
 
 enum LogLevel {
@@ -208,6 +210,7 @@ function extractCookiesFromHeaders(headers: CloudFrontHeaders) {
 }
 
 function withCookieDomain(distributionDomainName: string, cookieSettings: string) {
+    // Add the domain to the cookiesetting
     if (cookieSettings.toLowerCase().indexOf('domain') === -1) {
         // Add leading dot for compatibility with Amplify (or js-cookie really)
         return `${cookieSettings}; Domain=.${distributionDomainName}`;
@@ -216,6 +219,7 @@ function withCookieDomain(distributionDomainName: string, cookieSettings: string
 }
 
 export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
+    // Turn a regular key-value object into the explicit format expected by CloudFront 
     return Object.entries(headers).reduce((reduced, [key, value]) => (
         Object.assign(reduced, {
             [key.toLowerCase()]: [{
@@ -280,12 +284,6 @@ export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: str
     }
 }
 
-export function decodeToken(jwt: string) {
-    const tokenBody = jwt.split('.')[1];
-    const decodableTokenBody = tokenBody.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(Buffer.from(decodableTokenBody, 'base64').toString());
-}
-
 interface GenerateCookieHeadersParam {
     clientId: string,
     oauthScopes: string[],
@@ -342,7 +340,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     } else {
         cookieNames = getElasticsearchCookieNames();
         cookies = {
-            [cookieNames.cognitoEnabledKey]: `True; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+            [cookieNames.cognitoEnabledKey]: `True; ${withCookieDomain(param.domainName, param.cookieSettings.cognitoEnabled)}`,
         };
     }
     Object.assign(cookies, {
@@ -386,6 +384,12 @@ const AXIOS_INSTANCE = axios.create({
     httpsAgent: new Agent({ keepAlive: true }),
 });
 
+
+export function decodeToken(jwt: string) {
+    const tokenBody = jwt.split('.')[1];
+    const decodableTokenBody = tokenBody.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(Buffer.from(decodableTokenBody, 'base64').toString());
+}
 
 export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig, logger: Logger): Promise<AxiosResponse<any>> {
     let attempts = 0;

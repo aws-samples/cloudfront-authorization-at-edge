@@ -34,9 +34,9 @@
     "adm-zip": "^0.4.14",
     "aws-sdk": "^2.658.0",
     "axios": "^0.19.2",
-    "cookie": "^0.4.0",
+    "cookie": "^0.4.1",
     "jsonwebtoken": "^8.5.1",
-    "jwks-rsa": "^1.8.0",
+    "jwks-rsa": "^1.8.1",
     "ncp": "^2.0.0",
     "s3-spa-upload": "^1.1.6"
   }

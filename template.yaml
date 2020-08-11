@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.5
+    SemanticVersion: 1.2.6
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -271,7 +271,7 @@ Resources:
             Id: protected-bucket
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
-          - DomainName: example.org
+          - DomainName: will-never-be-reached.org
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer

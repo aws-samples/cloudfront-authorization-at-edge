@@ -34,7 +34,7 @@ Parameters:
   SemanticVersion:
     Type: String
     Description: Semantic version of the back end
-    Default: 1.2.5
+    Default: 1.2.6
 
   HttpHeaders:
     Type: String

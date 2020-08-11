@@ -29,7 +29,7 @@ Resources:
     Properties:
       Location:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge-dev
-        SemanticVersion: 1.2.6
+        SemanticVersion: 1.2.7
       Parameters:
         UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient
@@ -40,3 +40,4 @@ Resources:
             "cookieName1": "cookieValue1; HttpOnly; Secure",
             "cookieName2": "cookieValue2; SameSite=Lax; Domain=.dhqmy2fj0cs0z.cloudfront.net"
           }
+        Version: 1217

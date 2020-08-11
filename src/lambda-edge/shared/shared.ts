@@ -167,14 +167,13 @@ export function getCompleteConfig(): CompleteConfig {
     const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
 
     // Derive cookie settings by merging the defaults with the explicitly provided values
-    // Default cookies settings depend on the deployment mode (SPA or Static Site)
     const defaultCookieSettings = getDefaultCookieSettings({
         compatibility: config.cookieCompatibility,
         mode: config.mode
     });
     const cookieSettings = config.cookieSettings ? Object.fromEntries(
         Object
-            .entries(config.cookieSettings)
+            .entries({ ...defaultCookieSettings, ...config.cookieSettings })
             .map(([k, v]) => [k, v || defaultCookieSettings[k as keyof CookieSettings]])
     ) as CookieSettings : defaultCookieSettings;
 

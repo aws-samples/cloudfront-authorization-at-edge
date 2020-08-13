@@ -372,6 +372,10 @@ Resources:
                 - CreateUserPoolAndClient
                 - !GetAtt UserPool.Arn
                 - !Ref UserPoolArn
+            - Effect: Allow
+              Action:
+                - cognito-idp:DeleteUserPoolDomain
+              Resource: "*"
 
   UserPoolClientUpdate:
     Type: Custom::UserPoolClientUpdate

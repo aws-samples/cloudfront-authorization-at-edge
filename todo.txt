@@ -8,3 +8,5 @@
      [x] template.yaml code
      [x] Lambda@Edge code
 [ ] Create example that reuses existing user pool
+[ ] Publish new version and test
+[ ] Update User Pool Client should upon delete undo what it did (in case it updated the redirect URL's)

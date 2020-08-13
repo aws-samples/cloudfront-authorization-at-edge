@@ -72,9 +72,10 @@ async function ensureCognitoUserPoolClient(
         SupportedIdentityProviders: ['COGNITO'],
         AllowedOAuthScopes: JSON.parse(oAuthScopes),
         ClientId: clientId,
+        UserPoolId: userPoolId,
+        ...UserPoolClient, // Keep existing values
         CallbackURLs: RedirectUrisSignInDeduplicated,
         LogoutURLs: RedirectUrisSignOutDeduplicated,
-        UserPoolId: userPoolId,
     };
     await cognitoClient.updateUserPoolClient(input).promise();
     return {

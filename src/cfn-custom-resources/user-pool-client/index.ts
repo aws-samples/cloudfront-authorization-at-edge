@@ -29,57 +29,66 @@ async function ensureCognitoUserPoolClient(
     redirectPathSignOut: string,
     alternateDomainNames: string[],
     physicalResourceId?: string) {
-    if (action === 'Delete') {
-        // Deletes aren't executed; the standard UserPool client CFN Resource should just be deleted
-        return { physicalResourceId: physicalResourceId! };
-    }
+
     const userPoolId = userPoolArn.split('/')[1];
     const userPoolRegion = userPoolArn.split(':')[3];
     const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
     const redirectDomains = [cloudFrontDistributionDomainName, ...alternateDomainNames].filter(domain => !!domain);
 
-    // Fetch existing callback URLs.
-    // We want to keep them to achieve compatibility with Amazon Elasticsearch Service (special case)
-    // This is because Amazon Elasticsearch Service integrates with Cognito, but creates it's own
-    // User Pool Clien then, and needs the callback URL's to remain the same (so that it can refresh tokens)
+    // Fetch existing callback URLs––we wan't to keep them and just add new entries that we need ourselves
     const { UserPoolClient } = await cognitoClient.describeUserPoolClient({
         ClientId: clientId, UserPoolId: userPoolId
     }).promise();
-    const existingRedirectUrisSignIn = (UserPoolClient?.CallbackURLs || []).filter(url => url.includes("es.amazonaws.com"));
-    const exitsingRedirectUrisSignOut = (UserPoolClient?.LogoutURLs || []).filter(url => url.includes("es.amazonaws.com"));
+    const existingRedirectUrisSignIn = UserPoolClient?.CallbackURLs || [];
+    const existingRedirectUrisSignOut = UserPoolClient?.LogoutURLs || [];
 
     // Combine existing callback URL's with the ones we calculated
     const RedirectUrisSignIn = [...redirectDomains.map(domain => `https://${domain}${redirectPathSignIn}`), ...existingRedirectUrisSignIn];
-    const RedirectUrisSignOut = [...redirectDomains.map(domain => `https://${domain}${redirectPathSignOut}`), ...exitsingRedirectUrisSignOut];
+    const RedirectUrisSignOut = [...redirectDomains.map(domain => `https://${domain}${redirectPathSignOut}`), ...existingRedirectUrisSignOut];
 
     // Deduplicate entries
-    const RedirectUrisSignInDeduplicated = [...new Set(RedirectUrisSignIn)];
-    const RedirectUrisSignOutDeduplicated = [...new Set(RedirectUrisSignOut)];
+    let RedirectUrisSignInDeduplicated = [...new Set(RedirectUrisSignIn)];
+    let RedirectUrisSignOutDeduplicated = [...new Set(RedirectUrisSignOut)];
 
-    // Provide dummy value if needed, to be able to proceed
-    // Should be obvious to user to update this later
-    if (!RedirectUrisSignInDeduplicated.length) {
-        RedirectUrisSignInDeduplicated.push(`https://example.org/${redirectPathSignIn}`);
-    }
-    if (!RedirectUrisSignOutDeduplicated.length) {
-        RedirectUrisSignOutDeduplicated.push(`https://example.org/${redirectPathSignOut}`);
+    // Determine which URL's we are going to add––and weren't already there
+    const AddedRedirectUrisSignIn = RedirectUrisSignInDeduplicated.filter(url => !existingRedirectUrisSignIn.includes(url));
+    const AddedRedirectUrisSignOut = RedirectUrisSignOutDeduplicated.filter(url => !existingRedirectUrisSignOut.includes(url));
+
+    if (action === 'Delete') {
+        // Upon deletes, remove the callback URL's we added ourselves earlier
+        const decoded = decodePhysicalResourceId(physicalResourceId);
+        if (decoded) {
+            RedirectUrisSignInDeduplicated = RedirectUrisSignInDeduplicated.filter(url => decoded.AddedRedirectUrisSignIn.includes(url));
+            RedirectUrisSignOutDeduplicated = RedirectUrisSignInDeduplicated.filter(url => decoded.AddedRedirectUrisSignIn.includes(url));
+        } else {
+            console.log(`Can't decode PhysicalResourceId ${physicalResourceId}––keeping existing redirect URI's`);
+        }
     }
 
-    // And finally, update the user ppol client
+    // And finally, update the user pool client
     const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest = {
-        AllowedOAuthFlows: ['code'],
-        AllowedOAuthFlowsUserPoolClient: true,
-        SupportedIdentityProviders: ['COGNITO'],
-        AllowedOAuthScopes: JSON.parse(oAuthScopes),
+        AllowedOAuthFlows: UserPoolClient?.AllowedOAuthFlows || ['code'],
+        AllowedOAuthFlowsUserPoolClient: UserPoolClient?.AllowedOAuthFlowsUserPoolClient || true,
+        SupportedIdentityProviders: UserPoolClient?.SupportedIdentityProviders || ['COGNITO'],
+        AllowedOAuthScopes: UserPoolClient?.AllowedOAuthScopes || JSON.parse(oAuthScopes),
         ClientId: clientId,
         UserPoolId: userPoolId,
-        ...UserPoolClient, // Keep existing values
-        CallbackURLs: RedirectUrisSignInDeduplicated,
-        LogoutURLs: RedirectUrisSignOutDeduplicated,
+        AnalyticsConfiguration: UserPoolClient?.AnalyticsConfiguration,
+        ClientName: UserPoolClient?.ClientName,
+        DefaultRedirectURI: UserPoolClient?.DefaultRedirectURI,
+        ExplicitAuthFlows: UserPoolClient?.ExplicitAuthFlows,
+        PreventUserExistenceErrors: UserPoolClient?.PreventUserExistenceErrors,
+        ReadAttributes: UserPoolClient?.ReadAttributes,
+        RefreshTokenValidity: UserPoolClient?.RefreshTokenValidity,
+        WriteAttributes: UserPoolClient?.WriteAttributes,
+        CallbackURLs: RedirectUrisSignInDeduplicated.length ? RedirectUrisSignInDeduplicated : undefined,
+        LogoutURLs: RedirectUrisSignOutDeduplicated.length ? RedirectUrisSignOutDeduplicated : undefined,
     };
     await cognitoClient.updateUserPoolClient(input).promise();
     return {
-        physicalResourceId: `${userPoolId}-${clientId}-updated-client`,
+        physicalResourceId: encodePhysicalResourceId({
+            AddedRedirectUrisSignIn, AddedRedirectUrisSignOut
+        }),
         Data: {
             RedirectUrisSignIn: RedirectUrisSignInDeduplicated.join(','),
             RedirectUrisSignOut: RedirectUrisSignOutDeduplicated.join(','),
@@ -125,4 +134,24 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
         };
     }
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
+}
+
+interface CreatedPhysicalResourceId {
+    AddedRedirectUrisSignIn: string[];
+    AddedRedirectUrisSignOut: string[];
+}
+
+function encodePhysicalResourceId(obj: CreatedPhysicalResourceId) {
+    return JSON.stringify({
+        AddedRedirectUrisSignIn: obj.AddedRedirectUrisSignIn.sort(),
+        AddedRedirectUrisSignOut: obj.AddedRedirectUrisSignOut.sort(),
+    });
+}
+
+function decodePhysicalResourceId(physicalResourceId?: string) {
+    try {
+        return JSON.parse(physicalResourceId!) as CreatedPhysicalResourceId
+    } catch (err) {
+        console.error(`Can't parse physicalResourceId: ${physicalResourceId}`);
+    }
 }

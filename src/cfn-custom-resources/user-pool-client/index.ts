@@ -24,7 +24,7 @@ async function getUserPoolClient(props: Props) {
     const userPoolRegion = props.UserPoolArn.split(':')[3];
     const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
     const input = {
-        ClientId: props.ClientId, UserPoolId: userPoolId
+        ClientId: props.UserPoolClientId, UserPoolId: userPoolId
     };
     console.debug(JSON.stringify(input, null, 4));
     const { UserPoolClient } = await cognitoClient.describeUserPoolClient(input).promise();
@@ -53,7 +53,7 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
         AllowedOAuthFlowsUserPoolClient,
         AllowedOAuthScopes,
         SupportedIdentityProviders: SupportedIdentityProviders,
-        ClientId: props.ClientId,
+        ClientId: props.UserPoolClientId,
         UserPoolId: userPoolId,
         CallbackURLs: [...new Set(redirectUrisSignIn)],
         LogoutURLs: [...new Set(redirectUrisSignOut)],
@@ -101,7 +101,7 @@ async function doNewUpdate(props: Props, redirectUrisSignIn: string[], redirectU
 
 interface Props {
     UserPoolArn: string;
-    ClientId: string;
+    UserPoolClientId: string;
     OAuthScopes: string[];
     CloudFrontDistributionDomainName: string;
     RedirectPathSignIn: string;

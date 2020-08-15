@@ -124,11 +124,15 @@ async function updateCognitoUserPoolClient(
     if (requestType === 'Create') {
         await doNewUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
     } else if (requestType === 'Update') {
-        const priorUris = getRedirectUris(oldProps!);
-        await undoPriorUpdate(oldProps!, priorUris.redirectUrisSignIn, priorUris.redirectUrisSignOut);
+        if (physicalResourceId === 'UpdatedUserPoolClient') {
+            const priorUris = getRedirectUris(oldProps!);
+            await undoPriorUpdate(oldProps!, priorUris.redirectUrisSignIn, priorUris.redirectUrisSignOut);
+        }
         await doNewUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
-    } else if (requestType === 'Delete' && physicalResourceId === 'UpdatedUserPoolClient') {
-        await undoPriorUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
+    } else if (requestType === 'Delete') {
+        if (physicalResourceId === 'UpdatedUserPoolClient') {
+            await undoPriorUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
+        }
     }
 
     return {

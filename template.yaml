@@ -106,11 +106,6 @@ Parameters:
     AllowedValues:
       - "amplify"
       - "elasticsearch"
-  AdditionalCookies:
-    Type: String
-    Description: 'Specify one or more additional cookies, as a JSON object––mapping cookie names to values and settings: {"cookieName1": "cookieValue1; HttpOnly; Secure"}'
-    Default: >-
-      {}
   UserPoolArn:
     Type: String
     Description: "Specify the ARN fn an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified."
@@ -546,8 +541,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "cookieCompatibility": "${CookieCompatibility}"
             }
           - Mode: !If
               - SPAMode
@@ -597,8 +591,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "cookieCompatibility": "${CookieCompatibility}"
             }
           - Mode: !If
               - SPAMode
@@ -661,8 +654,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "cookieCompatibility": "${CookieCompatibility}"
             }
           - Mode: !If
               - SPAMode
@@ -712,8 +704,7 @@ Resources:
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
-              "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "cookieCompatibility": "${CookieCompatibility}"
             }
           - Mode: !If
               - SPAMode

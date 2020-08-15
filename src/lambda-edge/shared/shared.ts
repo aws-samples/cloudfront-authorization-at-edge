@@ -72,7 +72,6 @@ interface CompleteConfigFromDisk extends ConfigFromDisk {
     clientSecret: string;
     nonceSigningSecret: string;
     cookieCompatibility: 'amplify' | 'elasticsearch';
-    additionalCookies: { [name: string]: string };
     secretAllowedCharacters?: string;
     pkceLength?: number;
     nonceLength?: number;
@@ -290,7 +289,6 @@ interface GenerateCookieHeadersParam {
     cookieSettings: CookieSettings,
     mode: Mode,
     cookieCompatibility: 'amplify' | 'elasticsearch';
-    additionalCookies: { [name: string]: string };
     tokens: {
         id_token: string;
         access_token: string;
@@ -365,7 +363,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     });
 
     // Return cookie object in format of CloudFront headers
-    return Object.entries({ ...param.additionalCookies, ...cookies }).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
+    return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
 
 function expireCookie(cookie: string = '') {

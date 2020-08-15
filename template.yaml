@@ -66,10 +66,9 @@ Parameters:
         "nonce": null
       }
   OAuthScopes:
-    Type: String
-    Description: The OAuth scopes to request the User Pool to add to the access token JWT. To be provided as a JSON array
-    Default: >-
-      ["phone", "email", "profile", "openid", "aws.cognito.signin.user.admin"]
+    Type: CommaDelimitedList
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT
+    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. To be provided as a JSON object
@@ -537,7 +536,7 @@ Resources:
               "userPoolArn": "${UserPoolArn}",
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
+              "oauthScopes": ${OAuthScopesJsonArray},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
@@ -566,6 +565,14 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
+            OAuthScopesJsonArray:
+              !Join
+                - ""
+                - - "[\""
+                  - !Join
+                    - "\", \""
+                    - !Ref OAuthScopes
+                  - "\"]"
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -580,7 +587,7 @@ Resources:
               "userPoolArn": "${UserPoolArn}",
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
+              "oauthScopes": ${OAuthScopesJsonArray},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
@@ -609,6 +616,14 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
+            OAuthScopesJsonArray:
+              !Join
+                - ""
+                - - "[\""
+                  - !Join
+                    - "\", \""
+                    - !Ref OAuthScopes
+                  - "\"]"
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -636,7 +651,7 @@ Resources:
               "userPoolArn": "${UserPoolArn}",
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
+              "oauthScopes": ${OAuthScopesJsonArray},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
@@ -665,6 +680,14 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
+            OAuthScopesJsonArray:
+              !Join
+                - ""
+                - - "[\""
+                  - !Join
+                    - "\", \""
+                    - !Ref OAuthScopes
+                  - "\"]"
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -679,7 +702,7 @@ Resources:
               "userPoolArn": "${UserPoolArn}",
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
+              "oauthScopes": ${OAuthScopesJsonArray},
               "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
@@ -708,6 +731,14 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
+            OAuthScopesJsonArray:
+              !Join
+                - ""
+                - - "[\""
+                  - !Join
+                    - "\", \""
+                    - !Ref OAuthScopes
+                  - "\"]"
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function

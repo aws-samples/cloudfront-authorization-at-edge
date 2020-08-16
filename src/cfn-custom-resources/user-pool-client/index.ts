@@ -18,6 +18,8 @@ import {
 import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
+const CUSTOM_RESOURCE_CURRENT_VERSION_NAME = "UpdatedUserPoolClientV2";
+
 
 async function getUserPoolClient(props: Props) {
     const userPoolId = props.UserPoolArn.split('/')[1];
@@ -26,7 +28,7 @@ async function getUserPoolClient(props: Props) {
     const input = {
         ClientId: props.UserPoolClientId, UserPoolId: userPoolId
     };
-    console.debug(JSON.stringify(input, null, 4));
+    console.debug("Describing User Pool Client", JSON.stringify(input, null, 4));
     const { UserPoolClient } = await cognitoClient.describeUserPoolClient(input).promise();
     return UserPoolClient;
 }
@@ -36,10 +38,16 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
     const userPoolRegion = props.UserPoolArn.split(':')[3];
     const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
 
-    let AllowedOAuthFlows = [...new Set(['code', ...existingUserPoolClient?.AllowedOAuthFlows || []])];
+    // Merge OAuth scopes and flows with what is already there on the existing User Pool Client
+    let AllowedOAuthFlows = [...new Set(['code'].concat(existingUserPoolClient?.AllowedOAuthFlows || []))];
     let AllowedOAuthFlowsUserPoolClient = true;
-    let AllowedOAuthScopes = [...new Set([...props.OAuthScopes, ...existingUserPoolClient?.AllowedOAuthScopes || []])];
-    let SupportedIdentityProviders = [...new Set(['COGNITO', ...existingUserPoolClient?.SupportedIdentityProviders || []])];
+    let AllowedOAuthScopes = [...new Set(props.OAuthScopes.concat(existingUserPoolClient?.AllowedOAuthScopes || []))];
+
+    let SupportedIdentityProviders = existingUserPoolClient?.SupportedIdentityProviders || [];
+    if (props.CreateUserPoolAndClient) {
+        // If we were the ones creating the User Pool Client, we'll enable COGNITO as IDP (probably the user wants this, if only for initial testing)
+        SupportedIdentityProviders = ['COGNITO'];
+    }
 
     // If there's no redirect URI's -- switch off OAuth (to avoid a Cognito exception)
     if (!redirectUrisSignIn.length) {
@@ -58,7 +66,7 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
         CallbackURLs: [...new Set(redirectUrisSignIn)],
         LogoutURLs: [...new Set(redirectUrisSignOut)],
     };
-    console.debug(JSON.stringify(input, null, 4));
+    console.debug("Updating User Pool Client", JSON.stringify(input, null, 4));
     await cognitoClient.updateUserPoolClient(input).promise();
 }
 
@@ -107,6 +115,7 @@ interface Props {
     RedirectPathSignIn: string;
     RedirectPathSignOut: string;
     AlternateDomainNames: string[];
+    CreateUserPoolAndClient: boolean;
 }
 
 
@@ -124,13 +133,13 @@ async function updateCognitoUserPoolClient(
     if (requestType === 'Create') {
         await doNewUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
     } else if (requestType === 'Update') {
-        if (physicalResourceId === 'UpdatedUserPoolClient') {
+        if (physicalResourceId === CUSTOM_RESOURCE_CURRENT_VERSION_NAME) {
             const priorUris = getRedirectUris(oldProps!);
             await undoPriorUpdate(oldProps!, priorUris.redirectUrisSignIn, priorUris.redirectUrisSignOut);
         }
         await doNewUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
     } else if (requestType === 'Delete') {
-        if (physicalResourceId === 'UpdatedUserPoolClient') {
+        if (physicalResourceId === CUSTOM_RESOURCE_CURRENT_VERSION_NAME) {
             await undoPriorUpdate(currentProps, currentUris.redirectUrisSignIn, currentUris.redirectUrisSignOut);
         }
     }
@@ -160,7 +169,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
         const Data = await updateCognitoUserPoolClient(RequestType, ResourceProperties as unknown as Props, OldResourceProperties as unknown as Props, PhysicalResourceId);
         response = {
             LogicalResourceId,
-            PhysicalResourceId: "UpdatedUserPoolClient",
+            PhysicalResourceId: CUSTOM_RESOURCE_CURRENT_VERSION_NAME,
             Status: 'SUCCESS',
             RequestId,
             StackId,

@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.10
+    SemanticVersion: 1.2.12
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -383,16 +383,18 @@ Resources:
         - CreateUserPoolAndClient
         - !Ref UserPoolClient
         - !Ref UserPoolClientId
-      CloudFrontDistributionDomainName:
-        !If [
-          CreateCloudFrontDistribution,
-          !GetAtt CloudFrontDistribution.DomainName,
-          "",
-        ]
+      CloudFrontDistributionDomainName: !If
+        - CreateCloudFrontDistribution
+        - !GetAtt CloudFrontDistribution.DomainName
+        - ""
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
       AlternateDomainNames: !Ref AlternateDomainNames
       OAuthScopes: !Ref OAuthScopes
+      CreateUserPoolAndClient: !If
+        - CreateUserPoolAndClient
+        - true
+        - false
 
   UserPoolClientUpdateHandler:
     Type: AWS::Serverless::Function
@@ -559,14 +561,13 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
-            OAuthScopesJsonArray:
-              !Join
-                - ""
-                - - "[\""
-                  - !Join
-                    - "\", \""
-                    - !Ref OAuthScopes
-                  - "\"]"
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -609,14 +610,13 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
-            OAuthScopesJsonArray:
-              !Join
-                - ""
-                - - "[\""
-                  - !Join
-                    - "\", \""
-                    - !Ref OAuthScopes
-                  - "\"]"
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -672,14 +672,13 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
-            OAuthScopesJsonArray:
-              !Join
-                - ""
-                - - "[\""
-                  - !Join
-                    - "\", \""
-                    - !Ref OAuthScopes
-                  - "\"]"
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -722,14 +721,13 @@ Resources:
               - CreateUserPoolAndClient
               - !Ref UserPoolClient
               - !Ref UserPoolClientId
-            OAuthScopesJsonArray:
-              !Join
-                - ""
-                - - "[\""
-                  - !Join
-                    - "\", \""
-                    - !Ref OAuthScopes
-                  - "\"]"
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function

@@ -95,10 +95,6 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
-  Version:
-    Type: String
-    Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
-    Default: ""
   CookieCompatibility:
     Type: String
     Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service"
@@ -108,16 +104,20 @@ Parameters:
       - "elasticsearch"
   AdditionalCookies:
     Type: String
-    Description: 'Specify one or more additional cookies, as a JSON object––mapping cookie names to values and settings: {"cookieName1": "cookieValue1; HttpOnly; Secure"}'
+    Description: 'Specify one or more additional cookies to set after successfull sign-in. Specify as a JSON object––mapping cookie names to values and settings: {"cookieName1": "cookieValue1; HttpOnly; Secure"}'
     Default: >-
       {}
   UserPoolArn:
     Type: String
-    Description: "Specify the ARN fn an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified."
+    Description: "Specify the ARN of an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified."
     Default: ""
   UserPoolClientId:
     Type: String
-    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: OAuth and Cognito IDP will be enabled on the pre-existing user pool client"
+    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: the pre-existing user pool client will be updated to enable OAuth"
+    Default: ""
+  Version:
+    Type: String
+    Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
     Default: ""
   LogLevel:
     Type: String

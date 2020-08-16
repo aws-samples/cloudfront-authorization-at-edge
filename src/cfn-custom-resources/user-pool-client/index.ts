@@ -94,13 +94,6 @@ async function doNewUpdate(props: Props, redirectUrisSignIn: string[], redirectU
     const existingRedirectUrisSignIn = existingUserPoolClient?.CallbackURLs || [];
     const existingRedirectUrisSignOut = existingUserPoolClient?.LogoutURLs || [];
 
-    if (redirectUrisSignIn.find(uri => existingRedirectUrisSignIn.includes(uri))) {
-        throw new Error("SignIn URI's overlap with pre-existing SignIn URI's on User Pool Client. Cannot continue without becoming mixed up.");
-    }
-    if (redirectUrisSignOut.find(uri => existingRedirectUrisSignOut.includes(uri))) {
-        throw new Error("SignOut URI's overlap with pre-existing SignOut URI's on User Pool Client. Cannot continue without becoming mixed up.");
-    }
-
     // Add new callback url's
     const redirectUrisSignInToSet = [...existingRedirectUrisSignIn, ...redirectUrisSignIn];
     const redirectUrisSignOutToSet = [...existingRedirectUrisSignOut, ...redirectUrisSignOut];

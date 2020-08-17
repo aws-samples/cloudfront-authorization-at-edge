@@ -115,12 +115,19 @@ If you do not want to deploy a SPA but rather a static site, then it is more sec
 
 ## Cookie compatibility
 
-The cookies that this solution sets, are compatible with AWS Amplify––which makes this solution work seamlessly with AWS Amplify. If you want to use this solution as an Auth@Edge layer in front of AWS Elasticsearch Service with Cognito integration, you need cookies to be compatible with the cookie-naming scheme of that service. In that case, upon deploying, set parameter CookieCompatibilty to "elasticsearch".
+The cookies that this solution sets, are compatible with AWS Amplify––which makes this solution work seamlessly with AWS Amplify.
+
+*Niche use case:*
+If you want to use this solution as an Auth@Edge layer in front of AWS Elasticsearch Service with Cognito integration, you need cookies to be compatible with the cookie-naming scheme of that service. In that case, upon deploying, set parameter CookieCompatibilty to "elasticsearch".
 
 If choosing compatibility with AWS Elasticsearch with Cognito integration:
 
 - Set parameter EnableSPAMode to "false", because AWS Elasticsearch Cognito integration uses a client secret.
 - Set parameters UserPoolArn and UserPoolClientId to the ARN and ID of the pre-existing User Pool and Client, that you've configured your Elasticsearch domain with.
+
+## Additional Cookies
+
+You can provide one or more additional cookies that will be set after succesfull sign-in, by setting the parameter AdditionalCookies. This may be of use to you, to dynamically provide configuration that you can read in your SPA's JavaScript.
 
 ## Contributing to this repo
 

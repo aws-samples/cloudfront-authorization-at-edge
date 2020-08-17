@@ -4,7 +4,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Example stack that shows how to reuse the serverless application and include your own resources
+  Example stack that shows how to reuse the serverless application with a pre-existing User Pool and Client.
+  The pre-existing User Pool Arn and Client ID can be provided to the Auth@Edge application through parameters.
+
+  In this example we're creating the User Pool and Client, and the Auth@Edge application in the same stack in the same region.
+  You could instead also use a pre-existing User Pool and Client from a different stack and region.
 
 Resources:
   UserPool:
@@ -33,11 +37,3 @@ Resources:
       Parameters:
         UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient
-        LogLevel: debug
-        CookieCompatibility: elasticsearch
-        AdditionalCookies: >-
-          {
-            "cookieName1": "cookieValue1; HttpOnly; Secure",
-            "cookieName2": "cookieValue2; SameSite=Lax; Domain=.dhqmy2fj0cs0z.cloudfront.net"
-          }
-        Version: 1217

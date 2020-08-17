@@ -33,7 +33,7 @@ Resources:
     Properties:
       Location:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge-dev
-        SemanticVersion: 1.2.12
+        SemanticVersion: 1.2.13
       Parameters:
         UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient

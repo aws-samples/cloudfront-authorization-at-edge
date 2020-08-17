@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.12
+    SemanticVersion: 1.2.13
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -97,7 +97,7 @@ Parameters:
       - "false"
   CookieCompatibility:
     Type: String
-    Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service"
+    Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service. In case of the latter, turn off SPA mode too: set parameter EnableSPAMode to false"
     Default: "amplify"
     AllowedValues:
       - "amplify"

@@ -44,7 +44,7 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
     let AllowedOAuthScopes = [...new Set(props.OAuthScopes.concat(existingUserPoolClient?.AllowedOAuthScopes || []))];
 
     let SupportedIdentityProviders = existingUserPoolClient?.SupportedIdentityProviders || [];
-    if (props.CreateUserPoolAndClient) {
+    if (props.CreateUserPoolAndClient === "true") {
         // If we were the ones creating the User Pool Client, we'll enable COGNITO as IDP (probably the user wants this, if only for initial testing)
         SupportedIdentityProviders = ['COGNITO'];
     }
@@ -108,7 +108,7 @@ interface Props {
     RedirectPathSignIn: string;
     RedirectPathSignOut: string;
     AlternateDomainNames: string[];
-    CreateUserPoolAndClient: boolean;
+    CreateUserPoolAndClient: "true" | "false";
 }
 
 

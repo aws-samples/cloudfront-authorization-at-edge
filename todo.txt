@@ -7,8 +7,9 @@
 [x] Config files use ARN instead of ID of user pool
      [x] template.yaml code
      [x] Lambda@Edge code
-[ ] Create example that reuses existing user pool
+[x] Create example that reuses existing user pool
 [ ] Publish new version and test
 [x] Update User Pool Client should upon delete undo what it did (in case it updated the redirect URL's)
-[ ] Doc update! Can now use existing user pool
+[x] Doc update! Can now use existing user pool
 [x] Do not turn Cognito IDP on, at Client Updates (only if we created the client)
+[ ] Test Cognito custom domain

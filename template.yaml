@@ -27,11 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-<<<<<<< HEAD
-    SemanticVersion: 1.4.7
-=======
-    SemanticVersion: 1.4.6
->>>>>>> 3e957e92b16eb9d9304cc726517f540d5097d068
+    SemanticVersion: 1.4.8
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -64,7 +60,7 @@ Parameters:
     Description: The settings for the cookies holding e.g. the JWT's. To be provided as a JSON object, mapping cookie type to setting. Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax". If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
     Default: >-
       {
-        "idToken": null,UserPoolClientUpdate
+        "idToken": null,
         "accessToken": null,
         "refreshToken": null,
         "nonce": null
@@ -215,13 +211,10 @@ Resources:
       DistributionConfig:
         Aliases:
           Ref: AlternateDomainNames
-<<<<<<< HEAD
-=======
         ViewerCertificate: 
           AcmCertificateArn: !Ref AcmCertificateArn
           MinimumProtocolVersion: TLSv1.2_2018 
           SslSupportMethod: sni-only
->>>>>>> 3e957e92b16eb9d9304cc726517f540d5097d068
         CacheBehaviors:
           - PathPattern: !Ref RedirectPathSignIn
             Compress: true

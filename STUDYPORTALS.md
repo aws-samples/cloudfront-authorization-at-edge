@@ -15,11 +15,7 @@ There are two variables that are important when generating the infrastructure.
 
 ### AWS
 
-<<<<<<< HEAD
-Run `sam build --region us-east-1` to build the infrastructure consisting of an S3 bucket, Cloudfront distribution and an authentication layer on top of it using the templates published as part of the [cloudfront-authorization-at-edge](https://github.com/dandobrescu/cloudfront-authorization-at-edge) project
-=======
 Run `sam build --region us-east-1` to build the infrastructure consisting of an S3 bucket, Cloudfront distribution and an authentication layer on top of it using the templates published as part of the [cloudfront-authorization-at-edge](https://github.com/studyportals/cloudfront-authorization-at-edge) project
->>>>>>> 3e957e92b16eb9d9304cc726517f540d5097d068
 
 Run `sam package --region us-east-1 --s3-bucket devops-sam-deployments-us-east-1 --output-template-file packaged.yaml` to prepare for deployment
 

@@ -27,7 +27,11 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
+<<<<<<< HEAD
     SemanticVersion: 1.4.7
+=======
+    SemanticVersion: 1.4.6
+>>>>>>> 3e957e92b16eb9d9304cc726517f540d5097d068
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -110,6 +114,10 @@ Parameters:
       - "warn"
       - "error"
       - "debug"
+  AcmCertificateArn: 
+    Type: String
+    Description: "The ARN of the ACM Certificate to be added to CF"
+    
 
 Conditions:
   CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
@@ -134,6 +142,10 @@ Resources:
     Condition: CreateCloudFrontDistribution
     Properties:
       AccessControl: Private
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
 
   CheckAuthHandler:
     Type: AWS::Serverless::Function
@@ -203,6 +215,13 @@ Resources:
       DistributionConfig:
         Aliases:
           Ref: AlternateDomainNames
+<<<<<<< HEAD
+=======
+        ViewerCertificate: 
+          AcmCertificateArn: !Ref AcmCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2018 
+          SslSupportMethod: sni-only
+>>>>>>> 3e957e92b16eb9d9304cc726517f540d5097d068
         CacheBehaviors:
           - PathPattern: !Ref RedirectPathSignIn
             Compress: true
@@ -696,7 +715,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-S3Bucket"
   WebsiteUrl:
-    Description: URL of the CloudFront distribution that serves your SPA from S3
+    Description: URLs of the CloudFront distribution that serves your SPA from S3
     Condition: CreateCloudFrontDistribution
     Value: !Sub "https://${CloudFrontDistribution.DomainName}"
     Export:

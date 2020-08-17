@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.4.1
+    SemanticVersion: 1.4.7
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -788,3 +788,18 @@ Outputs:
     Value: !GetAtt LambdaCodeUpdateHandler.Arn
     Export:
       Name: !Sub "${AWS::StackName}-LambdaCodeUpdateHandlerFunction"          
+  UserPoolOAuthScopes:
+    Description: The OAuthScopes used in the initial creation of the user pool. May need to be referenced again. 
+    Value: !Ref OAuthScopes
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolOAuthScopes"
+  WebsiteUrls:
+    Description: The ${WebsiteUrl} combined with ${AlternateDomainNames}. Can be used for CORS policies
+    Condition: CreateCloudFrontDistribution
+    Value: 
+      Fn::Join: 
+        - ",https://"
+        - - !Sub "https://${CloudFrontDistribution.DomainName}"
+          - !Join [',https://', !Ref AlternateDomainNames]
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteUrls"

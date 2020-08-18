@@ -22,9 +22,18 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref UserPool
+      AllowedOAuthScopes:
+        - phone
+        - email
+        - profile
+        - openid
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
-    Properties: 
+    Properties:
       Domain: !Sub "auth-${AWS::AccountId}"
       UserPoolId: !Ref UserPool
   MyLambdaEdgeProtectedSpaSetup:

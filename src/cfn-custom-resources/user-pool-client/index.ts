@@ -33,21 +33,18 @@ async function getUserPoolClient(props: Props) {
     return UserPoolClient;
 }
 
-async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], redirectUrisSignOut: string[], existingUserPoolClient?: CognitoIdentityServiceProvider.UserPoolClientType) {
+async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], redirectUrisSignOut: string[]) {
     const userPoolId = props.UserPoolArn.split('/')[1];
     const userPoolRegion = props.UserPoolArn.split(':')[3];
     const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
 
-    // Merge OAuth scopes and flows with what is already there on the existing User Pool Client
-    let AllowedOAuthFlows = [...new Set(['code'].concat(existingUserPoolClient?.AllowedOAuthFlows || []))];
-    let AllowedOAuthFlowsUserPoolClient = true;
-    let AllowedOAuthScopes = [...new Set(props.OAuthScopes.concat(existingUserPoolClient?.AllowedOAuthScopes || []))];
+    // To be able to set the redirect URL's, we must enable OAuth––required by Cognito
+    // Vice versa, when removing redirect URL's, we must disable OAuth if there's no more redirect URL's left
 
-    let SupportedIdentityProviders = existingUserPoolClient?.SupportedIdentityProviders || [];
-    if (props.CreateUserPoolAndClient === "true") {
-        // If we were the ones creating the User Pool Client, we'll enable COGNITO as IDP (probably the user wants this, if only for initial testing)
-        SupportedIdentityProviders = ['COGNITO'];
-    }
+    // Merge OAuth scopes and flows with what is already there on the existing User Pool Client
+    let AllowedOAuthFlows = ['code'];
+    let AllowedOAuthFlowsUserPoolClient = true;
+    let AllowedOAuthScopes = props.OAuthScopes;
 
     // If there's no redirect URI's -- switch off OAuth (to avoid a Cognito exception)
     if (!redirectUrisSignIn.length) {
@@ -60,7 +57,6 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
         AllowedOAuthFlows,
         AllowedOAuthFlowsUserPoolClient,
         AllowedOAuthScopes,
-        SupportedIdentityProviders: SupportedIdentityProviders,
         ClientId: props.UserPoolClientId,
         UserPoolId: userPoolId,
         CallbackURLs: [...new Set(redirectUrisSignIn)],
@@ -85,7 +81,7 @@ async function undoPriorUpdate(props: Props, redirectUrisSignInToRemove: string[
     const redirectUrisSignInToKeep = existingRedirectUrisSignIn.filter(uri => !redirectUrisSignInToRemove.includes(uri));
     const redirectUrisSignOutToKeep = existingRedirectUrisSignOut.filter(uri => !redirectUrisSignOutToRemove.includes(uri));
 
-    await updateUserPoolClient(props, redirectUrisSignInToKeep, redirectUrisSignOutToKeep, existingUserPoolClient);
+    await updateUserPoolClient(props, redirectUrisSignInToKeep, redirectUrisSignOutToKeep);
 }
 
 async function doNewUpdate(props: Props, redirectUrisSignIn: string[], redirectUrisSignOut: string[]) {
@@ -97,7 +93,7 @@ async function doNewUpdate(props: Props, redirectUrisSignIn: string[], redirectU
     // Add new callback url's
     const redirectUrisSignInToSet = [...existingRedirectUrisSignIn, ...redirectUrisSignIn];
     const redirectUrisSignOutToSet = [...existingRedirectUrisSignOut, ...redirectUrisSignOut];
-    await updateUserPoolClient(props, redirectUrisSignInToSet, redirectUrisSignOutToSet, existingUserPoolClient);
+    await updateUserPoolClient(props, redirectUrisSignInToSet, redirectUrisSignOutToSet);
 }
 
 interface Props {
@@ -108,7 +104,6 @@ interface Props {
     RedirectPathSignIn: string;
     RedirectPathSignOut: string;
     AlternateDomainNames: string[];
-    CreateUserPoolAndClient: "true" | "false";
 }
 
 

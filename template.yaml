@@ -113,7 +113,7 @@ Parameters:
     Default: ""
   UserPoolClientId:
     Type: String
-    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: the pre-existing user pool client will be updated to enable OAuth"
+    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: the OAuth settings of the pre-existing user pool client will be updated"
     Default: ""
   Version:
     Type: String
@@ -336,6 +336,12 @@ Resources:
         - StaticSiteMode
         - true
         - false
+      AllowedOAuthScopes: !Ref OAuthScopes
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      SupportedIdentityProviders:
+        - COGNITO
 
   UserPoolDomain:
     Type: Custom::UserPoolDomain
@@ -396,10 +402,6 @@ Resources:
       RedirectPathSignOut: !Ref RedirectPathSignOut
       AlternateDomainNames: !Ref AlternateDomainNames
       OAuthScopes: !Ref OAuthScopes
-      CreateUserPoolAndClient: !If
-        - CreateUserPoolAndClient
-        - true
-        - false
 
   UserPoolClientUpdateHandler:
     Type: AWS::Serverless::Function
@@ -497,7 +499,9 @@ Resources:
       CognitoAuthDomain: !GetAtt UserPoolDomain.DomainName
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
-      OAuthScopes: !Ref OAuthScopes
+      OAuthScopes: !Join
+        - ","
+        - !Ref OAuthScopes
       SignOutUrl: !Ref SignOutUrl
 
   ReactAppHandler:

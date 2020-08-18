@@ -57,7 +57,7 @@ REACT_APP_USER_POOL_AUTH_DOMAIN=${config.CognitoAuthDomain}
 REACT_APP_USER_POOL_REDIRECT_PATH_SIGN_IN=${config.RedirectPathSignIn}
 REACT_APP_USER_POOL_REDIRECT_PATH_SIGN_OUT=${config.RedirectPathSignOut}
 REACT_APP_SIGN_OUT_URL=${config.SignOutUrl}
-REACT_APP_USER_POOL_SCOPES=${JSON.parse(config.OAuthScopes).join(',')}
+REACT_APP_USER_POOL_SCOPES=${config.OAuthScopes}
 INLINE_RUNTIME_CHUNK=false
 `);
 

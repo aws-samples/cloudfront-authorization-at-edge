@@ -342,6 +342,10 @@ Resources:
         - code
       SupportedIdentityProviders:
         - COGNITO
+      CallbackURLs:
+        - https://example.com/will-be-replaced
+      LogoutURLs:
+        - https://example.com/will-be-replaced
 
   UserPoolDomain:
     Type: Custom::UserPoolDomain

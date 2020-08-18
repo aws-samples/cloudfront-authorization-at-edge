@@ -13,3 +13,4 @@
 [x] Doc update! Can now use existing user pool
 [x] Do not turn Cognito IDP on, at Client Updates (only if we created the client)
 [ ] Test Cognito custom domain
+[x] OAuth scope don't get cleanup up from user pool client. Think about that, what to do

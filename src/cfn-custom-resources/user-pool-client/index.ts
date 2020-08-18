@@ -19,7 +19,7 @@ import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
 const CUSTOM_RESOURCE_CURRENT_VERSION_NAME = "UpdatedUserPoolClientV2";
-
+const SENTINEL = 'https://example.com/will-be-replaced';
 
 async function getUserPoolClient(props: Props) {
     const userPoolId = props.UserPoolArn.split('/')[1];
@@ -46,8 +46,11 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
     let AllowedOAuthFlowsUserPoolClient = true;
     let AllowedOAuthScopes = props.OAuthScopes;
 
+    const CallbackURLs = [...new Set(redirectUrisSignIn)].filter(uri => uri !== SENTINEL);
+    const LogoutURLs = [...new Set(redirectUrisSignOut)].filter(uri => uri !== SENTINEL);
+
     // If there's no redirect URI's -- switch off OAuth (to avoid a Cognito exception)
-    if (!redirectUrisSignIn.length) {
+    if (!CallbackURLs.length) {
         AllowedOAuthFlows = [];
         AllowedOAuthFlowsUserPoolClient = false;
         AllowedOAuthScopes = [];
@@ -59,8 +62,8 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
         AllowedOAuthScopes,
         ClientId: props.UserPoolClientId,
         UserPoolId: userPoolId,
-        CallbackURLs: [...new Set(redirectUrisSignIn)],
-        LogoutURLs: [...new Set(redirectUrisSignOut)],
+        CallbackURLs,
+        LogoutURLs,
     };
     console.debug("Updating User Pool Client", JSON.stringify(input, null, 4));
     await cognitoClient.updateUserPoolClient(input).promise();

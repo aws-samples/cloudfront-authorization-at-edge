@@ -26,8 +26,6 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
     const createdPhysicalResource = decodePhysicalResourceId(physicalResourceId!);
     let returnPhysicalResourceId: string;
     let domainName: string | undefined;
-    const newUserPoolId = newUserPoolArn.split('/')[1];
-    const newUserPoolRegion = newUserPoolArn.split(':')[3];
 
     if (action === 'Delete') {
         // If we created the User Pool Domain earlier,
@@ -46,6 +44,8 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
         }
         returnPhysicalResourceId = physicalResourceId!;
     } else if (action === 'Create' || action === 'Update') {
+        const newUserPoolId = newUserPoolArn.split('/')[1];
+        const newUserPoolRegion = newUserPoolArn.split(':')[3];
         const cognitoClient = new CognitoIdentityServiceProvider({ region: newUserPoolRegion });
         const existingUserPool = await cognitoClient.describeUserPool({ UserPoolId: newUserPoolId }).promise();
         const domainPrefix = existingUserPool.UserPool?.Domain;
@@ -72,6 +72,7 @@ async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
+    console.log(JSON.stringify(event, undefined, 4));
     const {
         LogicalResourceId,
         RequestId,
@@ -97,6 +98,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
             }
         };
     } catch (err) {
+        console.error(err);
         response = {
             LogicalResourceId,
             PhysicalResourceId: PhysicalResourceId || `failed-to-create-${Date.now()}`,
@@ -122,6 +124,6 @@ function decodePhysicalResourceId(physicalResourceId: string) {
     try {
         return JSON.parse(physicalResourceId) as CreatedPhysicalResourceId
     } catch (err) {
-        console.error(`Can't parse physicalResourceId: ${physicalResourceId}`);
+        console.warn(`Can't parse physicalResourceId: ${physicalResourceId}`);
     }
 }

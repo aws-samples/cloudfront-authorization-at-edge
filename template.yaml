@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.4.6
+    SemanticVersion: 1.4.8
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -810,8 +810,8 @@ Outputs:
     Condition: CreateCloudFrontDistribution
     Value: 
       Fn::Join: 
-        - ","
+        - ",https://"
         - - !Sub "https://${CloudFrontDistribution.DomainName}"
-          - !Join [',', !Ref AlternateDomainNames]
+          - !Join [',https://', !Ref AlternateDomainNames]
     Export:
       Name: !Sub "${AWS::StackName}-WebsiteUrls"

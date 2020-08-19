@@ -14,3 +14,6 @@
 [x] Do not turn Cognito IDP on, at Client Updates (only if we created the client)
 [ ] Test Cognito custom domain
 [x] OAuth scope don't get cleanup up from user pool client. Think about that, what to do
+[ ] COGNITO idp gaat uit
+[ ] COGNITO user existence error non-legacy doen?
+[ ] Test in place upgrade once more

@@ -30,10 +30,13 @@ async function getUserPoolClient(props: Props) {
     };
     console.debug("Describing User Pool Client", JSON.stringify(input, null, 4));
     const { UserPoolClient } = await cognitoClient.describeUserPoolClient(input).promise();
+    if (!UserPoolClient) {
+        throw new Error("User Pool Client not found!");
+    }
     return UserPoolClient;
 }
 
-async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], redirectUrisSignOut: string[]) {
+async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], redirectUrisSignOut: string[], existingUserPoolClient: CognitoIdentityServiceProvider.UserPoolClientType) {
     const userPoolId = props.UserPoolArn.split('/')[1];
     const userPoolRegion = props.UserPoolArn.split(':')[3];
     const cognitoClient = new CognitoIdentityServiceProvider({ region: userPoolRegion });
@@ -64,6 +67,7 @@ async function updateUserPoolClient(props: Props, redirectUrisSignIn: string[], 
         UserPoolId: userPoolId,
         CallbackURLs,
         LogoutURLs,
+        SupportedIdentityProviders: existingUserPoolClient.SupportedIdentityProviders // Need to provide existing values otherwise they get cleared out :|
     };
     console.debug("Updating User Pool Client", JSON.stringify(input, null, 4));
     await cognitoClient.updateUserPoolClient(input).promise();
@@ -74,9 +78,6 @@ async function undoPriorUpdate(props: Props, redirectUrisSignInToRemove: string[
 
     // Get existing callback URL's
     const existingUserPoolClient = await getUserPoolClient(props);
-    if (!existingUserPoolClient) {
-        return;
-    }
     const existingRedirectUrisSignIn = existingUserPoolClient.CallbackURLs || [];
     const existingRedirectUrisSignOut = existingUserPoolClient.LogoutURLs || [];
 
@@ -84,7 +85,7 @@ async function undoPriorUpdate(props: Props, redirectUrisSignInToRemove: string[
     const redirectUrisSignInToKeep = existingRedirectUrisSignIn.filter(uri => !redirectUrisSignInToRemove.includes(uri));
     const redirectUrisSignOutToKeep = existingRedirectUrisSignOut.filter(uri => !redirectUrisSignOutToRemove.includes(uri));
 
-    await updateUserPoolClient(props, redirectUrisSignInToKeep, redirectUrisSignOutToKeep);
+    await updateUserPoolClient(props, redirectUrisSignInToKeep, redirectUrisSignOutToKeep, existingUserPoolClient);
 }
 
 async function doNewUpdate(props: Props, redirectUrisSignIn: string[], redirectUrisSignOut: string[]) {
@@ -96,7 +97,7 @@ async function doNewUpdate(props: Props, redirectUrisSignIn: string[], redirectU
     // Add new callback url's
     const redirectUrisSignInToSet = [...existingRedirectUrisSignIn, ...redirectUrisSignIn];
     const redirectUrisSignOutToSet = [...existingRedirectUrisSignOut, ...redirectUrisSignOut];
-    await updateUserPoolClient(props, redirectUrisSignInToSet, redirectUrisSignOutToSet);
+    await updateUserPoolClient(props, redirectUrisSignInToSet, redirectUrisSignOutToSet, existingUserPoolClient);
 }
 
 interface Props {

@@ -332,6 +332,7 @@ Resources:
     Condition: CreateUserPoolAndClient
     Properties:
       UserPoolId: !Ref UserPool
+      PreventUserExistenceErrors: ENABLED
       GenerateSecret: !If
         - StaticSiteMode
         - true

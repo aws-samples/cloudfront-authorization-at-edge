@@ -96,7 +96,7 @@ This solution contains CloudFront and Lambda@Edge resources that must be deploye
 
 This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low. For S3 this is less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway (depending on the cache-control meta-data you set on your S3 objects).
 
-You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. In this case, also specify a pre-existing User Pool Client ID. Note that the OAuth attributes of that client **will** be updated, so be careful. It is recommended to create a dedicated User Pool Client (without OAuth settings), to be reused by this solution.
+You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. In this case, also specify a pre-existing User Pool Client ID. Also, make sure you have configured the User Pool with a domain for the Cognito Hosted UI. Note that the solution's callback URLs wil be added to the User Pool Client you provide.
 
 ## SPA mode or Static Site mode?
 

@@ -17,3 +17,5 @@
 [x] COGNITO idp gaat uit
 [x] COGNITO user existence error non-legacy doen?
 [ ] Test in place upgrade once more
+[ ] Are the docs solid for people bringin their own user pool client? Should they configure example.com? Re-use example ok?
+[x] user pool domain toch maar via CFN doen?

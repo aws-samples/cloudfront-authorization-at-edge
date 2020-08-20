@@ -14,6 +14,7 @@ Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
+      UserPoolName: !Ref AWS::StackName
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       UsernameAttributes:
@@ -22,19 +23,20 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       UserPoolId: !Ref UserPool
-      AllowedOAuthScopes:
-        - phone
-        - email
-        - profile
-        - openid
-        - aws.cognito.signin.user.admin
-      AllowedOAuthFlowsUserPoolClient: true
-      AllowedOAuthFlows:
-        - code
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+      GenerateSecret: false
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
-      Domain: !Sub "auth-${AWS::AccountId}"
+      Domain: !Sub
+        - "auth-${StackIdSuffix}"
+        - StackIdSuffix: !Select
+            - 2
+            - !Split
+              - "/"
+              - !Ref AWS::StackId
       UserPoolId: !Ref UserPool
   MyLambdaEdgeProtectedSpaSetup:
     Type: AWS::Serverless::Application
@@ -42,7 +44,11 @@ Resources:
     Properties:
       Location:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge-dev
-        SemanticVersion: 1.2.13
+        SemanticVersion: 1.2.14
       Parameters:
         UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient
+Outputs:
+  WebsiteUrl:
+    Description: URL of the CloudFront distribution that serves your SPA from S3
+    Value: !GetAtt MyLambdaEdgeProtectedSpaSetup.Outputs.WebsiteUrl

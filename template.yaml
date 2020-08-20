@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.13
+    SemanticVersion: 1.2.14
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -316,7 +316,7 @@ Resources:
     Properties:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
-      UserPoolName: !Sub "${AWS::Region}-${AWS::StackName}-${AWS::AccountId}"
+      UserPoolName: !Ref AWS::StackName
       UsernameAttributes:
         - email
 
@@ -349,9 +349,22 @@ Resources:
         - https://example.com/will-be-replaced
 
   UserPoolDomain:
-    Type: Custom::UserPoolDomain
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: CreateUserPoolAndClient
     Properties:
-      ServiceToken: !GetAtt UserPoolDomainHandler.Arn
+      Domain: !Sub
+        - "auth-${StackIdSuffix}"
+        - StackIdSuffix: !Select
+            - 2
+            - !Split
+              - "/"
+              - !Ref AWS::StackId
+      UserPoolId: !Ref UserPool
+
+  UserPoolDomainLookup:
+    Type: Custom::UserPoolDomainLookup
+    Properties:
+      ServiceToken: !GetAtt UserPoolDomainLookupHandler.Arn
       UserPoolArn: !If
         - CreateUserPoolAndClient
         - !GetAtt UserPool.Arn
@@ -361,7 +374,7 @@ Resources:
         - Create
         - Lookup
 
-  UserPoolDomainHandler:
+  UserPoolDomainLookupHandler:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
@@ -371,21 +384,12 @@ Resources:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
-              Action: cognito-idp:DescribeUserPoolDomain
-              Resource: "*"
-            - Effect: Allow
               Action:
-                - cognito-idp:CreateUserPoolDomain
-                - cognito-idp:DeleteUserPoolDomain
                 - cognito-idp:DescribeUserPool
               Resource: !If
                 - CreateUserPoolAndClient
                 - !GetAtt UserPool.Arn
                 - !Ref UserPoolArn
-            - Effect: Allow
-              Action:
-                - cognito-idp:DeleteUserPoolDomain
-              Resource: "*"
 
   UserPoolClientUpdate:
     Type: Custom::UserPoolClientUpdate
@@ -501,7 +505,7 @@ Resources:
         - CreateUserPoolAndClient
         - !Ref UserPoolClient
         - !Ref UserPoolClientId
-      CognitoAuthDomain: !GetAtt UserPoolDomain.DomainName
+      CognitoAuthDomain: !Ref UserPoolDomainLookup
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
       OAuthScopes: !Join
@@ -548,7 +552,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
@@ -598,7 +602,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
@@ -661,7 +665,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
@@ -711,7 +715,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
@@ -770,11 +774,11 @@ Resources:
   NonceSigningSecret:
     Type: Custom::NonceSigningSecret
     Properties:
-      ServiceToken: !GetAtt NonceSigningSecretHandler.Arn
+      ServiceToken: !GetAtt RandomValueGenerator.Arn
       Length: 16
       Version: !Ref Version
 
-  NonceSigningSecretHandler:
+  RandomValueGenerator:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
@@ -821,7 +825,7 @@ Outputs:
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
     Condition: CreateUserPoolAndClient
-    Value: !GetAtt UserPoolDomain.DomainName
+    Value: !Ref UserPoolDomainLookup
     Export:
       Name: !Sub "${AWS::StackName}-CognitoAuthDomain"
   RedirectUrisSignIn:

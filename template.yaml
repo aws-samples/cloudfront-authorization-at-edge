@@ -7,7 +7,7 @@ Description: >
   Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge
 Metadata:
   AWS::ServerlessRepo::Application:
-    Name: cloudfront-authorization-at-edge-dev
+    Name: cloudfront-authorization-at-edge
     Description: >
       Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge.
       Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWT's and handle OAuth2 redirects.

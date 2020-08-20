@@ -92,7 +92,7 @@ When following this route, also provide parameter `AlternateDomainNames` upon de
 
 ## I already have a Cognito User Pool, I want to reuse that one
 
-You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. Make sure you have configured the User Pool with a domain for the Cognito Hosted UI.
+You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. Make sure you have already configured the User Pool with a domain for the Cognito Hosted UI.
 
 In this case, also specify a pre-existing User Pool Client ID. Note that the solution's callback URLs wil be added to the User Pool Client you provide.
 

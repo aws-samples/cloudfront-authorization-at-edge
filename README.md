@@ -90,13 +90,17 @@ The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can 
 
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
 
+## I already have a Cognito User Pool, I want to reuse that one
+
+You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. In this case, also specify a pre-existing User Pool Client ID. Also, make sure you have configured the User Pool with a domain for the Cognito Hosted UI. Note that the solution's callback URLs wil be added to the User Pool Client you provide.
+
 ## Deployment region
 
 This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).
 
 This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low. For S3 this is less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway (depending on the cache-control meta-data you set on your S3 objects).
 
-You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. In this case, also specify a pre-existing User Pool Client ID. Also, make sure you have configured the User Pool with a domain for the Cognito Hosted UI. Note that the solution's callback URLs wil be added to the User Pool Client you provide.
+You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one][I already have a Cognito User Pool, I want to reuse that one]
 
 ## SPA mode or Static Site mode?
 

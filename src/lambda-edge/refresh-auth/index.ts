@@ -3,15 +3,16 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
+import { getCompleteConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml } from '../shared/shared';
 
-let CONFIG: ReturnType<typeof getConfig>;
+let CONFIG: ReturnType<typeof getCompleteConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     if (!CONFIG) {
-        CONFIG = getConfig();
+        CONFIG = getCompleteConfig();
+        CONFIG.logger.debug("Configuration loaded:", CONFIG);
     }
-    CONFIG.logger.debug(event);
+    CONFIG.logger.debug("Event:", event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     let redirectedFromUri = `https://${domainName}`;
@@ -19,7 +20,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     try {
         const { requestedUri, nonce: currentNonce } = parseQueryString(request.querystring);
         redirectedFromUri += requestedUri || '';
-        const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const { idToken, accessToken, refreshToken, nonce: originalNonce } = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
 
         validateRefreshRequest(currentNonce, originalNonce, idToken, accessToken, refreshToken);
 

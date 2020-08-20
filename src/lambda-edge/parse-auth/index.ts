@@ -3,23 +3,24 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
+import { getCompleteConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 import { validate } from '../shared/validate-jwt';
 
-let CONFIG: ReturnType<typeof getConfig>;
+let CONFIG: ReturnType<typeof getCompleteConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     if (!CONFIG) {
-        CONFIG = getConfig();
+        CONFIG = getCompleteConfig();
+        CONFIG.logger.debug("Configuration loaded:", CONFIG);
     }
-    CONFIG.logger.debug(event);
+    CONFIG.logger.debug("Event:", event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const cognitoTokenEndpoint = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
     let redirectedFromUri = `https://${domainName}`;
     let idToken: string | undefined = undefined;
     try {
-        const cookies = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const cookies = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
         ({ idToken } = cookies);
         const { code, pkce, requestedUri } = validateQueryStringAndCookies({ querystring: request.querystring, cookies });
         CONFIG.logger.debug('Query string and cookies are valid');

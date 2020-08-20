@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.1
+    SemanticVersion: 2.0.0
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -66,10 +66,9 @@ Parameters:
         "nonce": null
       }
   OAuthScopes:
-    Type: String
-    Description: The OAuth scopes to request the User Pool to add to the access token JWT. To be provided as a JSON array
-    Default: >-
-      ["phone", "email", "profile", "openid", "aws.cognito.signin.user.admin"]
+    Type: CommaDelimitedList
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT
+    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
   HttpHeaders:
     Type: String
     Description: The HTTP headers to set on all responses from CloudFront. To be provided as a JSON object
@@ -96,6 +95,26 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
+  CookieCompatibility:
+    Type: String
+    Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service. In case of the latter, turn off SPA mode too: set parameter EnableSPAMode to false"
+    Default: "amplify"
+    AllowedValues:
+      - "amplify"
+      - "elasticsearch"
+  AdditionalCookies:
+    Type: String
+    Description: 'Specify one or more additional cookies to set after successfull sign-in. Specify as a JSON object––mapping cookie names to values and settings: {"cookieName1": "cookieValue1; HttpOnly; Secure"}'
+    Default: >-
+      {}
+  UserPoolArn:
+    Type: String
+    Description: "Specify the ARN of an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified. Also, the User Pool should have a domain configured"
+    Default: ""
+  UserPoolClientId:
+    Type: String
+    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: new callback URL's will be added to the pre-existing user pool client"
+    Default: ""
   Version:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
@@ -112,7 +131,10 @@ Parameters:
       - "debug"
 
 Conditions:
-  CreateUser: !Not [!Equals [!Ref EmailAddress, ""]]
+  CreateUser: !And
+    - !Not [!Equals [!Ref EmailAddress, ""]]
+    - !Equals [!Ref UserPoolArn, ""]
+    - !Equals [!Ref UserPoolClientId, ""]
   CreateCloudFrontDistribution:
     !Equals [!Ref CreateCloudFrontDistribution, "true"]
   SPAMode: !Equals [!Ref EnableSPAMode, "true"]
@@ -123,6 +145,7 @@ Conditions:
   CreateCloudFrontDistributionSpaMode: !And
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+  CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
 
 Globals:
   Function:
@@ -247,7 +270,7 @@ Resources:
             Id: protected-bucket
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
-          - DomainName: example.org
+          - DomainName: will-never-be-reached.org
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
@@ -289,10 +312,11 @@ Resources:
 
   UserPool:
     Type: AWS::Cognito::UserPool
+    Condition: CreateUserPoolAndClient
     Properties:
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
-      UserPoolName: !Sub "${AWS::Region}-${AWS::StackName}-${AWS::AccountId}"
+      UserPoolName: !Ref AWS::StackName
       UsernameAttributes:
         - email
 
@@ -305,20 +329,48 @@ Resources:
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
+    Condition: CreateUserPoolAndClient
     Properties:
       UserPoolId: !Ref UserPool
+      PreventUserExistenceErrors: ENABLED
       GenerateSecret: !If
         - StaticSiteMode
         - true
         - false
+      AllowedOAuthScopes: !Ref OAuthScopes
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - https://example.com/will-be-replaced
+      LogoutURLs:
+        - https://example.com/will-be-replaced
 
   UserPoolDomain:
-    Type: Custom::UserPoolDomain
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: CreateUserPoolAndClient
     Properties:
-      ServiceToken: !GetAtt UserPoolDomainHandler.Arn
+      Domain: !Sub
+        - "auth-${StackIdSuffix}"
+        - StackIdSuffix: !Select
+            - 2
+            - !Split
+              - "/"
+              - !Ref AWS::StackId
       UserPoolId: !Ref UserPool
 
-  UserPoolDomainHandler:
+  UserPoolDomainLookup:
+    Type: Custom::UserPoolDomainLookup
+    Properties:
+      ServiceToken: !GetAtt UserPoolDomainLookupHandler.Arn
+      UserPoolArn: !If
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+
+  UserPoolDomainLookupHandler:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
@@ -328,26 +380,29 @@ Resources:
         - Version: "2012-10-17"
           Statement:
             - Effect: Allow
-              Action: cognito-idp:DescribeUserPoolDomain
-              Resource: "*"
-            - Effect: Allow
               Action:
-                - cognito-idp:CreateUserPoolDomain
-                - cognito-idp:DeleteUserPoolDomain
-              Resource: !GetAtt UserPool.Arn
+                - cognito-idp:DescribeUserPool
+              Resource: !If
+                - CreateUserPoolAndClient
+                - !GetAtt UserPool.Arn
+                - !Ref UserPoolArn
 
   UserPoolClientUpdate:
     Type: Custom::UserPoolClientUpdate
     Properties:
       ServiceToken: !GetAtt UserPoolClientUpdateHandler.Arn
-      UserPoolId: !Ref UserPool
-      UserPoolClientId: !Ref UserPoolClient
-      CloudFrontDistributionDomainName:
-        !If [
-          CreateCloudFrontDistribution,
-          !GetAtt CloudFrontDistribution.DomainName,
-          "",
-        ]
+      UserPoolArn: !If
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+      UserPoolClientId: !If
+        - CreateUserPoolAndClient
+        - !Ref UserPoolClient
+        - !Ref UserPoolClientId
+      CloudFrontDistributionDomainName: !If
+        - CreateCloudFrontDistribution
+        - !GetAtt CloudFrontDistribution.DomainName
+        - ""
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
       AlternateDomainNames: !Ref AlternateDomainNames
@@ -365,15 +420,22 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:UpdateUserPoolClient
-              Resource: !GetAtt UserPool.Arn
+                - cognito-idp:DescribeUserPoolClient
+              Resource: "*"  # * to be able to clean up after myself, if you change the User Pool Client ID
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval
     Condition: StaticSiteMode
     Properties:
       ServiceToken: !GetAtt ClientSecretRetrievalHandler.Arn
-      UserPoolId: !Ref UserPool
-      UserPoolClientId: !Ref UserPoolClient
+      UserPoolArn: !If
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+      UserPoolClientId: !If
+        - CreateUserPoolAndClient
+        - !Ref UserPoolClient
+        - !Ref UserPoolClientId
 
   ClientSecretRetrievalHandler:
     Type: AWS::Serverless::Function
@@ -388,7 +450,10 @@ Resources:
             - Effect: Allow
               Action:
                 - cognito-idp:DescribeUserPoolClient
-              Resource: !GetAtt UserPool.Arn
+              Resource: !If
+                - CreateUserPoolAndClient
+                - !GetAtt UserPool.Arn
+                - !Ref UserPoolArn
 
   StaticSite:
     Type: Custom::StaticSite
@@ -428,12 +493,20 @@ Resources:
     Properties:
       ServiceToken: !GetAtt ReactAppHandler.Arn
       BucketName: !Ref S3Bucket
-      UserPoolId: !Ref UserPool
-      ClientId: !Ref UserPoolClient
-      CognitoAuthDomain: !GetAtt UserPoolDomain.DomainName
+      UserPoolArn: !If
+        - CreateUserPoolAndClient
+        - !GetAtt UserPool.Arn
+        - !Ref UserPoolArn
+      ClientId: !If
+        - CreateUserPoolAndClient
+        - !Ref UserPoolClient
+        - !Ref UserPoolClientId
+      CognitoAuthDomain: !Ref UserPoolDomainLookup
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
-      OAuthScopes: !Ref OAuthScopes
+      OAuthScopes: !Join
+        - ","
+        - !Ref OAuthScopes
       SignOutUrl: !Ref SignOutUrl
 
   ReactAppHandler:
@@ -471,11 +544,11 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "oauthScopes": ${OAuthScopesJsonArray},
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
@@ -483,18 +556,33 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
-              "nonceSigningSecret": "${NonceSigningSecret}"
+              "nonceSigningSecret": "${NonceSigningSecret}",
+              "cookieCompatibility": "${CookieCompatibility}",
+              "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - !Ref UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - !Ref UserPoolClientId
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   CheckAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -506,11 +594,11 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "oauthScopes": ${OAuthScopesJsonArray},
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
@@ -518,18 +606,33 @@ Resources:
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
               "logLevel": "${LogLevel}",
-              "nonceSigningSecret": "${NonceSigningSecret}"
+              "nonceSigningSecret": "${NonceSigningSecret}",
+              "cookieCompatibility": "${CookieCompatibility}",
+              "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - !Ref UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - !Ref UserPoolClientId
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   HttpHeadersHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -554,29 +657,45 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "oauthScopes": ${OAuthScopesJsonArray},
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
-              "logLevel": "${LogLevel}"
+              "logLevel": "${LogLevel}",
+              "nonceSigningSecret": "${NonceSigningSecret}",
+              "cookieCompatibility": "${CookieCompatibility}",
+              "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - !Ref UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - !Ref UserPoolClientId
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   SignOutHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
@@ -588,29 +707,45 @@ Resources:
         Fn::Sub:
           - >
             {
-              "userPoolId": "${UserPool}",
-              "clientId": "${UserPoolClient}",
+              "userPoolArn": "${UserPoolArn}",
+              "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
-              "oauthScopes": ${OAuthScopes},
-              "cognitoAuthDomain": "${UserPoolDomain.DomainName}",
+              "oauthScopes": ${OAuthScopesJsonArray},
+              "cognitoAuthDomain": "${UserPoolDomainLookup}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "redirectPathAuthRefresh": "${RedirectPathAuthRefresh}",
               "cookieSettings": ${CookieSettings},
               "mode": "${Mode}",
               "httpHeaders": ${HttpHeaders},
-              "logLevel": "${LogLevel}"
+              "logLevel": "${LogLevel}",
+              "nonceSigningSecret": "${NonceSigningSecret}",
+              "cookieCompatibility": "${CookieCompatibility}",
+              "additionalCookies": ${AdditionalCookies}
             }
-          - Mode:
-              !If
-                - SPAMode
-                - "spaMode"
-                - "staticSiteMode"
-            ClientSecret:
-              !If
-                - StaticSiteMode
-                - !GetAtt ClientSecretRetrieval.ClientSecret
-                - ""
+          - Mode: !If
+              - SPAMode
+              - "spaMode"
+              - "staticSiteMode"
+            ClientSecret: !If
+              - StaticSiteMode
+              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - ""
+            UserPoolArn: !If
+              - CreateUserPoolAndClient
+              - !GetAtt UserPool.Arn
+              - !Ref UserPoolArn
+            ClientId: !If
+              - CreateUserPoolAndClient
+              - !Ref UserPoolClient
+              - !Ref UserPoolClientId
+            OAuthScopesJsonArray: !Join
+              - ""
+              - - '["'
+                - !Join
+                  - '", "'
+                  - !Ref OAuthScopes
+                - '"]'
 
   LambdaCodeUpdateHandler:
     Type: AWS::Serverless::Function
@@ -635,11 +770,11 @@ Resources:
   NonceSigningSecret:
     Type: Custom::NonceSigningSecret
     Properties:
-      ServiceToken: !GetAtt NonceSigningSecretHandler.Arn
+      ServiceToken: !GetAtt RandomValueGenerator.Arn
       Length: 16
       Version: !Ref Version
 
-  NonceSigningSecretHandler:
+  RandomValueGenerator:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
@@ -667,11 +802,13 @@ Outputs:
       Name: !Sub "${AWS::StackName}-CloudFrontDistribution"
   UserPoolId:
     Description: The ID of the Cognito User Pool
+    Condition: CreateUserPoolAndClient
     Value: !Ref UserPool
     Export:
       Name: !Sub "${AWS::StackName}-UserPoolId"
   ClientId:
     Description: Client ID to use to interact with the User Pool
+    Condition: CreateUserPoolAndClient
     Value: !Ref UserPoolClient
     Export:
       Name: !Sub "${AWS::StackName}-ClientId"
@@ -683,7 +820,8 @@ Outputs:
       Name: !Sub "${AWS::StackName}-ClientSecret"
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
-    Value: !GetAtt UserPoolDomain.DomainName
+    Condition: CreateUserPoolAndClient
+    Value: !Ref UserPoolDomainLookup
     Export:
       Name: !Sub "${AWS::StackName}-CognitoAuthDomain"
   RedirectUrisSignIn:

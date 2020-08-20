@@ -15,6 +15,9 @@ This example shows how to wire up this solution's auth functions into your own C
 - Parameterized semantic version to allow operation with future versions of the application
 - Note the instructions on updating the User Pool client in this example's description.
 
+## [reuse-with-existing-user-pool.yaml](./reuse-with-existing-user-pool)
+This example shows how to reuse the serverless application with a pre-existing User Pool and Client.
+
 ## Deployment
 
 You can deploy the examples as follows:
@@ -23,7 +26,7 @@ You can deploy the examples as follows:
 #!/bin/sh
 
 STACK_NAME=my-protected-cloudfront-stack
-TEMPLATE=reuse-complete.yaml # Or reuse-auth-only.yaml
+TEMPLATE=reuse-complete.yaml # Or one of the other ones
 
 sam deploy --template-file $TEMPLATE --stack-name $STACK_NAME \
            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --region us-east-1

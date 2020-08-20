@@ -5,20 +5,21 @@ import { stringify as stringifyQueryString } from 'querystring';
 import { createHash, randomBytes } from 'crypto';
 import { CloudFrontRequestHandler } from 'aws-lambda';
 import { validate } from '../shared/validate-jwt';
-import { getConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
+import { getCompleteConfig, extractAndParseCookies, decodeToken, urlSafe, sign, timestampInSeconds } from '../shared/shared';
 
-let CONFIG: ReturnType<typeof getConfig>;
+let CONFIG: ReturnType<typeof getCompleteConfig>;
 
 export const handler: CloudFrontRequestHandler = async (event) => {
     if (!CONFIG) {
-        CONFIG = getConfig();
+        CONFIG = getCompleteConfig();
+        CONFIG.logger.debug("Configuration loaded:", CONFIG);
     }
-    CONFIG.logger.debug(event);
+    CONFIG.logger.debug("Event:", event);
     const request = event.Records[0].cf.request;
     const domainName = request.headers['host'][0].value;
     const requestedUri = `${request.uri}${request.querystring ? '?' + request.querystring : ''}`;
     try {
-        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId);
+        const { idToken, refreshToken, nonce, nonceHmac } = extractAndParseCookies(request.headers, CONFIG.clientId, CONFIG.cookieCompatibility);
         CONFIG.logger.debug('Extracted cookies:\n', { idToken, refreshToken, nonce, nonceHmac });
 
         // If there's no ID token in your cookies then you are not signed in yet

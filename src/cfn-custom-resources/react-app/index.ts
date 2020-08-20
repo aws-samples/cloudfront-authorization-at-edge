@@ -20,7 +20,7 @@ interface Configuration {
     CognitoAuthDomain: string;
     RedirectPathSignIn: string;
     RedirectPathSignOut: string;
-    UserPoolId: string;
+    UserPoolArn: string;
     OAuthScopes: string;
     SignOutUrl: string;
 }
@@ -45,15 +45,19 @@ async function buildSpa(config: Configuration) {
         symlinkSync(`${__dirname}/node_modules`, `${temp_dir}/node_modules`);
     }
 
+    const userPoolId = config.UserPoolArn.split('/')[1];
+    const userPoolRegion = config.UserPoolArn.split(':')[3];
+
     console.log(`Creating environment file ${temp_dir}/.env ...`);
     writeFileSync(`${temp_dir}/.env`, `SKIP_PREFLIGHT_CHECK=true
-REACT_APP_USER_POOL_ID=${config.UserPoolId}
+REACT_APP_USER_POOL_ID=${userPoolId}
+REACT_APP_USER_POOL_REGION=${userPoolRegion}
 REACT_APP_USER_POOL_WEB_CLIENT_ID=${config.ClientId}
 REACT_APP_USER_POOL_AUTH_DOMAIN=${config.CognitoAuthDomain}
 REACT_APP_USER_POOL_REDIRECT_PATH_SIGN_IN=${config.RedirectPathSignIn}
 REACT_APP_USER_POOL_REDIRECT_PATH_SIGN_OUT=${config.RedirectPathSignOut}
 REACT_APP_SIGN_OUT_URL=${config.SignOutUrl}
-REACT_APP_USER_POOL_SCOPES=${JSON.parse(config.OAuthScopes).join(',')}
+REACT_APP_USER_POOL_SCOPES=${config.OAuthScopes}
 INLINE_RUNTIME_CHUNK=false
 `);
 

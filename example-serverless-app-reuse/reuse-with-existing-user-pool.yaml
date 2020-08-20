@@ -1,0 +1,54 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Example stack that shows how to reuse the serverless application with a pre-existing User Pool and Client.
+  The pre-existing User Pool Arn and Client ID can be provided to the Auth@Edge application through parameters.
+
+  In this example we're creating the User Pool and Client, and the Auth@Edge application in the same stack in the same region.
+  You could instead also use a pre-existing User Pool and Client from a different stack and region.
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref AWS::StackName
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes:
+        - email
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+      GenerateSecret: false
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub
+        - "auth-${StackIdSuffix}"
+        - StackIdSuffix: !Select
+            - 2
+            - !Split
+              - "/"
+              - !Ref AWS::StackId
+      UserPoolId: !Ref UserPool
+  MyLambdaEdgeProtectedSpaSetup:
+    Type: AWS::Serverless::Application
+    DependsOn: UserPoolDomain
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge-dev
+        SemanticVersion: 2.0.0
+      Parameters:
+        UserPoolArn: !GetAtt UserPool.Arn
+        UserPoolClientId: !Ref UserPoolClient
+Outputs:
+  WebsiteUrl:
+    Description: URL of the CloudFront distribution that serves your SPA from S3
+    Value: !GetAtt MyLambdaEdgeProtectedSpaSetup.Outputs.WebsiteUrl

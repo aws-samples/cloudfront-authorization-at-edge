@@ -1,7 +1,15 @@
-// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
+/*
+    Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+    SPDX-License-Identifier: MIT-0
 
-import { randomBytes } from 'crypto';
+    This is a CloudFormation custom resource. It's purpose is to:
+
+    - Lookup the URL of an existing User Pool Domain
+
+    We need to do this in a custom resource to support the scenario of looking up a pre-existing User Pool Domain
+*/
+
+
 import {
     CloudFormationCustomResourceHandler,
     CloudFormationCustomResourceResponse,
@@ -11,42 +19,29 @@ import {
 import axios from 'axios';
 import CognitoIdentityServiceProvider from 'aws-sdk/clients/cognitoidentityserviceprovider';
 
-const COGNITO_CLIENT = new CognitoIdentityServiceProvider({ region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION });
 
-async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete', newUserPoolId: string, physicalResourceId?: string) {
-    const decodedPhysicalResourceId = decodePhysicalResourceId(physicalResourceId!);
-    let returnPhysicalResourceId: string;
-    let domainName: string | undefined;
+async function ensureCognitoUserPoolDomain(action: 'Create' | 'Update' | 'Delete', newUserPoolArn: string, physicalResourceId?: string) {
     if (action === 'Delete') {
-        if (decodedPhysicalResourceId) {
-            const { userPoolId: oldUserPoolId, domainPrefix: oldDomainPrefix } = decodedPhysicalResourceId;
-            const input: CognitoIdentityServiceProvider.CreateUserPoolDomainRequest = {
-                Domain: oldDomainPrefix,
-                UserPoolId: oldUserPoolId,
-            };
-            await COGNITO_CLIENT.deleteUserPoolDomain(input).promise();
-        } else {
-            console.warn(`Can't delete ${physicalResourceId} as it can't be decoded`);
-        }
-        returnPhysicalResourceId = physicalResourceId!;
-    } else if (action === 'Create' || action === 'Update') {
-        const randomValue = decodedPhysicalResourceId && decodedPhysicalResourceId.randomValue || randomBytes(4).toString('hex');
-        const domainPrefix = `auth-${randomValue}`;
-        const existingDomain = await COGNITO_CLIENT.describeUserPoolDomain({ Domain: domainPrefix }).promise();
-        if (action === 'Create' || !existingDomain.DomainDescription || !existingDomain.DomainDescription!.CustomDomainConfig!) {
-            const input: CognitoIdentityServiceProvider.CreateUserPoolDomainRequest = {
-                Domain: domainPrefix,
-                UserPoolId: newUserPoolId,
-            };
-            await COGNITO_CLIENT.createUserPoolDomain(input).promise();
-        }
-        domainName = `${domainPrefix}.auth.${COGNITO_CLIENT.config.region}.amazoncognito.com`;
-        returnPhysicalResourceId = encodePhysicalResourceId(newUserPoolId, domainPrefix, randomValue);
+        return physicalResourceId!;
     }
-    return { domainName, physicalResourceId: returnPhysicalResourceId! };
+    const newUserPoolId = newUserPoolArn.split('/')[1];
+    const newUserPoolRegion = newUserPoolArn.split(':')[3];
+    const cognitoClient = new CognitoIdentityServiceProvider({ region: newUserPoolRegion });
+    const { UserPool } = await cognitoClient.describeUserPool({ UserPoolId: newUserPoolId }).promise();
+    if (!UserPool) {
+        throw new Error(`User Pool ${newUserPoolArn} does not exist`);
+    }
+    if (UserPool.CustomDomain) {
+        return UserPool.CustomDomain;
+    } else if (UserPool.Domain) {
+        return `${UserPool.Domain}.auth.${newUserPoolRegion}.amazoncognito.com`;
+    } else {
+        throw new Error(`User Pool ${newUserPoolArn} does not have a domain set up yet`);
+    }
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
+    console.log(JSON.stringify(event, undefined, 4));
     const {
         LogicalResourceId,
         RequestId,
@@ -60,18 +55,16 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
     let response: CloudFormationCustomResourceResponse;
     try {
-        const { domainName, physicalResourceId } = await ensureCognitoUserPoolDomain(RequestType, ResourceProperties.UserPoolId, PhysicalResourceId);
+        const physicalResourceId = await ensureCognitoUserPoolDomain(RequestType, ResourceProperties.UserPoolArn, PhysicalResourceId);
         response = {
             LogicalResourceId,
             PhysicalResourceId: physicalResourceId,
             Status: 'SUCCESS',
             RequestId,
-            StackId,
-            Data: {
-                DomainName: domainName,
-            }
+            StackId
         };
     } catch (err) {
+        console.error(err);
         response = {
             LogicalResourceId,
             PhysicalResourceId: PhysicalResourceId || `failed-to-create-${Date.now()}`,
@@ -82,17 +75,4 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
         };
     }
     await axios.put(ResponseURL, response, { headers: { 'content-type': '' } });
-}
-
-function encodePhysicalResourceId(userPoolId: string, domainPrefix: string, randomValue: string) {
-    const obj = { userPoolId, domainPrefix, randomValue };
-    return JSON.stringify(obj, Object.keys(obj).sort());
-}
-
-function decodePhysicalResourceId(physicalResourceId: string) {
-    try {
-        return JSON.parse(physicalResourceId) as { userPoolId: string; domainPrefix: string; randomValue: string; };
-    } catch (err) {
-        console.error(`Can't parse physicalResourceId: ${physicalResourceId}`);
-    }
 }

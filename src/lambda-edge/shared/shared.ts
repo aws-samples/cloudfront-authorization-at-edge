@@ -9,26 +9,43 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
 import html from './error-page/template.html';
 
+
 export interface CookieSettings {
     idToken: string;
     accessToken: string;
     refreshToken: string;
     nonce: string;
+    [key: string]: string;
 }
 
-const defaultCookieSettings: { [key: string]: CookieSettings } = {
-    spaMode: {
-        idToken: "Path=/; Secure; SameSite=Lax",
-        accessToken: "Path=/; Secure; SameSite=Lax",
-        refreshToken: "Path=/; Secure; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
-    },
-    staticSiteMode: {
-        idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
-    },
+function getDefaultCookieSettings(props: { mode: 'spaMode' | 'staticSiteMode', compatibility: 'amplify' | 'elasticsearch' }): CookieSettings {
+    // Defaults can be overridden by the user (CloudFormation Stack parameter) but should be solid enough for most purposes
+    if (props.compatibility === 'amplify') {
+        if (props.mode === 'spaMode') {
+            return {
+                idToken: "Path=/; Secure; SameSite=Lax",
+                accessToken: "Path=/; Secure; SameSite=Lax",
+                refreshToken: "Path=/; Secure; SameSite=Lax",
+                nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+            }
+        } else if (props.mode === 'staticSiteMode') {
+            return {
+                idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+                accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+                refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+                nonce: "Path=/; Secure; HttpOnly; SameSite=Lax"
+            }
+        };
+    } else if (props.compatibility === 'elasticsearch') {
+        return {
+            idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            nonce: "Path=/; Secure; HttpOnly; SameSite=Lax",
+            cognitoEnabled: "Path=/; Secure; SameSite=Lax"
+        }
+    }
+    throw new Error(`Cannot determine default cookiesettings for ${props.mode} with compatibility ${props.compatibility}`);
 }
 
 export interface HttpHeaders {
@@ -38,7 +55,12 @@ export interface HttpHeaders {
 type Mode = 'spaMode' | 'staticSiteMode';
 
 interface ConfigFromDisk {
-    userPoolId: string;
+    httpHeaders: HttpHeaders;
+    logLevel: keyof typeof LogLevel;
+}
+
+interface CompleteConfigFromDisk extends ConfigFromDisk {
+    userPoolArn: string;
     clientId: string;
     oauthScopes: string[];
     cognitoAuthDomain: string;
@@ -47,14 +69,18 @@ interface ConfigFromDisk {
     redirectPathAuthRefresh: string;
     cookieSettings: CookieSettings;
     mode: Mode,
-    httpHeaders: HttpHeaders;
     clientSecret: string;
     nonceSigningSecret: string;
-    logLevel: keyof typeof LogLevel;
+    cookieCompatibility: 'amplify' | 'elasticsearch';
+    additionalCookies: { [name: string]: string };
     secretAllowedCharacters?: string;
     pkceLength?: number;
     nonceLength?: number;
     nonceMaxAge?: number;
+}
+
+function isCompleteConfig(config: any): config is CompleteConfigFromDisk {
+    return config["userPoolArn"] !== undefined;
 }
 
 enum LogLevel {
@@ -103,10 +129,14 @@ class Logger {
 }
 
 export interface Config extends ConfigFromDisk {
+    cloudFrontHeaders: CloudFrontHeaders;
+    logger: Logger;
+}
+
+export interface CompleteConfig extends Config, CompleteConfigFromDisk {
     tokenIssuer: string;
     tokenJwksUri: string;
     cloudFrontHeaders: CloudFrontHeaders;
-    logger: Logger;
     secretAllowedCharacters: string;
     pkceLength: number;
     nonceLength: number;
@@ -115,22 +145,37 @@ export interface Config extends ConfigFromDisk {
 
 export function getConfig(): Config {
     const config = JSON.parse(readFileSync(`${__dirname}/configuration.json`).toString('utf8')) as ConfigFromDisk;
+    return {
+        cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
+        logger: new Logger(LogLevel[config.logLevel]),
+        ...config
+    }
+}
+
+export function getCompleteConfig(): CompleteConfig {
+
+    const config = getConfig();
+
+    if (!isCompleteConfig(config)) {
+        throw new Error("Incomplete config in configuration.json");
+    }
 
     // Derive the issuer and JWKS uri all JWT's will be signed with from the User Pool's ID and region:
-    const userPoolRegion = config.userPoolId && config.userPoolId.match(/^(\S+?)_\S+$/)![1];
-    const tokenIssuer = config.userPoolId && `https://cognito-idp.${userPoolRegion}.amazonaws.com/${config.userPoolId}`;
-    const tokenJwksUri = tokenIssuer && `${tokenIssuer}/.well-known/jwks.json`;
+    const userPoolId = config.userPoolArn.split('/')[1];
+    const userPoolRegion = userPoolId.match(/^(\S+?)_\S+$/)![1];
+    const tokenIssuer = `https://cognito-idp.${userPoolRegion}.amazonaws.com/${userPoolId}`;
+    const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
 
     // Derive cookie settings by merging the defaults with the explicitly provided values
-    // Default cookies settings depend on the deployment mode (SPA or Static Site)
+    const defaultCookieSettings = getDefaultCookieSettings({
+        compatibility: config.cookieCompatibility,
+        mode: config.mode
+    });
     const cookieSettings = config.cookieSettings ? Object.fromEntries(
         Object
-            .entries(config.cookieSettings)
-            .map(([k, v]) => [k, v || defaultCookieSettings[config.mode][k as keyof CookieSettings]])
-    ) as CookieSettings : defaultCookieSettings[config.mode];
-
-    // Setup logger
-    const logger = new Logger(LogLevel[config.logLevel]);
+            .entries({ ...defaultCookieSettings, ...config.cookieSettings })
+            .map(([k, v]) => [k, v || defaultCookieSettings[k as keyof CookieSettings]])
+    ) as CookieSettings : defaultCookieSettings;
 
     // Defaults for nonce and PKCE
     const defaults = {
@@ -146,8 +191,6 @@ export function getConfig(): Config {
         cookieSettings,
         tokenIssuer,
         tokenJwksUri,
-        cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
-        logger,
     };
 }
 
@@ -166,6 +209,7 @@ function extractCookiesFromHeaders(headers: CloudFrontHeaders) {
 }
 
 function withCookieDomain(distributionDomainName: string, cookieSettings: string) {
+    // Add the domain to the cookiesetting
     if (cookieSettings.toLowerCase().indexOf('domain') === -1) {
         // Add leading dot for compatibility with Amplify (or js-cookie really)
         return `${cookieSettings}; Domain=.${distributionDomainName}`;
@@ -174,6 +218,7 @@ function withCookieDomain(distributionDomainName: string, cookieSettings: string
 }
 
 export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
+    // Turn a regular key-value object into the explicit format expected by CloudFront 
     return Object.entries(headers).reduce((reduced, [key, value]) => (
         Object.assign(reduced, {
             [key.toLowerCase()]: [{
@@ -184,44 +229,58 @@ export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
     ), {} as CloudFrontHeaders);
 }
 
-export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: string) {
+export function getAmplifyCookieNames(clientId: string, cookiesOrUserName: Cookies | string) {
+    const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`;
+    const lastUserKey = `${keyPrefix}.LastAuthUser`;
+    let tokenUserName: string;
+    if (typeof cookiesOrUserName === 'string') {
+        tokenUserName = cookiesOrUserName;
+    } else {
+        tokenUserName = cookiesOrUserName[lastUserKey];
+    }
+    return {
+        lastUserKey,
+        userDataKey: `${keyPrefix}.${tokenUserName}.userData`,
+        scopeKey: `${keyPrefix}.${tokenUserName}.tokenScopesString`,
+        idTokenKey: `${keyPrefix}.${tokenUserName}.idToken`,
+        accessTokenKey: `${keyPrefix}.${tokenUserName}.accessToken`,
+        refreshTokenKey: `${keyPrefix}.${tokenUserName}.refreshToken`,
+    }
+}
+
+export function getElasticsearchCookieNames() {
+    return {
+        idTokenKey: 'ID-TOKEN',
+        accessTokenKey: 'ACCESS-TOKEN',
+        refreshTokenKey: 'REFRESH-TOKEN',
+        cognitoEnabledKey: 'COGNITO-ENABLED',
+    }
+}
+
+
+export function extractAndParseCookies(headers: CloudFrontHeaders, clientId: string, cookieCompatibility: 'amplify' | 'elasticsearch') {
     const cookies = extractCookiesFromHeaders(headers);
     if (!cookies) {
         return {};
     }
 
-    const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`;
-    const lastUserKey = `${keyPrefix}.LastAuthUser`;
-    const tokenUserName = cookies[lastUserKey];
-
-    const scopeKey = `${keyPrefix}.${tokenUserName}.tokenScopesString`;
-    const scopes = cookies[scopeKey];
-
-    const idTokenKey = `${keyPrefix}.${tokenUserName}.idToken`;
-    const idToken = cookies[idTokenKey];
-
-    const accessTokenKey = `${keyPrefix}.${tokenUserName}.accessToken`;
-    const accessToken = cookies[accessTokenKey];
-
-    const refreshTokenKey = `${keyPrefix}.${tokenUserName}.refreshToken`;
-    const refreshToken = cookies[refreshTokenKey];
+    let cookieNames: { [name: string]: string };
+    if (cookieCompatibility === 'amplify') {
+        cookieNames = getAmplifyCookieNames(clientId, cookies);
+    } else {
+        cookieNames = getElasticsearchCookieNames();
+    }
 
     return {
-        tokenUserName,
-        idToken,
-        accessToken,
-        refreshToken,
-        scopes,
+        tokenUserName: cookies[cookieNames.lastUserKey],
+        idToken: cookies[cookieNames.idTokenKey],
+        accessToken: cookies[cookieNames.accessTokenKey],
+        refreshToken: cookies[cookieNames.refreshTokenKey],
+        scopes: cookies[cookieNames.scopeKey],
         nonce: cookies['spa-auth-edge-nonce'],
         nonceHmac: cookies['spa-auth-edge-nonce-hmac'],
         pkce: cookies['spa-auth-edge-pkce'],
     }
-}
-
-export function decodeToken(jwt: string) {
-    const tokenBody = jwt.split('.')[1];
-    const decodableTokenBody = tokenBody.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(Buffer.from(decodableTokenBody, 'base64').toString());
 }
 
 interface GenerateCookieHeadersParam {
@@ -230,6 +289,8 @@ interface GenerateCookieHeadersParam {
     domainName: string,
     cookieSettings: CookieSettings,
     mode: Mode,
+    cookieCompatibility: 'amplify' | 'elasticsearch';
+    additionalCookies: { [name: string]: string };
     tokens: {
         id_token: string;
         access_token: string;
@@ -249,45 +310,50 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
     const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
-    const keyPrefix = `CognitoIdentityServiceProvider.${param.clientId}`;
-    const idTokenKey = `${keyPrefix}.${tokenUserName}.idToken`;
-    const accessTokenKey = `${keyPrefix}.${tokenUserName}.accessToken`;
-    const refreshTokenKey = `${keyPrefix}.${tokenUserName}.refreshToken`;
-    const lastUserKey = `${keyPrefix}.LastAuthUser`;
-    const scopeKey = `${keyPrefix}.${tokenUserName}.tokenScopesString`;
-    const scopesString = param.oauthScopes.join(' ');
-    const userDataKey = `${keyPrefix}.${tokenUserName}.userData`;
-    const userData = JSON.stringify({
-        UserAttributes: [
-            {
-                Name: 'sub',
-                Value: decodedIdToken['sub']
-            },
-            {
-                Name: 'email',
-                Value: decodedIdToken['email']
-            }
-        ],
-        Username: tokenUserName
-    });
 
-    // Construct object with the cookies
-    const cookies = {
-        [idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        [accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-        [refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
-        [lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        [scopeKey]: `${scopesString}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-        [userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-        'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-    };
+    let cookies: Cookies;
+    let cookieNames: { [name: string]: string };
+    if (param.cookieCompatibility === 'amplify') {
+        cookieNames = getAmplifyCookieNames(param.clientId, tokenUserName);
+        const userData = JSON.stringify({
+            UserAttributes: [
+                {
+                    Name: 'sub',
+                    Value: decodedIdToken['sub']
+                },
+                {
+                    Name: 'email',
+                    Value: decodedIdToken['email']
+                }
+            ],
+            Username: tokenUserName
+        });
+
+        // Construct object with the cookies
+        cookies = {
+            [cookieNames.lastUserKey]: `${tokenUserName}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+            [cookieNames.scopeKey]: `${param.oauthScopes.join(' ')}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+            [cookieNames.userDataKey]: `${encodeURIComponent(userData)}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+            'amplify-signin-with-hostedUI': `true; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+        };
+    } else {
+        cookieNames = getElasticsearchCookieNames();
+        cookies = {
+            [cookieNames.cognitoEnabledKey]: `True; ${withCookieDomain(param.domainName, param.cookieSettings.cognitoEnabled)}`,
+        };
+    }
+    Object.assign(cookies, {
+        [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
+        [cookieNames.accessTokenKey]: `${param.tokens.access_token}; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
+        [cookieNames.refreshTokenKey]: `${param.tokens.refresh_token}; ${withCookieDomain(param.domainName, param.cookieSettings.refreshToken)}`,
+    });
 
     if (param.event === 'signOut') {
         // Expire all cookies
         Object.keys(cookies).forEach(key => cookies[key] = expireCookie(cookies[key]));
     } else if (param.event === 'refreshFailed') {
         // Expire refresh token (so the browser will not send it in vain again)
-        cookies[refreshTokenKey] = expireCookie(cookies[refreshTokenKey]);
+        cookies[cookieNames.refreshTokenKey] = expireCookie(cookies[cookieNames.refreshTokenKey]);
     }
 
     // Always expire nonce, nonceHmac and pkce - this is valid in all scenario's:
@@ -299,7 +365,7 @@ function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'ne
     });
 
     // Return cookie object in format of CloudFront headers
-    return Object.entries(cookies).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
+    return Object.entries({ ...param.additionalCookies, ...cookies }).map(([k, v]) => ({ key: 'set-cookie', value: `${k}=${v}` }));
 }
 
 function expireCookie(cookie: string = '') {
@@ -317,6 +383,12 @@ const AXIOS_INSTANCE = axios.create({
     httpsAgent: new Agent({ keepAlive: true }),
 });
 
+
+export function decodeToken(jwt: string) {
+    const tokenBody = jwt.split('.')[1];
+    const decodableTokenBody = tokenBody.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(Buffer.from(decodableTokenBody, 'base64').toString());
+}
 
 export async function httpPostWithRetry(url: string, data: any, config: AxiosRequestConfig, logger: Logger): Promise<AxiosResponse<any>> {
     let attempts = 0;

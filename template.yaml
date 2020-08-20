@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 1.2.14
+    SemanticVersion: 2.0.0
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -109,11 +109,11 @@ Parameters:
       {}
   UserPoolArn:
     Type: String
-    Description: "Specify the ARN of an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified."
+    Description: "Specify the ARN of an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified. Also, the User Pool should have a domain configured"
     Default: ""
   UserPoolClientId:
     Type: String
-    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: the OAuth settings of the pre-existing user pool client will be updated"
+    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: new callback URL's will be added to the pre-existing user pool client"
     Default: ""
   Version:
     Type: String
@@ -369,10 +369,6 @@ Resources:
         - CreateUserPoolAndClient
         - !GetAtt UserPool.Arn
         - !Ref UserPoolArn
-      CreateOrLookup: !If
-        - CreateUserPoolAndClient
-        - Create
-        - Lookup
 
   UserPoolDomainLookupHandler:
     Type: AWS::Serverless::Function
@@ -425,7 +421,7 @@ Resources:
               Action:
                 - cognito-idp:UpdateUserPoolClient
                 - cognito-idp:DescribeUserPoolClient
-              Resource: "*"
+              Resource: "*"  # * to be able to clean up after myself, if you change the User Pool Client ID
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval

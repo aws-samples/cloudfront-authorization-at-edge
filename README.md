@@ -94,9 +94,9 @@ You may find that your application does not render properly -- the default Conte
 
 Deploy the solution (e.g. from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge)) while setting parameter `CreateCloudFrontDistribution` to `false`. This way, only the Lambda@Edge functions will de deployed in your account. You'll also get a User Pool and Client (unless you're [bringing your own](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)). Then you can wire the Lambda@Edge functions up into your own CloudFront distribution. Create a behavior for all path patterns (root, RedirectPathSignIn, RedirectPathSignOut, RedirectPathAuthRefresh, SignOutUrl) and configure the corresponding Lambda@Edge function in each behavior.
 
-See this complete example: [./example-serverless-app-reuse/reuse-auth-only.yaml](./example-serverless-app-reuse/reuse-auth-only.yaml)
-
 The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can refer to in your CloudFront distribution.
+
+See this complete example: [./example-serverless-app-reuse/reuse-auth-only.yaml](./example-serverless-app-reuse/reuse-auth-only.yaml)
 
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
 

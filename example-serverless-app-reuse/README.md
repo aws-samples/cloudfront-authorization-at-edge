@@ -15,7 +15,7 @@ This example shows how to wire up this solution's auth functions into your own C
 - Parameterized semantic version to allow operation with future versions of the application
 - Note the instructions on updating the User Pool client in this example's description.
 
-## [reuse-with-existing-user-pool.yaml](./reuse-with-existing-user-pool)
+## [reuse-with-existing-user-pool.yaml](./reuse-with-existing-user-pool.yaml)
 This example shows how to reuse the serverless application with a pre-existing User Pool and Client.
 
 ## Deployment

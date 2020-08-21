@@ -2,11 +2,19 @@
 
 This repo accompanies the [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/authorizationedge-using-cookies-protect-your-amazon-cloudfront-content-from-being-downloaded-by-unauthenticated-users/).
 
-In that blog post a solution is explained, that puts Cognito authentication in front of (S3) downloads from CloudFront, using Lambda@Edge. JWT's are transferred using cookies to make authorization transparent to clients.
+In that blog post a solution is explained, that puts **Cognito** authentication in front of (S3) downloads from **CloudFront**, using **Lambda@Edge**. **JWT's** are transferred using **cookies** to make authorization transparent to clients.
 
 The sources in this repo implement that solution.
 
 The purpose of this sample code is to demonstrate how Lambda@Edge can be used to implement authorization, with Cognito as identity provider (IDP). Please treat the code as an _**illustration**_––thoroughly review it and adapt it to your needs, if you want to use it for serious things.
+
+### How to deploy
+
+The solution can be deployed to your AWS account with a few clicks, from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge). Note: deploy to us-east-1, as this is a requirement for Lambda@Edge (see [Deployment region](#deployment-region)).
+
+More deployment options below: [Deploying the solution](#deploying-the-solution)
+
+### Alternative: use HTTP headers
 
 This repo is the "sibling" of another repo here on aws-samples ([authorization-lambda-at-edge](https://github.com/aws-samples/authorization-lambda-at-edge)). The difference is that the solution in that repo uses http headers (not cookies) to transfer JWT's. While also a valid approach, the downside of it is that your Web App (SPA) needs to be altered to pass these headers, as browsers do not send these along automatically (which they do for cookies).
 
@@ -27,7 +35,7 @@ CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-res
 - [react-app](src/cfn-custom-resources/react-app): A sample React app that is protected by the solution. It uses AWS Amplify Framework to read the JWT's from cookies. The directory also contains a Lambda function that implements a CloudFormation custom resource to build the React app and upload it to S3
 - [static-site](src/cfn-custom-resources/static-site): A sample static site (see [SPA mode or Static Site mode?](#spa-mode-or-static-site-mode)) that is protected by the solution. The directory also contains a Lambda function that implements a CloudFormation custom resource to upload the static site to S3
 - [user-pool-client](src/cfn-custom-resources/user-pool-client): Lambda function that implements a CloudFormation custom resource to update the User Pool client with OAuth config
-- [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to update the User Pool with a domain for the hosted UI
+- [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to lookup the User Pool's domain, at which the Hosted UI is available
 - [lambda-code-update](src/cfn-custom-resources/lambda-code-update): Lambda function that implements a CloudFormation custom resource to inject configuration into the lambda@Edge functions and publish versions
 - [shared](src/lambda-edge/shared): Utility functions used by several Lambda@Edge functions
 
@@ -42,7 +50,7 @@ Other files and directories:
 
 ### Option 1: Deploy through the Serverless Application Repository
 
-The solution can be deployed with a few clicks through the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge).
+The solution can be deployed with a few clicks from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge).
 
 ### Option 2: Deploy with SAM CLI
 
@@ -84,11 +92,21 @@ You may find that your application does not render properly -- the default Conte
 
 ## I already have a CloudFront distribution, I just want to add auth
 
-Deploy the solution (e.g. from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge)) while setting parameter `CreateCloudFrontDistribution` to `false`. This way, only the Lambda@Edge functions will de deployed in your account, including a User Pool and Client. Then you can wire those Lambda@Edge functions up into your own CloudFront distribution. Create a behavior for all path patterns (root, RedirectPathSignIn, RedirectPathSignOut, RedirectPathAuthRefresh, SignOutUrl) and configure the corresponding Lambda@Edge function in each behavior.
+Deploy the solution (e.g. from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge)) while setting parameter `CreateCloudFrontDistribution` to `false`. This way, only the Lambda@Edge functions will de deployed in your account. You'll also get a User Pool and Client (unless you're [bringing your own](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)). Then you can wire the Lambda@Edge functions up into your own CloudFront distribution. Create a behavior for all path patterns (root, RedirectPathSignIn, RedirectPathSignOut, RedirectPathAuthRefresh, SignOutUrl) and configure the corresponding Lambda@Edge function in each behavior.
 
 The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can refer to in your CloudFront distribution.
 
+See this example on how to do it: [./example-serverless-app-reuse/reuse-auth-only.yaml](./example-serverless-app-reuse/reuse-auth-only.yaml)
+
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
+
+## I already have an S3 bucket, I want to use that one
+
+Go for the more barebone deployment, so you can do more yourself––i.e. reuse your bucket. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
+
+## I want to use another (S3 / HTTP) origin behind the CloudFront distribution
+
+Go for the more barebone deployment, so you can do more yourself––i.e. bring your own origins. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
 
 ## I already have a Cognito User Pool, I want to reuse that one
 
@@ -100,9 +118,10 @@ In this case, also specify a pre-existing User Pool Client ID. Note that the sol
 
 This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).
 
-This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low. For S3 this is less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway (depending on the cache-control meta-data you set on your S3 objects).
+This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low:
 
-You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)
+- You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)
+- For S3 latency might be less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway. This depends on the cache-control meta-data you set on your S3 objects. If you want to use an S3 bucket in another region, you'll have to create that yourself. In that case, go for the more barebone deployment, so you can do more yourself. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
 
 ## SPA mode or Static Site mode?
 

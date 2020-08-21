@@ -96,7 +96,7 @@ Deploy the solution (e.g. from the [Serverless Application Repository](https://c
 
 The CloudFormation Stack's Outputs contain the Lambda Version ARNs that you can refer to in your CloudFront distribution.
 
-See this complete example: [./example-serverless-app-reuse/reuse-auth-only.yaml](./example-serverless-app-reuse/reuse-auth-only.yaml)
+See this example on how to do it: [./example-serverless-app-reuse/reuse-auth-only.yaml](./example-serverless-app-reuse/reuse-auth-only.yaml)
 
 When following this route, also provide parameter `AlternateDomainNames` upon deploying, so the correct redirect URL's can be configured for you in the Cognito User Pool Client.
 

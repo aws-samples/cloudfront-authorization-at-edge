@@ -8,7 +8,7 @@ Description: >
   in your own CloudFront distribution. 
 
   After deployment, manually update the User Pool client to point the 'Callback URL' and 'Sign out URL' to the URL of the CloudFront distribution.
-  Alternately, add an alternate domain name to the CloudFront distribution and provide the name as parameter to the   serverless stack. The alternate
+  Alternately, add an alternate domain name to the CloudFront distribution and provide the name as parameter to the serverless stack. The alternate
   domain will also require adding a certificate to the Cloudfront Distribution. This alternative will set the User Pool client to the right Callback URL
   and Sign out URL automatically.
 

@@ -116,17 +116,10 @@ In this case, also specify a pre-existing User Pool Client ID. Note that the sol
 
 This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).
 
-This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low.
+This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low:
 
-### Cognito
-
-You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)
-
-### S3
-
-For S3 latency might be less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway. This depends on the cache-control meta-data you set on your S3 objects.
-
-If you want to use an S3 bucket in another region, you'll have to create that yourself. In that case, go for the more barebone deployment, so you can do more yourself. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
+- You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)
+- For S3 latency might be less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway. This depends on the cache-control meta-data you set on your S3 objects. If you want to use an S3 bucket in another region, you'll have to create that yourself. In that case, go for the more barebone deployment, so you can do more yourself. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
 
 ## SPA mode or Static Site mode?
 

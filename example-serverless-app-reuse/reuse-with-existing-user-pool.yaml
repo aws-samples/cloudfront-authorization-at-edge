@@ -24,9 +24,29 @@ Resources:
     Properties:
       UserPoolId: !Ref UserPool
       PreventUserExistenceErrors: ENABLED
+      GenerateSecret: true
+      AllowedOAuthScopes:
+        - phone
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
       SupportedIdentityProviders:
         - COGNITO
-      GenerateSecret: false
+      CallbackURLs:
+        # Ideally you would put your real callback URL's here, pointing to your custom domain name––the custom
+        # domain name that you would also supply as AlternateDomainNames to the cloudfront-authorization-at-edge stack below.
+        # However, if you just want to use the CloudFront domain name, use the sentinel value as below, to avoid a circular dependency.
+        # This sentinal value will be replaced automatically by the cloudfront-authorization-at-edge stack, with the CloudFront domain name
+        - https://example.com/will-be-replaced
+      LogoutURLs:
+        # Ideally you would put your real logout URL's here, pointing to your custom domain name––the custom
+        # domain name that you would also supply as AlternateDomainNames to the cloudfront-authorization-at-edge stack below.
+        # However, if you just want to use the CloudFront domain name, use the sentinel value as below, to avoid a circular dependency.
+        # This sentinal value will be replaced automatically by the cloudfront-authorization-at-edge stack, with the CloudFront domain name
+        - https://example.com/will-be-replaced
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:

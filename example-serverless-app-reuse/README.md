@@ -1,6 +1,6 @@
 # Examples that show how to reuse the serverless application in your own CloudFormation/SAM templates
 
-This directory contains two examples:
+This directory contains the following examples:
 
 ## [reuse-complete.yaml](./reuse-complete.yaml)
 This examples shows how you can add some users of your own to the serverless application's User Pool. Also it shows how you can access outputs from the serverless application.

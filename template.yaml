@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.0
+    SemanticVersion: 2.0.1
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -146,6 +146,9 @@ Conditions:
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
   CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
+  UpdateUserPoolClient: !Or
+    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+    - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
 
 Globals:
   Function:
@@ -389,6 +392,7 @@ Resources:
 
   UserPoolClientUpdate:
     Type: Custom::UserPoolClientUpdate
+    Condition: UpdateUserPoolClient
     Properties:
       ServiceToken: !GetAtt UserPoolClientUpdateHandler.Arn
       UserPoolArn: !If
@@ -826,11 +830,13 @@ Outputs:
       Name: !Sub "${AWS::StackName}-CognitoAuthDomain"
   RedirectUrisSignIn:
     Description: The URI(s) that will handle the redirect from Cognito after successfull sign-in
+    Condition: UpdateUserPoolClient
     Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignIn
     Export:
       Name: !Sub "${AWS::StackName}-RedirectUrisSignIn"
   RedirectUrisSignOut:
     Description: The URI(s) that will handle the redirect from Cognito after successfull sign-out
+    Condition: UpdateUserPoolClient
     Value: !GetAtt UserPoolClientUpdate.RedirectUrisSignOut
     Export:
       Name: !Sub "${AWS::StackName}-RedirectUrisSignOut"
@@ -864,3 +870,8 @@ Outputs:
     Value: !GetAtt LambdaCodeUpdateHandler.Arn
     Export:
       Name: !Sub "${AWS::StackName}-CodeUpdateHandler"
+  UserPoolClientUpdateHandler:
+    Description: The Lambda function ARN of the custom resource that updates the user pool client with the right redirect URI's for sign-in and sign-out
+    Value: !GetAtt UserPoolClientUpdateHandler.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientUpdateHandler"

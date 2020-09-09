@@ -10,6 +10,24 @@ Description: >
   In this example we're creating the User Pool and Client, and the Auth@Edge application in the same stack in the same region.
   You could instead also use a pre-existing User Pool and Client from a different stack and region.
 
+Parameters:
+  EnableSPAMode:
+    Type: String
+    Description: Set to 'false' to disable SPA-specific features (i.e. when deploying a static site that won't interact with logout/refresh)
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+  OAuthScopes:
+    Type: CommaDelimitedList
+    Description: The OAuth scopes to request the User Pool to add to the access token JWT
+    Default: "phone, email, profile, openid, aws.cognito.signin.user.admin"
+
+Conditions:
+  GenerateClientSecret: !Equals
+    - EnableSPAMode
+    - "false"
+
 Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -24,28 +42,21 @@ Resources:
     Properties:
       UserPoolId: !Ref UserPool
       PreventUserExistenceErrors: ENABLED
-      GenerateSecret: true
-      AllowedOAuthScopes:
-        - phone
-        - email
-        - openid
-        - profile
+      GenerateSecret: !If
+        - GenerateClientSecret
+        - true
+        - false
+      AllowedOAuthScopes: !Ref OAuthScopes
       AllowedOAuthFlowsUserPoolClient: true
       AllowedOAuthFlows:
         - code
       SupportedIdentityProviders:
         - COGNITO
       CallbackURLs:
-        # Ideally you would put your real callback URL's here, pointing to your custom domain name––the custom
-        # domain name that you would also supply as AlternateDomainNames to the cloudfront-authorization-at-edge stack below.
-        # However, if you just want to use the CloudFront domain name, use the sentinel value as below, to avoid a circular dependency.
-        # This sentinal value will be replaced automatically by the cloudfront-authorization-at-edge stack, with the CloudFront domain name
+        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
         - https://example.com/will-be-replaced
       LogoutURLs:
-        # Ideally you would put your real logout URL's here, pointing to your custom domain name––the custom
-        # domain name that you would also supply as AlternateDomainNames to the cloudfront-authorization-at-edge stack below.
-        # However, if you just want to use the CloudFront domain name, use the sentinel value as below, to avoid a circular dependency.
-        # This sentinal value will be replaced automatically by the cloudfront-authorization-at-edge stack, with the CloudFront domain name
+        # The following sentinel value will be replaced by Auth@Edge with the CloudFront domain name (if you let Auth@Edge create the CloudFront distribution)
         - https://example.com/will-be-replaced
   UserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
@@ -68,6 +79,11 @@ Resources:
       Parameters:
         UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient
+        EnableSPAMode: !Ref EnableSPAMode
+        CreateCloudFrontDistribution: true
+        OAuthScopes: !Join
+          - ","
+          - !Ref OAuthScopes
 Outputs:
   WebsiteUrl:
     Description: URL of the CloudFront distribution that serves your SPA from S3

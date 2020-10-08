@@ -8,7 +8,7 @@ import { parse } from 'cookie';
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Agent } from 'https';
 import html from './error-page/template.html';
-
+import { validate } from './validate-jwt';
 
 export interface CookieSettings {
     idToken: string;
@@ -73,6 +73,7 @@ interface CompleteConfigFromDisk extends ConfigFromDisk {
     nonceSigningSecret: string;
     cookieCompatibility: 'amplify' | 'elasticsearch';
     additionalCookies: { [name: string]: string };
+    requiredGroup: string;
     secretAllowedCharacters?: string;
     pkceLength?: number;
     nonceLength?: number;
@@ -453,3 +454,24 @@ export function sign(stringToSign: string, secret: string, signatureLength: numb
 export function timestampInSeconds() {
     return Date.now() / 1000 | 0;
 }
+
+export async function validateAndCheckIdToken(idToken: string, config: CompleteConfig) {
+    config.logger.info('Validating JWT ...');
+    let idTokenPayload = await validate(idToken, config.tokenJwksUri, config.tokenIssuer, config.clientId);
+    config.logger.info('JWT is valid');
+
+    // Check that the ID token has the required group.
+    if (config.requiredGroup) {
+        let cognitoGroups = idTokenPayload['cognito:groups'];
+        if (!cognitoGroups) {
+            throw new MissingRequiredGroupError('Token does not have any cognito groups');
+        }
+
+        if (!cognitoGroups.includes(config.requiredGroup)) {
+            throw new MissingRequiredGroupError('Token does not have requiredGroup');
+        }
+        config.logger.info('JWT has requiredGroup');
+    }
+}
+
+export class MissingRequiredGroupError extends Error { }

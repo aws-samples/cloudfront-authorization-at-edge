@@ -115,6 +115,10 @@ Parameters:
     Type: String
     Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: new callback URL's will be added to the pre-existing user pool client"
     Default: ""
+  UserPoolRequiredGroup:
+    Type: String
+    Description: "Specify a group that a user has to be part of to view private site. If left blank any user in the pool can access the private site. You will need to manually create this group."
+    Default: ""
   Version:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
@@ -562,7 +566,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolRequiredGroup}"
             }
           - Mode: !If
               - SPAMode
@@ -612,7 +617,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolRequiredGroup}"
             }
           - Mode: !If
               - SPAMode
@@ -675,7 +681,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolRequiredGroup}"
             }
           - Mode: !If
               - SPAMode
@@ -725,7 +732,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolRequiredGroup}"
             }
           - Mode: !If
               - SPAMode

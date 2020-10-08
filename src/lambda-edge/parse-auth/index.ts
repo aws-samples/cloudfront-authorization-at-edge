@@ -3,8 +3,7 @@
 
 import { parse as parseQueryString, stringify as stringifyQueryString } from 'querystring';
 import { CloudFrontRequestHandler } from 'aws-lambda';
-import { getCompleteConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds } from '../shared/shared';
-import { validate } from '../shared/validate-jwt';
+import { getCompleteConfig, extractAndParseCookies, generateCookieHeaders, httpPostWithRetry, createErrorHtml, urlSafe, sign, timestampInSeconds, validateAndCheckIdToken, MissingRequiredGroupError } from '../shared/shared';
 
 let CONFIG: ReturnType<typeof getCompleteConfig>;
 
@@ -51,6 +50,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         CONFIG.logger.info('Successfully exchanged authorization code for tokens');
         CONFIG.logger.debug('Response from Cognito token endpoint:\n', { status, headers, tokens });
 
+        // Validate the token and if a group is required make sure the token has it.
+        // If not throw an Error or MissingRequiredGroupError
+        await validateAndCheckIdToken(tokens.id_token, CONFIG);
+
         const response = {
             status: '307',
             statusDescription: 'Temporary Redirect',
@@ -73,9 +76,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             // There is an ID token - maybe the user signed in already (e.g. in another browser tab)
             CONFIG.logger.debug('ID token found, will check if it is valid');
             try {
-                CONFIG.logger.info('Validating JWT ...');
-                await validate(idToken, CONFIG.tokenJwksUri, CONFIG.tokenIssuer, CONFIG.clientId);
-                CONFIG.logger.info('JWT is valid');
+                // Validate the token and if a group is required make sure the token has it.
+                // If not throw an Error or MissingRequiredGroupError
+                await validateAndCheckIdToken(idToken, CONFIG);
+
                 // Return user to where he/she came from
                 const response = {
                     status: '307',
@@ -103,6 +107,15 @@ export const handler: CloudFrontRequestHandler = async (event) => {
                 details: err.toString(),
                 linkUri: redirectedFromUri,
                 linkText: 'Confirm',
+            }
+        } else if (err instanceof MissingRequiredGroupError) {
+            htmlParams = {
+                title: 'Not Authorized',
+                message: 'Your user is not authorized for this site. Please contact the admin.',
+                expandText: 'Click for details',
+                details: err.toString(),
+                linkUri: redirectedFromUri,
+                linkText: 'Try Again',
             }
         } else {
             htmlParams = {

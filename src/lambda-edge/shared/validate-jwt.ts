@@ -42,9 +42,9 @@ export async function validate(jwtToken: string, jwksUri: string, issuer: string
         issuer,
         ignoreExpiration: false,
     };
-    return new Promise((resolve, reject) => verify(
+    return new Promise<any>((resolve, reject) => verify(
         jwtToken,
         jwk,
         verificationOptions,
-        (err) => err ? reject(err) : resolve()));
+        (err, decoded) => err ? reject(err) : resolve(decoded)));
 }

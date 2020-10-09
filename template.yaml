@@ -115,9 +115,12 @@ Parameters:
     Type: String
     Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: new callback URL's will be added to the pre-existing user pool client"
     Default: ""
-  UserPoolRequiredGroup:
+  UserPoolGroupName:
     Type: String
-    Description: "Specify a group that a user has to be part of to view private site. If left blank any user in the pool can access the private site. You will need to manually create this group."
+    Description: >
+      Specify a group that a user has to be part of to view the private site. If left blank, any user in the pool can access the private site.
+      The UserPoolGroup will be created if the UserPool also created (that happens when no UserPoolArn is set).
+      If the group is created and the default user is created, the default user will also be added to the group.
     Default: ""
   Version:
     Type: String
@@ -150,6 +153,12 @@ Conditions:
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
   CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
+  CreateUserPoolGroup: !And
+    - !Condition CreateUserPoolAndClient
+    - !Not [!Equals [!Ref UserPoolGroupName, ""]]
+  AttachUserToPoolGroup: !And
+    - !Condition CreateUser
+    - !Condition CreateUserPoolGroup
   UpdateUserPoolClient: !Or
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
@@ -327,10 +336,25 @@ Resources:
       UsernameAttributes:
         - email
 
+  UserPoolGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Condition: CreateUserPoolGroup
+    Properties:
+      GroupName: !Ref UserPoolGroupName
+      UserPoolId: !Ref UserPool
+
   User:
     Type: AWS::Cognito::UserPoolUser
     Condition: CreateUser
     Properties:
+      Username: !Ref EmailAddress
+      UserPoolId: !Ref UserPool
+
+  UserPoolGroupAttachment:
+    Type: AWS::Cognito::UserPoolUserToGroupAttachment
+    Condition: AttachUserToPoolGroup
+    Properties:
+      GroupName: !Ref UserPoolGroupName
       Username: !Ref EmailAddress
       UserPoolId: !Ref UserPool
 
@@ -567,7 +591,7 @@ Resources:
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies},
-              "requiredGroup": "${UserPoolRequiredGroup}"
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode
@@ -618,7 +642,7 @@ Resources:
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies},
-              "requiredGroup": "${UserPoolRequiredGroup}"
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode
@@ -682,7 +706,7 @@ Resources:
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies},
-              "requiredGroup": "${UserPoolRequiredGroup}"
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode
@@ -733,7 +757,7 @@ Resources:
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
               "additionalCookies": ${AdditionalCookies},
-              "requiredGroup": "${UserPoolRequiredGroup}"
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode

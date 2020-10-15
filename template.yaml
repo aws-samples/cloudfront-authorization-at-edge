@@ -118,9 +118,9 @@ Parameters:
   UserPoolGroupName:
     Type: String
     Description: >
-      Specify a group that a user has to be part of to view the private site. If left blank, any user in the pool can access the private site.
-      The UserPoolGroup will be created if the UserPool also created (that happens when no UserPoolArn is set).
-      If the group is created and the default user is created, the default user will also be added to the group.
+      Specify a group that users have to be part of to view the private site. Use this to further protect your private site, in case you don't want every user in the User Pool to have access.
+      The UserPoolGroup will be created if the UserPool is also created (that happens when no UserPoolArn is set).
+      If the UserPoolGroup is created and the default user is also created (when you specify EmailAddress), that user will also be added to the group.
     Default: ""
   Version:
     Type: String

@@ -42,9 +42,11 @@ export async function validate(jwtToken: string, jwksUri: string, issuer: string
         issuer,
         ignoreExpiration: false,
     };
-    return new Promise((resolve, reject) => verify(
+
+    // JWT's from Cognito are JSON objects
+    return new Promise<{ [key: string]: any }>((resolve, reject) => verify(
         jwtToken,
         jwk,
         verificationOptions,
-        (err) => err ? reject(err) : resolve()));
+        (err, decoded) => err ? reject(err) : resolve(decoded)));
 }

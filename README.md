@@ -114,6 +114,21 @@ You can use a pre-existing Cognito User Pool (e.g. from another region), by prov
 
 In this case, also specify a pre-existing User Pool Client ID. Note that the solution's callback URLs wil be added to the User Pool Client you provide.
 
+## I want to use a social identity provider
+
+You should use the UserPoolGroupName parameter, to specify a group that users must be a member of in order to access the site.
+
+Without this UserPoolGroupName, the lambda@edge functions will allow any confirmed user in the User Pool access to the site.
+When an identity provider is added to the User Pool, anybody that signs in though the identity provider is immediately a confirmed user.
+So with a social identity provider where anyone can create an account, this means anyone can access the site you are trying to protect.
+
+With the UserPoolGroupName parameter defined, you will need to add each user to this group before they can access the site.
+
+If the solution is creating the User Pool, it will create the User Pool Group too.
+If the solution is creating the User Pool and a default user (via the EmailAddress parameter), then this user will be added User Pool Group.
+
+If you are using a pre-existing User Pool, you will need to make a group that has a name matching the UserPoolGroupName.
+
 ## Deployment region
 
 This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).

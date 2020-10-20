@@ -115,6 +115,13 @@ Parameters:
     Type: String
     Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: new callback URL's will be added to the pre-existing user pool client"
     Default: ""
+  UserPoolGroupName:
+    Type: String
+    Description: >
+      Specify a group that users have to be part of to view the private site. Use this to further protect your private site, in case you don't want every user in the User Pool to have access.
+      The UserPoolGroup will be created if the UserPool is also created (that happens when no UserPoolArn is set).
+      If the UserPoolGroup is created and the default user is also created (when you specify EmailAddress), that user will also be added to the group.
+    Default: ""
   Version:
     Type: String
     Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
@@ -146,6 +153,12 @@ Conditions:
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
   CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
+  CreateUserPoolGroup: !And
+    - !Condition CreateUserPoolAndClient
+    - !Not [!Equals [!Ref UserPoolGroupName, ""]]
+  AttachUserToPoolGroup: !And
+    - !Condition CreateUser
+    - !Condition CreateUserPoolGroup
   UpdateUserPoolClient: !Or
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
@@ -323,10 +336,25 @@ Resources:
       UsernameAttributes:
         - email
 
+  UserPoolGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Condition: CreateUserPoolGroup
+    Properties:
+      GroupName: !Ref UserPoolGroupName
+      UserPoolId: !Ref UserPool
+
   User:
     Type: AWS::Cognito::UserPoolUser
     Condition: CreateUser
     Properties:
+      Username: !Ref EmailAddress
+      UserPoolId: !Ref UserPool
+
+  UserPoolGroupAttachment:
+    Type: AWS::Cognito::UserPoolUserToGroupAttachment
+    Condition: AttachUserToPoolGroup
+    Properties:
+      GroupName: !Ref UserPoolGroupName
       Username: !Ref EmailAddress
       UserPoolId: !Ref UserPool
 
@@ -562,7 +590,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode
@@ -612,7 +641,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode
@@ -675,7 +705,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode
@@ -725,7 +756,8 @@ Resources:
               "logLevel": "${LogLevel}",
               "nonceSigningSecret": "${NonceSigningSecret}",
               "cookieCompatibility": "${CookieCompatibility}",
-              "additionalCookies": ${AdditionalCookies}
+              "additionalCookies": ${AdditionalCookies},
+              "requiredGroup": "${UserPoolGroupName}"
             }
           - Mode: !If
               - SPAMode

@@ -460,10 +460,6 @@ export async function validateAndCheckIdToken(idToken: string, config: CompleteC
     let idTokenPayload = await validate(idToken, config.tokenJwksUri, config.tokenIssuer, config.clientId);
     config.logger.info('JWT is valid');
 
-    if (idTokenPayload == undefined) {
-      throw new Error('Token payload is undefined');
-    }
-
     // Check that the ID token has the required group.
     if (config.requiredGroup) {
         let cognitoGroups = idTokenPayload['cognito:groups'];

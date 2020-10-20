@@ -43,12 +43,8 @@ export async function validate(jwtToken: string, jwksUri: string, issuer: string
         ignoreExpiration: false,
     };
 
-    // The types in jsonwebtoken indicate that the type of `decoded` passed to the callback
-    // is `object | undefined`, however a type of object makes it hard to look up claims.
-    // decoded['something'] is not allowed by typescript
-    // The jsonwebtoken decode function returns a type of { [key: string]: any }
-    // so that is what is used here to make it more convenient
-    return new Promise<{ [key: string]: any } | undefined>((resolve, reject) => verify(
+    // JWT's from Cognito are JSON objects
+    return new Promise<{ [key: string]: any }>((resolve, reject) => verify(
         jwtToken,
         jwk,
         verificationOptions,

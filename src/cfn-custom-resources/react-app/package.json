@@ -6,8 +6,7 @@
     "@aws-amplify/auth": "^3.4.7",
     "@aws-amplify/core": "^3.7.0",
     "react": "^16.14.0",
-    "react-dom": "^16.14.0",
-    "react-scripts": "^3.4.3"
+    "react-dom": "^16.14.0"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -30,5 +29,7 @@
       "last 1 safari version"
     ]
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "react-scripts": "^3.4.3"
+  }
 }

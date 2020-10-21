@@ -548,8 +548,8 @@ Resources:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
       Runtime: nodejs12.x
-      Timeout: 180
-      MemorySize: 2048
+      Timeout: 300
+      MemorySize: 3008
       Policies:
         - Version: "2012-10-17"
           Statement:

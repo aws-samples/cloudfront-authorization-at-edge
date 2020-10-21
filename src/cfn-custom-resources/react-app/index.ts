@@ -29,12 +29,15 @@ interface Configuration {
 async function buildSpa(config: Configuration) {
 
     const temp_dir = '/tmp/spa';
+    const home_dir = '/tmp/home';
 
     console.log(`Copying SPA sources to ${temp_dir} and making dependencies available there ...`);
 
-    if (!existsSync(temp_dir)) {
-        mkdirSync(temp_dir);
-    }
+    [temp_dir, home_dir].forEach(dir => {
+        if (!existsSync(dir)) {
+            mkdirSync(dir);
+        }
+    });
 
     await Promise.all(['src', 'public', 'package.json'].map(async (path) => (
         new Promise((resolve, reject) => {
@@ -62,7 +65,7 @@ INLINE_RUNTIME_CHUNK=false
 `);
 
     console.log(`Running build of React app in ${temp_dir} ...`);
-    execSync('node node_modules/react-scripts/scripts/build.js', { cwd: temp_dir, stdio: 'inherit' });
+    execSync(`npx react-scripts build`, { cwd: temp_dir, stdio: 'inherit', env: { ...process.env, "HOME": home_dir } });
     console.log('Build succeeded');
 
     return `${temp_dir}/build`;

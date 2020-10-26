@@ -10,7 +10,7 @@ import {
 } from 'aws-lambda';
 import axios from 'axios';
 import s3SpaUpload from 's3-spa-upload';
-import { symlinkSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { ncp } from 'ncp';
 
 
@@ -39,14 +39,11 @@ async function buildSpa(config: Configuration) {
         }
     });
 
-    await Promise.all(['src', 'public', 'package.json'].map(async (path) => (
+    await Promise.all(['src', 'public', 'package.json', 'package-lock.json'].map(async (path) => (
         new Promise((resolve, reject) => {
             ncp(`${__dirname}/${path}`, `${temp_dir}/${path}`, err => err ? reject(err) : resolve());
         }))
     ));
-    if (!existsSync(`${temp_dir}/node_modules`)) {
-        symlinkSync(`${__dirname}/node_modules`, `${temp_dir}/node_modules`);
-    }
 
     const userPoolId = config.UserPoolArn.split('/')[1];
     const userPoolRegion = config.UserPoolArn.split(':')[3];
@@ -64,8 +61,10 @@ REACT_APP_USER_POOL_SCOPES=${config.OAuthScopes}
 INLINE_RUNTIME_CHUNK=false
 `);
 
+    console.log(`Installing dependencies to build React app in ${temp_dir} ...`);
+    execSync('npm ci', { cwd: temp_dir, stdio: 'inherit', env: { ...process.env, "HOME": home_dir } });
     console.log(`Running build of React app in ${temp_dir} ...`);
-    execSync(`npx react-scripts build`, { cwd: temp_dir, stdio: 'inherit', env: { ...process.env, "HOME": home_dir } });
+    execSync('npm run build', { cwd: temp_dir, stdio: 'inherit', env: { ...process.env, "HOME": home_dir } });
     console.log('Build succeeded');
 
     return `${temp_dir}/build`;

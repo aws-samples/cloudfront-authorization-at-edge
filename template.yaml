@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.2
+    SemanticVersion: 2.0.3
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:

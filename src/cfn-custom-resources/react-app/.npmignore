@@ -25,3 +25,6 @@ yarn-error.log*
 # React sources are plain JS (not TS)
 !*.js
 build
+
+# Include package lock
+!package-lock.json

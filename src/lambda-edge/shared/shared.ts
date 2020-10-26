@@ -308,7 +308,15 @@ export const generateCookieHeaders = {
 
 
 function _generateCookieHeaders(param: GenerateCookieHeadersParam & { event: 'newTokens' | 'signOut' | 'refreshFailed' }) {
-    // Set cookies with the exact names and values Amplify uses for seamless interoperability with Amplify
+    /*
+    Generate cookie headers for the following scenario's:
+      - new tokens: called from Parse Auth and Refresh Auth lambda, when receiving fresh JWT's from Cognito
+      - sign out: called from Sign Out Lambda, when the user visits the sign out URL
+      - refresh failed: called from Refresh Auth lambda when the refresh failed (e.g. because the refresh token has expired)
+
+    Note that there are other places besides this helper function where cookies can be set (search codebase for "set-cookie")
+    */
+
     const decodedIdToken = decodeToken(param.tokens.id_token);
     const tokenUserName = decodedIdToken['cognito:username'];
 

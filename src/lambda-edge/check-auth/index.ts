@@ -64,9 +64,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     } catch (err) {
         CONFIG.logger.info(`Will redirect to Cognito for sign-in because: ${err}`);
 
-        // Reuse existing state if possible, to be more lenient to users doing parallel sign-in's
-        // Users being users, may open the sign-in page in one browser tab, do something else,
-        // open the sign-in page in another tab, do something else, come back to the first tab and complete the sign-in (etc.)
+        // Generate new state which involves a signed nonce
+        // This way we can check later whether the sign-in redirect was done by us (it should, to prevent CSRF attacks)
         const nonce = generateNonce();
         const state = {
             nonce,
@@ -75,13 +74,14 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         }
         CONFIG.logger.debug('Using new state\n', state);
 
-        // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
-        // Cognito decodes the URL, causing a malformed link due to the JSON string, and results in an empty 400 response from Cognito.
         const loginQueryString = stringifyQueryString({
             redirect_uri: `https://${domainName}${CONFIG.redirectPathSignIn}`,
             response_type: 'code',
             client_id: CONFIG.clientId,
-            state: urlSafe.stringify(Buffer.from(JSON.stringify({ nonce: state.nonce, requestedUri })).toString('base64')),
+            state:
+                // Encode the state variable as base64 to avoid a bug in Cognito hosted UI when using multiple identity providers
+                // Cognito decodes the URL, causing a malformed link due to the JSON string, and results in an empty 400 response from Cognito. 
+                urlSafe.stringify(Buffer.from(JSON.stringify({ nonce: state.nonce, requestedUri })).toString('base64')),
             scope: CONFIG.oauthScopes.join(' '),
             code_challenge_method: 'S256',
             code_challenge: state.pkceHash,

@@ -153,6 +153,9 @@ If you do not want to deploy a SPA but rather a static site, then it is more sec
 - Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
 - Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
 
+## Deploying changes to the react-app or static-site
+To deploy changes to the [react-app](src/cfn-custom-resources/react-app) or [static-site](src/cfn-custom-resources/static-site) after successful iniital deployment, you'll need to upload your react-app or static-site changes directly to the S3 bucket (with a utility like [s3-spa-upload](https://www.npmjs.com/package/s3-spa-upload)).  Making changes to the code only and re-deploying with SAM will not pick up those code changes to be deployed to the S3 bucket.  See [Issue # 96](https://github.com/aws-samples/cloudfront-authorization-at-edge/issues/96) for an alternative to force your code changes to deploy.  
+
 ## Cookie compatibility
 
 The cookies that this solution sets, are compatible with AWS Amplify––which makes this solution work seamlessly with AWS Amplify.

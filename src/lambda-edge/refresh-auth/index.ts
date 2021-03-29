@@ -54,7 +54,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    if (CONFIG.clientSecret !== "") {
+    if (CONFIG.clientSecret) {
       const encodedSecret = Buffer.from(
         `${CONFIG.clientId}:${CONFIG.clientSecret}`
       ).toString("base64");

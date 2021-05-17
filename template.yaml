@@ -186,10 +186,7 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: CreateCloudFrontDistribution
     Properties:
-      AccessControl: PublicRead
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: 404.html
+      AccessControl: Private
 
   CheckAuthHandler:
     Type: AWS::Serverless::Function
@@ -263,7 +260,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref DefaultPermissionBoundaryPolicy, !Ref PermissionBoundaryPolicyArn]
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -436,8 +433,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      #Runtime: nodejs12.x
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -476,8 +471,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      #Runtime: nodejs12.x
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -507,8 +500,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      #Runtime: nodejs12.x
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -533,10 +524,8 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
-      #Runtime: nodejs12.x
       Timeout: 180
       MemorySize: 2048
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -581,10 +570,8 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
-      #Runtime: nodejs12.x
       Timeout: 300
       MemorySize: 3008
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -823,8 +810,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      #Runtime: nodejs12.x
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -849,10 +834,8 @@ Resources:
   RandomValueGenerator:
     Type: AWS::Serverless::Function
     Properties:
-      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       CodeUri: src/cfn-custom-resources/generate-secret/
       Handler: index.handler
-      #Runtime: nodejs12.x
 
 Outputs:
   S3Bucket:

@@ -34,7 +34,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/centrica-engineering/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.5-alpha18
+    SemanticVersion: 2.0.5-alpha19
     SourceCodeUrl: https://github.com/centrica-engineering/cloudfront-authorization-at-edge
 
 Parameters:

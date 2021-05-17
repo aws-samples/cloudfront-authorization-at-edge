@@ -6,7 +6,7 @@
 # sam build --use-container
 # aws-adfs login --profile="otp-prod"
 # sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket cloudfront-authorization-at-edge-centrica --profile "otp-prod"
-# sam publish --template packaged.yaml --region eu-west-2 --profile "otp-prod"
+# sam publish --template packaged.yaml --region us-east-1 --profile "otp-prod"
 
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
@@ -178,6 +178,8 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
+    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !GetAtt DefaultPermissionBoundaryPolicy.Arn, !Ref PermissionBoundaryPolicyArn]
+    Runtime: nodejs12.x
 
 Resources:
   S3Bucket:
@@ -434,8 +436,8 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      Runtime: nodejs12.x
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #Runtime: nodejs12.x
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -474,8 +476,8 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      Runtime: nodejs12.x
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #Runtime: nodejs12.x
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -505,8 +507,8 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      Runtime: nodejs12.x
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #Runtime: nodejs12.x
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -531,10 +533,10 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      #Runtime: nodejs12.x
       Timeout: 180
       MemorySize: 2048
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -579,10 +581,10 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      #Runtime: nodejs12.x
       Timeout: 300
       MemorySize: 3008
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -821,8 +823,8 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      Runtime: nodejs12.x
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #Runtime: nodejs12.x
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -847,10 +849,10 @@ Resources:
   RandomValueGenerator:
     Type: AWS::Serverless::Function
     Properties:
-      PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
+      #PermissionsBoundary: !Ref PermissionBoundaryPolicyArn
       CodeUri: src/cfn-custom-resources/generate-secret/
       Handler: index.handler
-      Runtime: nodejs12.x
+      #Runtime: nodejs12.x
 
 Outputs:
   S3Bucket:

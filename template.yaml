@@ -178,7 +178,7 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
-    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !GetAtt DefaultPermissionBoundaryPolicy.Arn, !Ref PermissionBoundaryPolicyArn]
+    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref DefaultPermissionBoundaryPolicy, !Ref PermissionBoundaryPolicyArn]
     Runtime: nodejs12.x
 
 Resources:

@@ -1,5 +1,12 @@
 # Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
+#
+# npm install
+# npm run build
+# sam build --use-container
+# aws-adfs login --profile="otp-prod"
+# sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket cloudfront-authorization-at-edge-centrica --profile "otp-prod"
+# sam publish --template packaged.yaml --region us-east-1 --profile "otp-prod"
 
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
@@ -7,7 +14,7 @@ Description: >
   Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge
 Metadata:
   AWS::ServerlessRepo::Application:
-    Name: cloudfront-authorization-at-edge
+    Name: cloudfront-authorization-at-edge-centrica
     Description: >
       Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge.
       Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWT's and handle OAuth2 redirects.
@@ -26,9 +33,9 @@ Metadata:
         "vue",
         "amplify",
       ]
-    HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.4
-    SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
+    HomePageUrl: https://github.com/centrica-engineering/cloudfront-authorization-at-edge
+    SemanticVersion: 2.0.5-alpha19
+    SourceCodeUrl: https://github.com/centrica-engineering/cloudfront-authorization-at-edge
 
 Parameters:
   EmailAddress:
@@ -136,8 +143,13 @@ Parameters:
       - "warn"
       - "error"
       - "debug"
+  PermissionBoundaryPolicyArn:
+    Description: ARN to a boundary policy if your organisation uses some for roles, optional. TODO find a way around not being able to pass dynamic values DefaultPermissionBoundaryPolicy.Arn
+    Type: String
+    Default: "true"
 
 Conditions:
+  CreateDefaultBoundaryPolicy: !Equals [!Ref PermissionBoundaryPolicyArn, "true"]
   CreateUser: !And
     - !Not [!Equals [!Ref EmailAddress, ""]]
     - !Equals [!Ref UserPoolArn, ""]
@@ -166,6 +178,8 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
+    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref DefaultPermissionBoundaryPolicy, !Ref PermissionBoundaryPolicyArn]
+    Runtime: nodejs12.x
 
 Resources:
   S3Bucket:
@@ -219,6 +233,18 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
+  DefaultPermissionBoundaryPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: CreateDefaultBoundaryPolicy
+    Properties:
+      Description: "non-restrictive default permission boundary, used only if no separate PermissionBoundaryPolicyArn is used"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: '*'
+            Resource: '*'
+      ManagedPolicyName: DefaultPermissionBoundaryPolicy
   LambdaEdgeExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -234,6 +260,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref DefaultPermissionBoundaryPolicy, !Ref PermissionBoundaryPolicyArn]
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -406,7 +433,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -445,7 +471,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -475,7 +500,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -500,7 +524,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
-      Runtime: nodejs12.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -547,7 +570,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
-      Runtime: nodejs12.x
       Timeout: 300
       MemorySize: 3008
       Policies:
@@ -788,7 +810,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      Runtime: nodejs12.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -815,7 +836,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
       Handler: index.handler
-      Runtime: nodejs12.x
 
 Outputs:
   S3Bucket:

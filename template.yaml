@@ -1,12 +1,5 @@
 # Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-#
-# npm install
-# npm run build
-# sam build --use-container
-# aws-adfs login --profile="otp-prod"
-# sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket cloudfront-authorization-at-edge-centrica --profile "otp-prod"
-# sam publish --template packaged.yaml --region us-east-1 --profile "otp-prod"
 
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31

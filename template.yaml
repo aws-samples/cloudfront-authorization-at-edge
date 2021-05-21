@@ -26,9 +26,9 @@ Metadata:
         "vue",
         "amplify",
       ]
-    HomePageUrl: https://github.com/centrica-engineering/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.5-alpha19
-    SourceCodeUrl: https://github.com/centrica-engineering/cloudfront-authorization-at-edge
+    HomePageUrl: https://github.com/aws-sample/cloudfront-authorization-at-edge
+    SemanticVersion: 2.0.4
+    SourceCodeUrl: https://github.com/aws-sample/cloudfront-authorization-at-edge
 
 Parameters:
   EmailAddress:
@@ -137,7 +137,7 @@ Parameters:
       - "error"
       - "debug"
   PermissionBoundaryPolicyArn:
-    Description: ARN to a boundary policy if your organisation uses some for roles, optional. TODO find a way around not being able to pass dynamic values DefaultPermissionBoundaryPolicy.Arn
+    Description: ARN of a boundary policy if your organisation uses some for roles, optional.
     Type: String
     Default: "true"
 

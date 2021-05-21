@@ -26,9 +26,9 @@ Metadata:
         "vue",
         "amplify",
       ]
-    HomePageUrl: https://github.com/aws-sample/cloudfront-authorization-at-edge
+    HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
     SemanticVersion: 2.0.4
-    SourceCodeUrl: https://github.com/aws-sample/cloudfront-authorization-at-edge
+    SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
   EmailAddress:

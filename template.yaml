@@ -162,6 +162,8 @@ Conditions:
   UpdateUserPoolClient: !Or
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
+  RegionIsUsEast1: !Equals [!Ref AWS::Region, "us-east-1"]
+  RegionIsNotUsEast1: !Not [!Equals [!Ref AWS::Region, "us-east-1"]]
 
 Globals:
   Function:
@@ -176,46 +178,51 @@ Resources:
 
   CheckAuthHandler:
     Type: AWS::Serverless::Function
+    Condition: RegionIsUsEast1
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
   ParseAuthHandler:
     Type: AWS::Serverless::Function
+    Condition: RegionIsUsEast1
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
   RefreshAuthHandler:
     Type: AWS::Serverless::Function
+    Condition: RegionIsUsEast1
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
   HttpHeadersHandler:
     Type: AWS::Serverless::Function
+    Condition: RegionIsUsEast1
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
   SignOutHandler:
     Type: AWS::Serverless::Function
+    Condition: RegionIsUsEast1
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -234,6 +241,28 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  UsEast1Deployment:
+    Type: Custom::UsEast1Deployment
+    Condition: RegionIsNotUsEast1
+    Properties:
+      ServiceToken: !GetAtt UsEast1DeploymentHandler.Arn
+      LambdaRoleArn: !GetAtt LambdaEdgeExecutionRole.Arn
+      Version: !Ref Version
+
+  UsEast1DeploymentHandler:
+    Type: AWS::Serverless::Function
+    Condition: RegionIsNotUsEast1
+    Properties:
+      CodeUri: src/cfn-custom-resources/us-east-1-lambda-stack
+      Handler: index.handler
+      Runtime: nodejs14.x
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: cloudformation:*
+              Resource: !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:*/${AWS::StackName}/*"
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -406,7 +435,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -445,7 +474,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -453,7 +482,7 @@ Resources:
               Action:
                 - cognito-idp:UpdateUserPoolClient
                 - cognito-idp:DescribeUserPoolClient
-              Resource: "*"  # * to be able to clean up after myself, if you change the User Pool Client ID
+              Resource: "*" # * to be able to clean up after myself, if you change the User Pool Client ID
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval
@@ -475,7 +504,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -500,7 +529,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -547,7 +576,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Timeout: 300
       MemorySize: 3008
       Policies:
@@ -788,7 +817,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -815,7 +844,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
 
 Outputs:
   S3Bucket:

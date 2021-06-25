@@ -11,12 +11,11 @@
 
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceResponse,
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import axios from "axios";
 import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
+import { sendCfnResponse, Status } from "./cfn-response";
 
 async function ensureCognitoUserPoolDomain(
   action: "Create" | "Update" | "Delete",
@@ -50,44 +49,31 @@ async function ensureCognitoUserPoolDomain(
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
   console.log(JSON.stringify(event, undefined, 4));
-  const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
-    ResourceProperties,
-    RequestType,
-  } = event;
+  const { ResourceProperties, RequestType } = event;
 
   const { PhysicalResourceId } = event as
     | CloudFormationCustomResourceDeleteEvent
     | CloudFormationCustomResourceUpdateEvent;
-
-  let response: CloudFormationCustomResourceResponse;
+  let status = Status.SUCCESS;
+  let physicalResourceId: string | undefined;
+  let data: { [key: string]: any } | undefined;
+  let reason: string | undefined;
   try {
-    const physicalResourceId = await ensureCognitoUserPoolDomain(
+    physicalResourceId = await ensureCognitoUserPoolDomain(
       RequestType,
       ResourceProperties.UserPoolArn,
       PhysicalResourceId
     );
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId: physicalResourceId,
-      Status: "SUCCESS",
-      RequestId,
-      StackId,
-    };
   } catch (err) {
     console.error(err);
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId:
-        PhysicalResourceId || `failed-to-create-${Date.now()}`,
-      Status: "FAILED",
-      Reason: err.stack || err.message,
-      RequestId,
-      StackId,
-    };
+    status = Status.FAILED;
+    reason = err;
   }
-  await axios.put(ResponseURL, response, { headers: { "content-type": "" } });
+  await sendCfnResponse({
+    event,
+    status,
+    data,
+    physicalResourceId,
+    reason,
+  });
 };

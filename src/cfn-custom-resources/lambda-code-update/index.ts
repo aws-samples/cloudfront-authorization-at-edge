@@ -3,15 +3,15 @@
 
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceResponse,
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import axios from "axios";
 import Lambda from "aws-sdk/clients/lambda";
 import Zip from "adm-zip";
 import { writeFileSync, mkdtempSync } from "fs";
 import { resolve } from "path";
+import { sendCfnResponse, Status } from "./cfn-response";
+import { fetch } from "./https";
 
 const LAMBDA_CLIENT = new Lambda({
   region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION,
@@ -36,9 +36,7 @@ async function updateLambdaCode(
   const { Code } = await LAMBDA_CLIENT.getFunction({
     FunctionName: lambdaFunction,
   }).promise();
-  const { data } = await axios.get(Code!.Location!, {
-    responseType: "arraybuffer",
-  });
+  const data = await fetch(Code!.Location!);
   const lambdaZip = new Zip(data);
   console.log(
     "Lambda zip contents:",
@@ -58,15 +56,12 @@ async function updateLambdaCode(
     newLambdaZip.getEntries().map((entry) => entry.name)
   );
 
-  const {
-    CodeSha256,
-    Version,
-    FunctionArn,
-  } = await LAMBDA_CLIENT.updateFunctionCode({
-    FunctionName: lambdaFunction,
-    ZipFile: newLambdaZip.toBuffer(),
-    Publish: true,
-  }).promise();
+  const { CodeSha256, Version, FunctionArn } =
+    await LAMBDA_CLIENT.updateFunctionCode({
+      FunctionName: lambdaFunction,
+      ZipFile: newLambdaZip.toBuffer(),
+      Publish: true,
+    }).promise();
   console.log({ CodeSha256, Version, FunctionArn });
   return {
     physicalResourceId: lambdaFunction,
@@ -75,14 +70,7 @@ async function updateLambdaCode(
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
-  const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
-    ResourceProperties,
-    RequestType,
-  } = event;
+  const { ResourceProperties, RequestType } = event;
 
   const { PhysicalResourceId } = event as
     | CloudFormationCustomResourceDeleteEvent
@@ -90,32 +78,27 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
   const { LambdaFunction, Configuration } = ResourceProperties;
 
-  let response: CloudFormationCustomResourceResponse;
+  let status = Status.SUCCESS;
+  let physicalResourceId: string | undefined;
+  let data: { [key: string]: any } | undefined;
+  let reason: string | undefined;
   try {
-    const { physicalResourceId, Data } = await updateLambdaCode(
+    ({ physicalResourceId, Data: data } = await updateLambdaCode(
       RequestType,
       LambdaFunction,
       Configuration,
       PhysicalResourceId
-    );
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId: physicalResourceId,
-      Status: "SUCCESS",
-      RequestId,
-      StackId,
-      Data,
-    };
+    ));
   } catch (err) {
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId:
-        PhysicalResourceId || `failed-to-create-${Date.now()}`,
-      Status: "FAILED",
-      Reason: err.stack || err.message,
-      RequestId,
-      StackId,
-    };
+    console.error(err);
+    status = Status.FAILED;
+    reason = err;
   }
-  await axios.put(ResponseURL, response, { headers: { "content-type": "" } });
+  await sendCfnResponse({
+    event,
+    status,
+    data,
+    physicalResourceId,
+    reason,
+  });
 };

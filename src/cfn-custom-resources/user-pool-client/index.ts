@@ -11,12 +11,11 @@
 
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceResponse,
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import axios from "axios";
 import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
+import { sendCfnResponse, Status } from "./cfn-response";
 
 const CUSTOM_RESOURCE_CURRENT_VERSION_NAME = "UpdatedUserPoolClientV2";
 const SENTINEL = "https://example.com/will-be-replaced";
@@ -75,17 +74,18 @@ async function updateUserPoolClient(
     AllowedOAuthScopes = [];
   }
 
-  const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest = {
-    AllowedOAuthFlows,
-    AllowedOAuthFlowsUserPoolClient,
-    AllowedOAuthScopes,
-    ClientId: props.UserPoolClientId,
-    UserPoolId: userPoolId,
-    CallbackURLs,
-    LogoutURLs,
-    SupportedIdentityProviders:
-      existingUserPoolClient.SupportedIdentityProviders, // Need to provide existing values otherwise they get cleared out :|
-  };
+  const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest =
+    {
+      AllowedOAuthFlows,
+      AllowedOAuthFlowsUserPoolClient,
+      AllowedOAuthScopes,
+      ClientId: props.UserPoolClientId,
+      UserPoolId: userPoolId,
+      CallbackURLs,
+      LogoutURLs,
+      SupportedIdentityProviders:
+        existingUserPoolClient.SupportedIdentityProviders, // Need to provide existing values otherwise they get cleared out :|
+    };
   console.debug("Updating User Pool Client", JSON.stringify(input, null, 4));
   await cognitoClient.updateUserPoolClient(input).promise();
 }
@@ -212,49 +212,35 @@ async function updateCognitoUserPoolClient(
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
   console.log(JSON.stringify(event, undefined, 4));
-  const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
-    ResourceProperties,
-    RequestType,
-  } = event;
+  const { ResourceProperties, RequestType } = event;
 
   const { PhysicalResourceId } = event as
     | CloudFormationCustomResourceDeleteEvent
     | CloudFormationCustomResourceUpdateEvent;
-  const {
-    OldResourceProperties,
-  } = event as CloudFormationCustomResourceUpdateEvent;
+  const { OldResourceProperties } =
+    event as CloudFormationCustomResourceUpdateEvent;
 
-  let response: CloudFormationCustomResourceResponse;
+  let status = Status.SUCCESS;
+  let physicalResourceId: string | undefined;
+  let data: { [key: string]: any } | undefined;
+  let reason: string | undefined;
   try {
-    const Data = await updateCognitoUserPoolClient(
+    data = await updateCognitoUserPoolClient(
       RequestType,
-      (ResourceProperties as unknown) as Props,
-      (OldResourceProperties as unknown) as Props,
+      ResourceProperties as unknown as Props,
+      OldResourceProperties as unknown as Props,
       PhysicalResourceId
     );
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId: CUSTOM_RESOURCE_CURRENT_VERSION_NAME,
-      Status: "SUCCESS",
-      RequestId,
-      StackId,
-      Data,
-    };
   } catch (err) {
     console.error(err);
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId:
-        PhysicalResourceId || `failed-to-create-${Date.now()}`,
-      Status: "FAILED",
-      Reason: err.stack || err.message,
-      RequestId,
-      StackId,
-    };
+    status = Status.FAILED;
+    reason = err;
   }
-  await axios.put(ResponseURL, response, { headers: { "content-type": "" } });
+  await sendCfnResponse({
+    event,
+    status,
+    data,
+    physicalResourceId,
+    reason,
+  });
 };

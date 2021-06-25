@@ -3,12 +3,9 @@
 
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceResponse,
-  CloudFormationCustomResourceDeleteEvent,
-  CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import axios from "axios";
 import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
+import { sendCfnResponse, Status } from "./cfn-response";
 
 async function retrieveClientSecret(
   action: "Create" | "Update" | "Delete",
@@ -39,47 +36,32 @@ async function retrieveClientSecret(
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
   console.log(JSON.stringify(event, undefined, 4));
   const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
     ResourceProperties,
     RequestType,
   } = event;
 
-  const { PhysicalResourceId } = event as
-    | CloudFormationCustomResourceDeleteEvent
-    | CloudFormationCustomResourceUpdateEvent;
-
   const { UserPoolArn, UserPoolClientId } = ResourceProperties;
 
-  let response: CloudFormationCustomResourceResponse;
+  let status = Status.SUCCESS;
+  let physicalResourceId: string | undefined;
+  let data: { [key: string]: any } | undefined;
+  let reason: string | undefined;
   try {
-    const { physicalResourceId, Data } = await retrieveClientSecret(
+    ({ physicalResourceId, Data: data } = await retrieveClientSecret(
       RequestType,
       UserPoolArn,
       UserPoolClientId
-    );
-    console.log(physicalResourceId);
-    console.log(Data);
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId: physicalResourceId!,
-      Status: "SUCCESS",
-      RequestId,
-      StackId,
-      Data,
-    };
+    ));
   } catch (err) {
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId:
-        PhysicalResourceId || `failed-to-create-${Date.now()}`,
-      Status: "FAILED",
-      Reason: err.stack || err.message,
-      RequestId,
-      StackId,
-    };
+    console.error(err);
+    status = Status.FAILED;
+    reason = err;
   }
-  await axios.put(ResponseURL, response, { headers: { "content-type": "" } });
+  await sendCfnResponse({
+    event,
+    status,
+    data,
+    physicalResourceId,
+    reason,
+  });
 };

@@ -1,5 +1,5 @@
 /*
-    Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+    Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
     SPDX-License-Identifier: MIT-0
 
     This is a CloudFormation custom resource. It's purpose is to:

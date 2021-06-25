@@ -107,6 +107,10 @@ async function ensureUsEast1LambdaStack(props: {
   requestType: "Create" | "Update" | "Delete";
   physicalResourceId: string | undefined;
 }) {
+  // This function will create/update a stack in us-east-1, with the Lambda@Edge functions
+  // (or clean up after itself upon deleting)
+
+  // If we're deleting, delete the us-east-1 stack, if it still exists
   if (props.requestType === "Delete") {
     const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
       StackName: props.stackName,
@@ -120,7 +124,13 @@ async function ensureUsEast1LambdaStack(props: {
       return;
     }
   }
+
+  // To be able to create the Lambda@Edge functions in us-east-1 we first need to create
+  // an S3 bucket there, to hold the code.
   const deploymentBucket = await ensureDeploymentUsEast1Stack(props);
+
+  // To get the Lambda@Edge configuration, we'll simply download the CloudFormation template for
+  // this, the current, stack, and use the configuration that is in there.
   console.log("Getting CFN template ...");
   const { TemplateBody: originalTemplate } = await CFN_CLIENT.getTemplate({
     StackName: props.stackId,
@@ -136,6 +146,9 @@ async function ensureUsEast1LambdaStack(props: {
   const templateForUsEast1 = JSON.parse(
     US_EAST_1_STACK_BASE_TEMPLATE
   ) as CfnTemplateWithLambdas;
+
+  // For each concerned lambda, extract it's configuration from the downloaded CloudFormation template
+  // and add it to the new template, for us-east-1 deployment
   await Promise.all(
     LAMBDA_NAMES.map((lambdaName) => {
       const lambdaProperty = Object.entries(props).find(
@@ -151,6 +164,7 @@ async function ensureUsEast1LambdaStack(props: {
           )}`
         );
       }
+      // Copy the Lambda code to us-east-1, and set that location in the new CloudFormation template
       return copyLambdaCodeToUsEast1({
         lambdaArn: lambdaProperty[1]!,
         toBucket: deploymentBucket,
@@ -179,7 +193,9 @@ async function ensureUsEast1LambdaStack(props: {
     "Constructed CloudFormation template for Lambda's:",
     JSON.stringify(templateForUsEast1, null, 2)
   );
-  return await ensureLambdaUsEast1Stack({
+
+  // Deploy the template with the Lambda@Edge functions to us-east-1
+  return ensureLambdaUsEast1Stack({
     ...props,
     newTemplate: JSON.stringify(templateForUsEast1),
   });
@@ -221,26 +237,21 @@ async function ensureLambdaUsEast1Stack(props: {
       ChangeSetName: changeSetArn,
     }).promise();
   if (status === "FAILED") {
+    // The only reason we'll allow a FAILED change set is if there were no changes
     if (!reason?.includes("didn't contain changes")) {
       throw new Error(`Failed to create change set: ${reason}`);
     } else {
+      // No changes to make to the Lambda@Edge functions, clean up the change set then
       await CFN_CLIENT_US_EAST_1.deleteChangeSet({
         ChangeSetName: changeSetArn,
       }).promise();
+
+      // Need to get the outputs (Lambda ARNs) from the existing stack then
       const { Stacks: existingStacks } =
         await CFN_CLIENT_US_EAST_1.describeStacks({
           StackName: props.stackName,
         }).promise();
-      const existingOutputs = LAMBDA_NAMES.reduce((acc, lambdaName) => {
-        const lambdaArn = existingStacks?.[0].Outputs?.find(
-          (output) => output.OutputKey === lambdaName
-        )?.OutputValue;
-        return { ...acc, [lambdaName]: lambdaArn };
-      }, {} as { [key: string]: string | undefined });
-      if (!Object.values(existingOutputs).every((lambdaArn) => !!lambdaArn))
-        throw new Error(
-          `Failed to locate (all) lambda arns in us-east-1 stack: ${existingOutputs}`
-        );
+      const existingOutputs = extractOutputsFromStackResponse(existingStacks);
       console.log(
         `us-east-1 stack unchanged. Stack outputs: ${JSON.stringify(
           existingOutputs,
@@ -252,6 +263,7 @@ async function ensureLambdaUsEast1Stack(props: {
     }
   }
 
+  // Execute change set and wait for completion
   console.log(
     "Executing change set for adding lambda functions to us-east-1 stack ..."
   );
@@ -267,16 +279,7 @@ async function ensureLambdaUsEast1Stack(props: {
       StackName: props.stackName,
     }
   ).promise();
-  const outputs = LAMBDA_NAMES.reduce((acc, lambdaName) => {
-    const lambdaArn = updatedStacks?.[0].Outputs?.find(
-      (output) => output.OutputKey === lambdaName
-    )?.OutputValue;
-    return { ...acc, [lambdaName]: lambdaArn };
-  }, {} as { [key: string]: string | undefined });
-  if (!Object.values(outputs).every((lambdaArn) => !!lambdaArn))
-    throw new Error(
-      `Failed to locate (all) lambda arns in us-east-1 stack: ${outputs}`
-    );
+  const outputs = extractOutputsFromStackResponse(updatedStacks);
   console.log(
     `us-east-1 stack succesfully updated. Stack outputs: ${JSON.stringify(
       outputs,
@@ -287,10 +290,29 @@ async function ensureLambdaUsEast1Stack(props: {
   return outputs as { [key: string]: string };
 }
 
+function extractOutputsFromStackResponse(stacks?: CloudFormation.Stack[]) {
+  // find the ARNs for all Lambda functions, which will be output from this custom resource
+
+  const outputs = LAMBDA_NAMES.reduce((acc, lambdaName) => {
+    const lambdaArn = stacks?.[0].Outputs?.find(
+      (output) => output.OutputKey === lambdaName
+    )?.OutputValue;
+    return { ...acc, [lambdaName]: lambdaArn };
+  }, {} as { [key: string]: string | undefined });
+  if (!Object.values(outputs).every((lambdaArn) => !!lambdaArn))
+    throw new Error(
+      `Failed to locate (all) lambda arns in us-east-1 stack: ${outputs}`
+    );
+  return outputs;
+}
+
 async function ensureDeploymentUsEast1Stack(props: {
   stackId: string;
   stackName: string;
 }) {
+  // Create a stack in us-east-1 with a deployment bucket
+  // (in a next step, Lambda fuctions will be added to this stack)
+
   console.log("Checking if us-east-1 stack already exists ...");
   const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
     StackName: props.stackName,
@@ -308,6 +330,8 @@ async function ensureDeploymentUsEast1Stack(props: {
     );
     return deploymentBucket;
   }
+
+  // Create the stack
   console.log("Creating change set for us-east-1 stack ...");
   const { Id: changeSetArn } = await CFN_CLIENT_US_EAST_1.createChangeSet({
     StackName: props.stackName,

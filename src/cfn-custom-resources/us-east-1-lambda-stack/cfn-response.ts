@@ -21,7 +21,7 @@ export async function sendCfnResponse(props: {
 }) {
   const response = {
     Status: props.status,
-    Reason: props.reason || "See CloudWatch logs",
+    Reason: props.reason?.toString() || "See CloudWatch logs",
     PhysicalResourceId: props.physicalResourceId || "no-explicit-id",
     StackId: props.event.StackId,
     RequestId: props.event.RequestId,
@@ -29,7 +29,7 @@ export async function sendCfnResponse(props: {
     Data: props.data || {},
   };
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const options = {
       method: "PUT",
       headers: { "content-type": "" },

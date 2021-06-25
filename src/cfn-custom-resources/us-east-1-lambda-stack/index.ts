@@ -12,13 +12,15 @@ import {
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import CloudFormation from "aws-sdk/clients/CloudFormation";
+import CloudFormation from "aws-sdk/clients/cloudformation";
 import S3 from "aws-sdk/clients/s3";
+import Lambda from "aws-sdk/clients/lambda";
 import { sendCfnResponse, Status } from "./cfn-response";
+import { fetch } from "./https";
 
 const CFN_CLIENT = new CloudFormation();
 const CFN_CLIENT_US_EAST_1 = new CloudFormation({ region: "us-east-1" });
-const S3_CLIENT = new S3();
+const LAMBDA_CLIENT = new Lambda();
 const S3_CLIENT_US_EAST_1 = new S3({ region: "us-east-1" });
 
 interface CfnTemplateBase {
@@ -31,10 +33,16 @@ interface CfnTemplateBase {
       };
     };
   };
-  Outputs?: {
+  Outputs: {
     [key: string]: {
       Value: {
-        Ref: string;
+        "Fn::GetAtt"?: string[];
+        Ref?: string;
+      };
+      Export?: {
+        Name: {
+          "Fn::Sub": string;
+        };
       };
     };
   };
@@ -89,17 +97,30 @@ const LAMBDA_NAMES = [
 async function ensureUsEast1LambdaStack(props: {
   stackId: string;
   stackName: string;
+  checkAuthHandlerArn: string;
+  parseAuthHandlerArn: string;
+  refreshAuthHandlerArn: string;
+  httpHeadersHandlerArn: string;
+  signOutHandlerArn: string;
   lambdaRoleArn: string;
   requestType: "Create" | "Update" | "Delete";
   physicalResourceId: string | undefined;
 }) {
   if (props.requestType === "Delete") {
-    await CFN_CLIENT_US_EAST_1.deleteStack({
+    const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
       StackName: props.stackName,
-    }).promise();
-    return;
+    })
+      .promise()
+      .catch(() => ({ Stacks: undefined }));
+    if (stacks?.length) {
+      await CFN_CLIENT_US_EAST_1.deleteStack({
+        StackName: props.stackName,
+      }).promise();
+      return;
+    }
   }
   const deploymentBucket = await ensureDeploymentUsEast1Stack(props);
+  console.log("Getting CFN template ...");
   const { TemplateBody: originalTemplate } = await CFN_CLIENT.getTemplate({
     StackName: props.stackId,
     TemplateStage: "Processed",
@@ -111,12 +132,26 @@ async function ensureUsEast1LambdaStack(props: {
   const parsedOriginalTemplate = JSON.parse(
     originalTemplate
   ) as CfnTemplateWithLambdas;
-  const templateForUsEast1 = JSON.parse(US_EAST_1_STACK_BASE_TEMPLATE);
+  const templateForUsEast1 = JSON.parse(
+    US_EAST_1_STACK_BASE_TEMPLATE
+  ) as CfnTemplateWithLambdas;
   await Promise.all(
     LAMBDA_NAMES.map((lambdaName) => {
-      copyLambdaCodeToUsEast1({
-        fromBucket:
-          parsedOriginalTemplate.Resources[lambdaName].Properties.Code.S3Bucket,
+      const lambdaProperty = Object.entries(props).find(
+        ([key, lambdaArn]) =>
+          key.toLowerCase().startsWith(lambdaName.toLowerCase()) && !!lambdaArn
+      );
+      if (!lambdaProperty) {
+        throw new Error(
+          `Couldn't locate ARN for lambda ${lambdaName} in input properties: ${JSON.stringify(
+            props,
+            null,
+            2
+          )}`
+        );
+      }
+      return copyLambdaCodeToUsEast1({
+        lambdaArn: lambdaProperty[1]!,
         toBucket: deploymentBucket,
         key: parsedOriginalTemplate.Resources[lambdaName].Properties.Code.S3Key,
       }).then(() => {
@@ -126,12 +161,26 @@ async function ensureUsEast1LambdaStack(props: {
         delete updatedLambdaResource.Condition;
         updatedLambdaResource.Properties.Role = props.lambdaRoleArn;
         templateForUsEast1.Resources[lambdaName] = updatedLambdaResource;
+        templateForUsEast1.Outputs[lambdaName] = {
+          Value: {
+            "Fn::GetAtt": [lambdaName, "Arn"],
+          },
+          Export: {
+            Name: {
+              "Fn::Sub": "${AWS::StackName}-" + lambdaName,
+            },
+          },
+        };
       });
     })
   );
+  console.log(
+    "Constructed CloudFormation template for Lambda's:",
+    JSON.stringify(templateForUsEast1, null, 2)
+  );
   return await ensureLambdaUsEast1Stack({
     ...props,
-    newTemplate: templateForUsEast1,
+    newTemplate: JSON.stringify(templateForUsEast1),
   });
 }
 
@@ -140,21 +189,77 @@ async function ensureLambdaUsEast1Stack(props: {
   stackName: string;
   newTemplate: string;
 }) {
+  console.log(
+    "Creating change set for adding lambda functions to us-east-1 stack ..."
+  );
   const { Id: changeSetArn } = await CFN_CLIENT_US_EAST_1.createChangeSet({
     StackName: props.stackName,
-    ChangeSetName: "CreateOrUpdateLambdaHandlers",
+    ChangeSetName: props.stackName,
     TemplateBody: props.newTemplate,
+    ChangeSetType: "UPDATE",
+    ResourceTypes: ["AWS::Lambda::Function"],
   }).promise();
   if (!changeSetArn)
     throw new Error(
       "Failed to create change set for lambda handlers deployment"
     );
+  console.log(
+    "Waiting for completion of change set for adding lambda functions to us-east-1 stack ..."
+  );
   await CFN_CLIENT_US_EAST_1.waitFor("changeSetCreateComplete", {
     ChangeSetName: changeSetArn,
-  }).promise();
+  })
+    .promise()
+    .catch((err) =>
+      console.log(
+        `Caught exception while waiting for change set create completion: ${err}`
+      )
+    );
+  const { Status: status, StatusReason: reason } =
+    await CFN_CLIENT_US_EAST_1.describeChangeSet({
+      ChangeSetName: changeSetArn,
+    }).promise();
+  if (status === "FAILED") {
+    if (!reason?.includes("didn't contain changes")) {
+      throw new Error(`Failed to create change set: ${reason}`);
+    } else {
+      await CFN_CLIENT_US_EAST_1.deleteChangeSet({
+        ChangeSetName: changeSetArn,
+      }).promise();
+      const { Stacks: existingStacks } =
+        await CFN_CLIENT_US_EAST_1.describeStacks({
+          StackName: props.stackName,
+        }).promise();
+      const existingOutputs = LAMBDA_NAMES.reduce((acc, lambdaName) => {
+        const lambdaArn = existingStacks?.[0].Outputs?.find(
+          (output) => output.OutputKey === lambdaName
+        )?.OutputValue;
+        return { ...acc, [lambdaName]: lambdaArn };
+      }, {} as { [key: string]: string | undefined });
+      if (!Object.values(existingOutputs).every((lambdaArn) => !!lambdaArn))
+        throw new Error(
+          `Failed to locate (all) lambda arns in us-east-1 stack: ${existingOutputs}`
+        );
+      console.log(
+        `us-east-1 stack unchanged. Stack outputs: ${JSON.stringify(
+          existingOutputs,
+          null,
+          2
+        )}`
+      );
+      return existingOutputs as { [key: string]: string };
+    }
+  }
+
+  console.log(
+    "Executing change set for adding lambda functions to us-east-1 stack ..."
+  );
   await CFN_CLIENT_US_EAST_1.executeChangeSet({
     ChangeSetName: changeSetArn,
   }).promise();
+  console.log(
+    "Waiting for completion of execute change set for adding lambda functions to us-east-1 stack ..."
+  );
   const { Stacks: updatedStacks } = await CFN_CLIENT_US_EAST_1.waitFor(
     "stackUpdateComplete",
     {
@@ -171,6 +276,13 @@ async function ensureLambdaUsEast1Stack(props: {
     throw new Error(
       `Failed to locate (all) lambda arns in us-east-1 stack: ${outputs}`
     );
+  console.log(
+    `us-east-1 stack succesfully updated. Stack outputs: ${JSON.stringify(
+      outputs,
+      null,
+      2
+    )}`
+  );
   return outputs as { [key: string]: string };
 }
 
@@ -178,30 +290,42 @@ async function ensureDeploymentUsEast1Stack(props: {
   stackId: string;
   stackName: string;
 }) {
+  console.log("Checking if us-east-1 stack already exists ...");
   const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
-    StackName: props.stackId,
-  }).promise();
+    StackName: props.stackName,
+  })
+    .promise()
+    .catch(() => ({ Stacks: undefined }));
   if (stacks?.length) {
     const deploymentBucket = stacks[0].Outputs?.find(
       (output) => output.OutputKey === "DeploymentBucket"
     )?.OutputValue;
     if (!deploymentBucket)
       throw new Error("Failed to locate deployment bucket in us-east-1 stack");
+    console.log(
+      `us-east-1 stack exists. Deployment bucket: ${deploymentBucket}`
+    );
     return deploymentBucket;
   }
+  console.log("Creating change set for us-east-1 stack ...");
   const { Id: changeSetArn } = await CFN_CLIENT_US_EAST_1.createChangeSet({
     StackName: props.stackName,
-    ChangeSetName: "CreateDeploymentBucket",
+    ChangeSetName: props.stackName,
     TemplateBody: US_EAST_1_STACK_BASE_TEMPLATE,
+    ChangeSetType: "CREATE",
+    ResourceTypes: ["AWS::S3::Bucket"],
   }).promise();
   if (!changeSetArn)
     throw new Error("Failed to create change set for bucket deployment");
+  console.log("Waiting for change set create complete for us-east-1 stack ...");
   await CFN_CLIENT_US_EAST_1.waitFor("changeSetCreateComplete", {
     ChangeSetName: changeSetArn,
   }).promise();
+  console.log("Executing change set for us-east-1 stack ...");
   await CFN_CLIENT_US_EAST_1.executeChangeSet({
     ChangeSetName: changeSetArn,
   }).promise();
+  console.log("Waiting for creation of us-east-1 stack ...");
   const { Stacks: createdStacks } = await CFN_CLIENT_US_EAST_1.waitFor(
     "stackCreateComplete",
     {
@@ -217,18 +341,22 @@ async function ensureDeploymentUsEast1Stack(props: {
 }
 
 async function copyLambdaCodeToUsEast1(props: {
-  fromBucket: string;
+  lambdaArn: string;
   toBucket: string;
   key: string;
 }) {
-  const { Body } = await S3_CLIENT.getObject({
-    Bucket: props.fromBucket,
-    Key: props.key,
+  console.log(`Copying Lambda code: ${JSON.stringify(props, null, 2)}`);
+  const { Code } = await LAMBDA_CLIENT.getFunction({
+    FunctionName: props.lambdaArn,
   }).promise();
+  console.log(
+    `Downloading lambda code for ${props.lambdaArn} from ${Code!.Location!}`
+  );
+  const data = await fetch(Code!.Location!);
   await S3_CLIENT_US_EAST_1.putObject({
     Bucket: props.toBucket,
     Key: props.key,
-    Body,
+    Body: data,
   }).promise();
   return props;
 }
@@ -240,7 +368,14 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
 
   const {
     PhysicalResourceId: physicalResourceId,
-    ResourceProperties: { LambdaRoleArn: lambdaRoleArn },
+    ResourceProperties: {
+      LambdaRoleArn: lambdaRoleArn,
+      CheckAuthHandlerArn: checkAuthHandlerArn,
+      ParseAuthHandlerArn: parseAuthHandlerArn,
+      RefreshAuthHandlerArn: refreshAuthHandlerArn,
+      HttpHeadersHandlerArn: httpHeadersHandlerArn,
+      SignOutHandlerArn: signOutHandlerArn,
+    },
   } = event as
     | CloudFormationCustomResourceDeleteEvent
     | CloudFormationCustomResourceUpdateEvent;
@@ -255,6 +390,11 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
       physicalResourceId,
       requestType,
       lambdaRoleArn,
+      checkAuthHandlerArn,
+      parseAuthHandlerArn,
+      refreshAuthHandlerArn,
+      httpHeadersHandlerArn,
+      signOutHandlerArn,
     });
   } catch (err) {
     console.error(err);

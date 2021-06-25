@@ -13,10 +13,6 @@ import { resolve } from "path";
 import { sendCfnResponse, Status } from "./cfn-response";
 import { fetch } from "./https";
 
-const LAMBDA_CLIENT = new Lambda({
-  region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION,
-});
-
 async function updateLambdaCode(
   action: "Create" | "Update" | "Delete",
   lambdaFunction: string,
@@ -30,12 +26,16 @@ async function updateLambdaCode(
   console.log(
     `Adding configuration to Lambda function ${lambdaFunction}:\n${stringifiedConfig}`
   );
+  const region = lambdaFunction.split(":")[3];
+  const lambdaClient = new Lambda({ region });
   // Parse the JSON to ensure it's validity (and avoid ugly errors at runtime)
   const config = JSON.parse(stringifiedConfig);
   // Fetch and extract Lambda zip contents to temporary folder, add configuration.json, and rezip
-  const { Code } = await LAMBDA_CLIENT.getFunction({
-    FunctionName: lambdaFunction,
-  }).promise();
+  const { Code } = await lambdaClient
+    .getFunction({
+      FunctionName: lambdaFunction,
+    })
+    .promise();
   const data = await fetch(Code!.Location!);
   const lambdaZip = new Zip(data);
   console.log(
@@ -56,12 +56,13 @@ async function updateLambdaCode(
     newLambdaZip.getEntries().map((entry) => entry.name)
   );
 
-  const { CodeSha256, Version, FunctionArn } =
-    await LAMBDA_CLIENT.updateFunctionCode({
+  const { CodeSha256, Version, FunctionArn } = await lambdaClient
+    .updateFunctionCode({
       FunctionName: lambdaFunction,
       ZipFile: newLambdaZip.toBuffer(),
       Publish: true,
-    }).promise();
+    })
+    .promise();
   console.log({ CodeSha256, Version, FunctionArn });
   return {
     physicalResourceId: lambdaFunction,

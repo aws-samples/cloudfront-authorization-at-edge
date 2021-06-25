@@ -41,7 +41,7 @@ async function buildSpa(config: Configuration) {
     ["src", "public", "package.json", "package-lock.json"].map(
       async (path) =>
         new Promise<void>((resolve, reject) => {
-          ncp(`${__dirname}/${path}`, `${temp_dir}/${path}`, (err) =>
+          ncp(`${__dirname}/react-app/${path}`, `${temp_dir}/${path}`, (err) =>
             err ? reject(err) : resolve()
           );
         })
@@ -109,10 +109,6 @@ export const handler: CloudFormationCustomResourceHandler = async (
   console.log(JSON.stringify(event, undefined, 4));
 
   const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
     ResourceProperties,
     RequestType,
   } = event;

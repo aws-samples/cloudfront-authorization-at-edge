@@ -66,7 +66,7 @@ The solution can be deployed with a few clicks from the [Serverless Application 
 
 NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please run this in "Linux Subsystem for Windows" or in Cygwin or something similar)
 
-1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge`
+1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge && cd cloudfront-authorization-at-edge`
 2. Install dependencies: `npm install`
 3. TypeScript compile and run Webpack: `npm run build`
 4. Run SAM build. `sam build`

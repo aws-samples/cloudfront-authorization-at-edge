@@ -10,7 +10,7 @@
     "analyze": "webpack --profile --json > stats.json && webpack-bundle-analyzer ./stats.json",
     "build": "npm run tsc && npm run webpack",
     "update-dependencies": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && rm -rf node_modules package-lock.json && npm update --dev); done; npm i",
-    "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --ignore-scripts); done",
+    "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --ignore-scripts); done",
     "audit-fix": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm audit fix); done"
   },
   "keywords": [],

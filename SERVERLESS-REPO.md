@@ -15,6 +15,6 @@ If you supply an email address, a user will be created that you can use to sign-
 
 To open the web app after successful deployment, navigate to the CloudFormation stack, in the "Outputs" tab, click on the output named: "WebsiteUrl".
 
-NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge must be deployed to us-east-1 as it is a global configuration. If you want to use a pre-existing User Pool in another region, that works too––provide the User Pool ARN through the corresponding parameter then. That User Pool must already be configured with a User Pool domain for the Cognito Hosted UI. Also provide a pre-existing User Pool Client ID in this case.
+NOTE: If you want to use a pre-existing User Pool, provide the User Pool ARN through the corresponding parameter then. That User Pool must already be configured with a User Pool domain for the Cognito Hosted UI. Also provide a pre-existing User Pool Client ID in this case.
 
 NOTE: The purpose of this sample application is to demonstrate how Lambda@Edge can be used to implement authorization, with Cognito as identity provider (IDP). Please treat the application as an _**illustration**_––thoroughly review it and adapt it to your needs, if you want to use it for serious things.

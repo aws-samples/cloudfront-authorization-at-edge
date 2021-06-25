@@ -10,7 +10,7 @@ The purpose of this sample code is to demonstrate how Lambda@Edge can be used to
 
 ### How to deploy
 
-The solution can be deployed to your AWS account with a few clicks, from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge). Note: deploy to us-east-1, as this is a requirement for Lambda@Edge (see [Deployment region](#deployment-region)).
+The solution can be deployed to your AWS account with a few clicks, from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge).
 
 More deployment options below: [Deploying the solution](#deploying-the-solution)
 
@@ -62,8 +62,6 @@ The solution can be deployed with a few clicks from the [Serverless Application 
 4. You need an existing S3 bucket to use for the SAM deployment. Create an empty bucket.
 5. Ensure your system includes a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please enable/install "Linux Subsystem for Windows" or Cygwin or something similar)
 
-NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge must be deployed to us-east-1 as it is a global configuration.
-
 #### Deployment
 
 NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please run this in "Linux Subsystem for Windows" or in Cygwin or something similar)
@@ -71,9 +69,9 @@ NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, z
 1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge`
 2. Install dependencies: `npm install`
 3. TypeScript compile and run Webpack: `npm run build`
-4. Run SAM build. Use a container to support binaries: `sam build --use-container`
-5. Run SAM package: `sam package --output-template-file packaged.yaml --s3-bucket <Your SAM bucket> --region us-east-1`
-6. Run SAM deploy: `sam deploy --template-file packaged.yaml --stack-name <Your Stack Name> --capabilities CAPABILITY_IAM --parameter-overrides EmailAddress=<your email> --region us-east-1`
+4. Run SAM build. `sam build`
+5. Run SAM package: `sam package --output-template-file packaged.yaml --s3-bucket <Your SAM bucket>`
+6. Run SAM deploy: `sam deploy --template-file packaged.yaml --stack-name <Your Stack Name> --capabilities CAPABILITY_IAM --parameter-overrides EmailAddress=<your email>`
 
 Providing an email address (as above in step 6) is optional. If you provide it, a user will be created in the Cognito User Pool that you can sign-in with.
 
@@ -131,12 +129,7 @@ If you are using a pre-existing User Pool, you will need to make a group that ha
 
 ## Deployment region
 
-This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).
-
-This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low:
-
-- You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)
-- For S3 latency might be less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway. This depends on the cache-control meta-data you set on your S3 objects. If you want to use an S3 bucket in another region, you'll have to create that yourself. In that case, go for the more barebone deployment, so you can do more yourself. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
+You can deploy this solution to any AWS region of your liking (that supports the services used). If you choose a region other than us-east-1, this solution will automaticaly create a second CloudFormation stack in us-east-1, for the Lambda@Edge functions. This is because Lambda@Edge must be deployed to us-east-1, this is a CloudFront requirement. Note though that this is a deployment concern only (which the solution handles automatically for you), Lambda@Edge will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally.
 
 ## SPA mode or Static Site mode?
 

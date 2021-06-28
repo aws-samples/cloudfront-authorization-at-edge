@@ -5,8 +5,8 @@ import { CloudFrontHeaders } from "aws-lambda";
 import { readFileSync } from "fs";
 import { createHmac } from "crypto";
 import { parse } from "cookie";
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
-import { Agent } from "https";
+import { fetch } from "./https";
+import { Agent, RequestOptions } from "https";
 import html from "./error-page/template.html";
 import { validate } from "./validate-jwt";
 
@@ -462,27 +462,42 @@ function expireCookie(cookie: string = "") {
   return ["", ...settings, expires].join("; ");
 }
 
-const AXIOS_INSTANCE = axios.create({
-  httpsAgent: new Agent({ keepAlive: true }),
-});
-
 export function decodeToken(jwt: string) {
   const tokenBody = jwt.split(".")[1];
   const decodableTokenBody = tokenBody.replace(/-/g, "+").replace(/_/g, "/");
   return JSON.parse(Buffer.from(decodableTokenBody, "base64").toString());
 }
 
-export async function httpPostWithRetry(
+const AGENT = new Agent({ keepAlive: true });
+
+export async function httpPostToCognitoWithRetry(
   url: string,
-  data: any,
-  config: AxiosRequestConfig,
+  data: Buffer,
+  options: RequestOptions,
   logger: Logger
-): Promise<AxiosResponse<any>> {
+) {
   let attempts = 0;
   while (true) {
     ++attempts;
     try {
-      return await AXIOS_INSTANCE.post(url, data, config);
+      return await fetch(url, data, {
+        agent: AGENT,
+        ...options,
+        method: "POST",
+      }).then((res) => {
+        if (res.status !== 200) {
+          throw new Error(`Status is ${res.status}, expected 200`);
+        }
+        if (!res.headers["content-type"]?.startsWith("application/json")) {
+          throw new Error(
+            `Content-Type is ${res.headers["content-type"]}, expected application/json`
+          );
+        }
+        return {
+          ...res,
+          data: JSON.parse(res.data.toString()),
+        };
+      });
     } catch (err) {
       logger.debug(`HTTP POST to ${url} failed (attempt ${attempts}):`);
       logger.debug((err.response && err.response.data) || err);

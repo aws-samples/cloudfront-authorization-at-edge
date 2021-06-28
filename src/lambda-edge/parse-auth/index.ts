@@ -10,7 +10,7 @@ import {
   getCompleteConfig,
   extractAndParseCookies,
   generateCookieHeaders,
-  httpPostWithRetry,
+  httpPostToCognitoWithRetry,
   createErrorHtml,
   urlSafe,
   sign,
@@ -54,7 +54,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       code_verifier: pkce,
     });
 
-    const requestConfig: Parameters<typeof httpPostWithRetry>[2] = {
+    const requestConfig: Parameters<typeof httpPostToCognitoWithRetry>[2] = {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
@@ -63,16 +63,20 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       const encodedSecret = Buffer.from(
         `${CONFIG.clientId}:${CONFIG.clientSecret}`
       ).toString("base64");
-      requestConfig.headers.Authorization = `Basic ${encodedSecret}`;
+      requestConfig.headers!.Authorization = `Basic ${encodedSecret}`;
     }
     CONFIG.logger.debug("HTTP POST to Cognito token endpoint:\n", {
       uri: cognitoTokenEndpoint,
       body,
       requestConfig,
     });
-    const { status, headers, data: tokens } = await httpPostWithRetry(
+    const {
+      status,
+      headers,
+      data: tokens,
+    } = await httpPostToCognitoWithRetry(
       cognitoTokenEndpoint,
-      body,
+      Buffer.from(body),
       requestConfig,
       CONFIG.logger
     ).catch((err) => {

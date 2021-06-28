@@ -1,9 +1,7 @@
 // Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import {
-  CloudFormationCustomResourceHandler,
-} from "aws-lambda";
+import { CloudFormationCustomResourceHandler } from "aws-lambda";
 import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
 import { sendCfnResponse, Status } from "./cfn-response";
 
@@ -22,10 +20,11 @@ async function retrieveClientSecret(
   const cognitoClient = new CognitoIdentityServiceProvider({
     region: userPoolRegion,
   });
-  const input: CognitoIdentityServiceProvider.Types.DescribeUserPoolClientRequest = {
-    UserPoolId: userPoolId,
-    ClientId: clientId,
-  };
+  const input: CognitoIdentityServiceProvider.Types.DescribeUserPoolClientRequest =
+    {
+      UserPoolId: userPoolId,
+      ClientId: clientId,
+    };
   const res = await cognitoClient.describeUserPoolClient(input).promise();
   return {
     physicalResourceId: `${userPoolId}-${clientId}-retrieved-client-secret`,
@@ -35,10 +34,7 @@ async function retrieveClientSecret(
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
   console.log(JSON.stringify(event, undefined, 4));
-  const {
-    ResourceProperties,
-    RequestType,
-  } = event;
+  const { ResourceProperties, RequestType } = event;
 
   const { UserPoolArn, UserPoolClientId } = ResourceProperties;
 

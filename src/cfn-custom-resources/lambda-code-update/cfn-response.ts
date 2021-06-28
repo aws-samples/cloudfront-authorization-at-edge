@@ -32,7 +32,7 @@ export async function sendCfnResponse(props: {
     Data: props.data || {},
   };
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const options = {
       method: "PUT",
       headers: { "content-type": "" },

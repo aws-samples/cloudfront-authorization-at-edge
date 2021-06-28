@@ -108,10 +108,7 @@ export const handler: CloudFormationCustomResourceHandler = async (
 ) => {
   console.log(JSON.stringify(event, undefined, 4));
 
-  const {
-    ResourceProperties,
-    RequestType,
-  } = event;
+  const { ResourceProperties, RequestType } = event;
 
   const { ServiceToken, ...config } = ResourceProperties;
 

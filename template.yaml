@@ -139,10 +139,10 @@ Parameters:
   PermissionBoundaryPolicyArn:
     Description: ARN of a boundary policy if your organisation uses some for roles, optional.
     Type: String
-    Default: "true"
+    Default: ""
 
 Conditions:
-  CreateDefaultBoundaryPolicy: !Equals [!Ref PermissionBoundaryPolicyArn, "true"]
+  CreateDefaultBoundaryPolicy: !Equals [!Ref PermissionBoundaryPolicyArn, ""]
   CreateUser: !And
     - !Not [!Equals [!Ref EmailAddress, ""]]
     - !Equals [!Ref UserPoolArn, ""]
@@ -171,8 +171,8 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
-    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref DefaultPermissionBoundaryPolicy, !Ref PermissionBoundaryPolicyArn]
-    Runtime: nodejs12.x
+    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref AWS::NoValue, !Ref PermissionBoundaryPolicyArn]
+    Runtime: nodejs14.x
 
 Resources:
   S3Bucket:
@@ -186,7 +186,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -195,7 +195,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -204,7 +204,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -213,7 +213,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -222,22 +222,10 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
-  DefaultPermissionBoundaryPolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Condition: CreateDefaultBoundaryPolicy
-    Properties:
-      Description: "non-restrictive default permission boundary, used only if no separate PermissionBoundaryPolicyArn is used"
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action: '*'
-            Resource: '*'
-      ManagedPolicyName: DefaultPermissionBoundaryPolicy
   LambdaEdgeExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -253,7 +241,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref DefaultPermissionBoundaryPolicy, !Ref PermissionBoundaryPolicyArn]
+      PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref AWS::NoValue, !Ref PermissionBoundaryPolicyArn]
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution

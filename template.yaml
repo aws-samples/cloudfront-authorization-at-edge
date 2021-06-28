@@ -279,6 +279,7 @@ Resources:
               Resource: !Ref AWS::StackId
             - Effect: Allow
               Action:
+                - s3:GetObject
                 - s3:PutObject
                 - s3:CreateBucket
                 - s3:DeleteBucket
@@ -293,6 +294,7 @@ Resources:
                 - !GetAtt SignOutHandler.Arn
             - Effect: Allow
               Action:
+                - lambda:GetFunction
                 - lambda:CreateFunction
                 - lambda:DeleteFunction
                 - lambda:UpdateFunctionCode

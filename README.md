@@ -10,13 +10,19 @@ The purpose of this sample code is to demonstrate how Lambda@Edge can be used to
 
 ### How to deploy
 
-The solution can be deployed to your AWS account with a few clicks, from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge). Note: deploy to us-east-1, as this is a requirement for Lambda@Edge (see [Deployment region](#deployment-region)).
+The solution can be deployed to your AWS account with a few clicks, from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge).
 
 More deployment options below: [Deploying the solution](#deploying-the-solution)
 
 ### Alternative: use HTTP headers
 
 This repo is the "sibling" of another repo here on aws-samples ([authorization-lambda-at-edge](https://github.com/aws-samples/authorization-lambda-at-edge)). The difference is that the solution in that repo uses http headers (not cookies) to transfer JWT's. While also a valid approach, the downside of it is that your Web App (SPA) needs to be altered to pass these headers, as browsers do not send these along automatically (which they do for cookies).
+
+### Alternative: build an Auth@Edge solution yourself, using NPM library [cognito-at-edge](https://github.com/awslabs/cognito-at-edge)
+
+The repo here contains a complete Auth@Edge solution, i.e. predefined Lambda@Edge code, combined with a CloudFormation template and various CloudFormation custom resources that enable one-click deployment. This CloudFormation template has various parameters, to support multiple use cases (e.g. bring your own User Pool or CloudFront distribution).
+
+You may want to have full control and implement an Auth@Edge solution yourself. In that case, the NPM library [cognito-at-edge](https://github.com/awslabs/cognito-at-edge), may be of use to you. It implements the same functionalities as the solution here, but wrapped conveniently in an NPM package, that you can easily include in your Lambda@Edge functions.
 
 ## Repo contents
 
@@ -32,18 +38,20 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
+- [us-east-1-lambda-stack](src/cfn-custom-resources/us-east-1-lambda-stack): Lambda function that implements a CloudFormation custom resource that makes sure the Lambda@Edge functions are deployed to us-east-1 (which is a CloudFront requirement, see below.)
 - [react-app](src/cfn-custom-resources/react-app): A sample React app that is protected by the solution. It uses AWS Amplify Framework to read the JWT's from cookies. The directory also contains a Lambda function that implements a CloudFormation custom resource to build the React app and upload it to S3
 - [static-site](src/cfn-custom-resources/static-site): A sample static site (see [SPA mode or Static Site mode?](#spa-mode-or-static-site-mode)) that is protected by the solution. The directory also contains a Lambda function that implements a CloudFormation custom resource to upload the static site to S3
 - [user-pool-client](src/cfn-custom-resources/user-pool-client): Lambda function that implements a CloudFormation custom resource to update the User Pool client with OAuth config
 - [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to lookup the User Pool's domain, at which the Hosted UI is available
 - [lambda-code-update](src/cfn-custom-resources/lambda-code-update): Lambda function that implements a CloudFormation custom resource to inject configuration into the lambda@Edge functions and publish versions
+- [generate-secret](src/cfn-custom-resources/generate-secret): Lambda function that implements a CloudFormation custom resource that generates a unique secret upon deploying
 - [shared](src/lambda-edge/shared): Utility functions used by several Lambda@Edge functions
 
 Other files and directories:
 
-- [./example-serverless-app-reuse](./example-serverless-app-reuse): Contains an example SAM template that shows how to reuse this application from the Serverless Application Repository in your own SAM templates.
+- [./example-serverless-app-reuse](./example-serverless-app-reuse): Contains example SAM templates and CDK code that shows how to reuse this application your own SAM or CDK templates.
 - [./template.yaml](./template.yaml): The SAM template that comprises the solution
-- [./webpack.config.js](./webpack.config.js): Webpack config for the Lambda@Edge functions and for the React-app custom resource
+- [./webpack.config.js](./webpack.config.js): Webpack config for the Lambda@Edge functions
 - [./tsconfig.json](./tsconfig.json): TypeScript configuration for this project
 
 ## Deploying the solution
@@ -52,7 +60,11 @@ Other files and directories:
 
 The solution can be deployed with a few clicks from the [Serverless Application Repository](https://console.aws.amazon.com/lambda/home#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge).
 
-### Option 2: Deploy with SAM CLI
+### Option 2: Deploy by including the Serverless Application in your own CloudFormation template or CDK code
+
+See [./example-serverless-app-reuse](./example-serverless-app-reuse)
+
+### Option 3: Deploy with SAM CLI
 
 #### Pre-requisites
 
@@ -62,33 +74,28 @@ The solution can be deployed with a few clicks from the [Serverless Application 
 4. You need an existing S3 bucket to use for the SAM deployment. Create an empty bucket.
 5. Ensure your system includes a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please enable/install "Linux Subsystem for Windows" or Cygwin or something similar)
 
-NOTE: Deploy this application to region us-east-1. This is because Lambda@Edge must be deployed to us-east-1 as it is a global configuration.
-
 #### Deployment
 
 NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, zsh, etc. (i.e. Windows users: please run this in "Linux Subsystem for Windows" or in Cygwin or something similar)
 
-1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge`
+1. Clone this repo `git clone https://github.com/aws-samples/cloudfront-authorization-at-edge && cd cloudfront-authorization-at-edge`
 2. Install dependencies: `npm install`
 3. TypeScript compile and run Webpack: `npm run build`
-4. Run SAM build. Use a container to support binaries: `sam build --use-container`
-5. Run SAM package: `sam package --output-template-file packaged.yaml --s3-bucket <Your SAM bucket> --region us-east-1`
-6. Run SAM deploy: `sam deploy --template-file packaged.yaml --stack-name <Your Stack Name> --capabilities CAPABILITY_IAM --parameter-overrides EmailAddress=<your email> --region us-east-1`
+4. Run SAM build. `sam build`
+5. Run SAM package: `sam package --output-template-file packaged.yaml --s3-bucket <Your SAM bucket>`
+6. Run SAM deploy: `sam deploy --template-file packaged.yaml --stack-name <Your Stack Name> --capabilities CAPABILITY_IAM --parameter-overrides EmailAddress=<your email>`
 
 Providing an email address (as above in step 6) is optional. If you provide it, a user will be created in the Cognito User Pool that you can sign-in with.
 
-### Option 3: Deploy by including the Serverless Application in your own CloudFormation template
-
-See [./example-serverless-app-reuse](./example-serverless-app-reuse)
-
 ### Option 4: Deploy as is, then test a custom application
-You may want to see how your existing application works with the authentication framework before investing the effort to integrate or automate.  One approach involves creating a full deploy from one of the deploy options above, then dropping your application into the bucket that's created.  There are a few points to be aware of:
 
-- If you want your application to load by default instead of the sample REACT single page app (SPA), you'll need to rename the sample REACT's `index.html` and ensure your SPA entry page is named `index.html`.  The renamed sample REACT's page will still work when specifically addressed in a URL.
+You may want to see how your existing application works with the authentication framework before investing the effort to integrate or automate. One approach involves creating a full deploy from one of the deploy options above, then dropping your application into the bucket that's created. There are a few points to be aware of:
+
+- If you want your application to load by default instead of the sample REACT single page app (SPA), you'll need to rename the sample REACT's `index.html` and ensure your SPA entry page is named `index.html`. The renamed sample REACT's page will still work when specifically addressed in a URL.
 - It's also fine to let your SPA have its own page name, but you'll need to remember to test with its actual URL, e.g. if you drop your SPA entry page into the bucket as `myapp.html` your test URL will look like `https://SOMECLOUDFRONTURLSTRING.cloudfront.net/myapp.html`
-- Make sure none of your SPA filenames collide with the REACT app.  Alternately just remove the REACT app first -- but sometimes it's nice to keep it in place to validate that authentication is generally working.
+- Make sure none of your SPA filenames collide with the REACT app. Alternately just remove the REACT app first -- but sometimes it's nice to keep it in place to validate that authentication is generally working.
 
-You may find that your application does not render properly -- the default Content Security Policy (CSP) in the CloudFormation parameter may be the issue.  As a quick test you can either remove the `"Content-Security-Policy":"..."` parameter from the CloudFormation's HttpHeaders parameter, or substitute your own. Leave the other headers in the parameter alone unless you have a good reason. 
+You may find that your application does not render properly -- the default Content Security Policy (CSP) in the CloudFormation parameter may be the issue. As a quick test you can either remove the `"Content-Security-Policy":"..."` parameter from the CloudFormation's HttpHeaders parameter, or substitute your own. Leave the other headers in the parameter alone unless you have a good reason.
 
 ## I already have a CloudFront distribution, I just want to add auth
 
@@ -131,12 +138,7 @@ If you are using a pre-existing User Pool, you will need to make a group that ha
 
 ## Deployment region
 
-This solution contains CloudFront and Lambda@Edge resources that must be deployed to us-east-1 (but will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally).
-
-This solution also contains an Amazon Cognito User Pool and S3 bucket, that should ideally be deployed in a region close to your users, to keep latency low:
-
-- You can use a pre-existing Cognito User Pool (e.g. from another region): [I already have a Cognito User Pool, I want to reuse that one](#i-already-have-a-cognito-user-pool-i-want-to-reuse-that-one)
-- For S3 latency might be less of a concern than for Cognito, as your content on S3 will probably be cached at CloudFront edge locations anyway. This depends on the cache-control meta-data you set on your S3 objects. If you want to use an S3 bucket in another region, you'll have to create that yourself. In that case, go for the more barebone deployment, so you can do more yourself. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
+You can deploy this solution to any AWS region of your liking (that supports the services used). If you choose a region other than us-east-1, this solution will automaticaly create a second CloudFormation stack in us-east-1, for the Lambda@Edge functions. This is because Lambda@Edge must be deployed to us-east-1, this is a CloudFront requirement. Note though that this is a deployment concern only (which the solution handles automatically for you), Lambda@Edge will run in all [Points of Presence](https://aws.amazon.com/cloudfront/features/#Amazon_CloudFront_Infrastructure) globally.
 
 ## SPA mode or Static Site mode?
 
@@ -154,13 +156,14 @@ If you do not want to deploy a SPA but rather a static site, then it is more sec
 - Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
 
 ## Deploying changes to the react-app or static-site
-To deploy changes to the [react-app](src/cfn-custom-resources/react-app) or [static-site](src/cfn-custom-resources/static-site) after successful inital deployment, you'll need to upload your react-app or static-site changes directly to the S3 bucket (with a utility like [s3-spa-upload](https://www.npmjs.com/package/s3-spa-upload)).  Making changes to the code only and re-deploying with SAM will not pick up those code changes to be deployed to the S3 bucket.  See [Issue # 96](https://github.com/aws-samples/cloudfront-authorization-at-edge/issues/96) for an alternative to force your code changes to deploy.  
+
+To deploy changes to the [react-app](src/cfn-custom-resources/react-app) or [static-site](src/cfn-custom-resources/static-site) after successful inital deployment, you'll need to upload your react-app or static-site changes directly to the S3 bucket (with a utility like [s3-spa-upload](https://www.npmjs.com/package/s3-spa-upload)). Making changes to the code only and re-deploying with SAM will not pick up those code changes to be deployed to the S3 bucket. See [Issue # 96](https://github.com/aws-samples/cloudfront-authorization-at-edge/issues/96) for an alternative to force your code changes to deploy.
 
 ## Cookie compatibility
 
 The cookies that this solution sets, are compatible with AWS Amplify––which makes this solution work seamlessly with AWS Amplify.
 
-*Niche use case:*
+_Niche use case:_
 If you want to use this solution as an Auth@Edge layer in front of AWS Elasticsearch Service with Cognito integration, you need cookies to be compatible with the cookie-naming scheme of that service. In that case, upon deploying, set parameter CookieCompatibilty to "elasticsearch".
 
 If choosing compatibility with AWS Elasticsearch with Cognito integration:

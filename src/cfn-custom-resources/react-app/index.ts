@@ -1,17 +1,16 @@
-// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
 import { execSync } from "child_process";
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceResponse,
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import axios from "axios";
 import s3SpaUpload from "s3-spa-upload";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { ncp } from "ncp";
+import { sendCfnResponse, Status } from "./cfn-response";
 
 interface Configuration {
   BucketName: string;
@@ -41,8 +40,8 @@ async function buildSpa(config: Configuration) {
   await Promise.all(
     ["src", "public", "package.json", "package-lock.json"].map(
       async (path) =>
-        new Promise((resolve, reject) => {
-          ncp(`${__dirname}/${path}`, `${temp_dir}/${path}`, (err) =>
+        new Promise<void>((resolve, reject) => {
+          ncp(`${__dirname}/react-app/${path}`, `${temp_dir}/${path}`, (err) =>
             err ? reject(err) : resolve()
           );
         })
@@ -109,14 +108,7 @@ export const handler: CloudFormationCustomResourceHandler = async (
 ) => {
   console.log(JSON.stringify(event, undefined, 4));
 
-  const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
-    ResourceProperties,
-    RequestType,
-  } = event;
+  const { ResourceProperties, RequestType } = event;
 
   const { ServiceToken, ...config } = ResourceProperties;
 
@@ -124,36 +116,30 @@ export const handler: CloudFormationCustomResourceHandler = async (
     | CloudFormationCustomResourceDeleteEvent
     | CloudFormationCustomResourceUpdateEvent;
 
-  let response: CloudFormationCustomResourceResponse;
+  let status = Status.SUCCESS;
+  let physicalResourceId: string | undefined;
+  let data: { [key: string]: any } | undefined;
+  let reason: string | undefined;
   try {
-    const physicalResourceId = await Promise.race([
+    physicalResourceId = await Promise.race([
       buildUploadSpa(RequestType, config as Configuration, PhysicalResourceId),
-      new Promise((_, reject) =>
+      new Promise<undefined>((_, reject) =>
         setTimeout(
           () => reject(new Error("Task timeout")),
           context.getRemainingTimeInMillis() - 500
         )
       ),
     ]);
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId: physicalResourceId as string,
-      Status: "SUCCESS",
-      RequestId,
-      StackId,
-      Data: {},
-    };
   } catch (err) {
     console.error(err);
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId:
-        PhysicalResourceId || `failed-to-create-${Date.now()}`,
-      Status: "FAILED",
-      Reason: err.stack || err.message,
-      RequestId,
-      StackId,
-    };
+    status = Status.FAILED;
+    reason = err;
   }
-  await axios.put(ResponseURL, response, { headers: { "content-type": "" } });
+  await sendCfnResponse({
+    event,
+    status,
+    data,
+    physicalResourceId,
+    reason,
+  });
 };

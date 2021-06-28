@@ -74,14 +74,14 @@ interface CfnLambdaResource {
 
 const US_EAST_1_STACK_BASE_TEMPLATE = JSON.stringify({
   Resources: {
-    DeploymentBucket: {
+    AuthEdgeDeploymentBucket: {
       Type: "AWS::S3::Bucket",
     },
   },
   Outputs: {
     DeploymentBucket: {
       Value: {
-        Ref: "DeploymentBucket",
+        Ref: "AuthEdgeDeploymentBucket",
       },
     },
   },

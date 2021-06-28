@@ -112,17 +112,22 @@ async function ensureUsEast1LambdaStack(props: {
 
   // If we're deleting, delete the us-east-1 stack, if it still exists
   if (props.requestType === "Delete") {
+    console.log("Getting status of us-east-1 stack ...");
     const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
       StackName: props.stackName,
     })
       .promise()
       .catch(() => ({ Stacks: undefined }));
     if (stacks?.length) {
+      console.log("Deleting us-east-1 stack ...");
       await CFN_CLIENT_US_EAST_1.deleteStack({
         StackName: props.stackName,
       }).promise();
-      return;
+      console.log("us-east-1 stack deleted");
+    } else {
+      console.log("us-east-1 stack already deleted");
     }
+    return;
   }
 
   // To be able to create the Lambda@Edge functions in us-east-1 we first need to create

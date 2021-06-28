@@ -3,5 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "dependencies": {
+    "s3-spa-upload": "^1.1.6"
+  }
 }

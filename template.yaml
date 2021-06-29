@@ -258,7 +258,6 @@ Resources:
       CodeUri: src/cfn-custom-resources/us-east-1-lambda-stack
       Handler: index.handler
       Timeout: 900
-      PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionBoundaryPolicyArn, !Ref AWS::NoValue]
       Policies:
         - Version: "2012-10-17"
           Statement:

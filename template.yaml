@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.4
+    SemanticVersion: 2.0.6
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -142,7 +142,7 @@ Parameters:
     Default: ""
 
 Conditions:
-  CreateDefaultBoundaryPolicy: !Equals [!Ref PermissionBoundaryPolicyArn, ""]
+  ApplyPermissionsBoundary: !Not !Equals [!Ref PermissionBoundaryPolicyArn, ""]
   CreateUser: !And
     - !Not [!Equals [!Ref EmailAddress, ""]]
     - !Equals [!Ref UserPoolArn, ""]
@@ -171,7 +171,7 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
-    PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref AWS::NoValue, !Ref PermissionBoundaryPolicyArn]
+    PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionBoundaryPolicyArn, !Ref AWS::NoValue]
     Runtime: nodejs14.x
 
 Resources:
@@ -186,7 +186,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -195,7 +194,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -204,7 +202,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -213,7 +210,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -222,7 +218,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -241,7 +236,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      PermissionsBoundary: !If [CreateDefaultBoundaryPolicy, !Ref AWS::NoValue, !Ref PermissionBoundaryPolicyArn]
+      PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionBoundaryPolicyArn, !Ref AWS::NoValue]
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution

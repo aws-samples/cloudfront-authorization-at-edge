@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.6
+    SemanticVersion: 2.0.7
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -136,8 +136,13 @@ Parameters:
       - "warn"
       - "error"
       - "debug"
+  PermissionsBoundaryPolicyArn:
+    Description: ARN of a boundary policy if your organisation uses some for roles, optional.
+    Type: String
+    Default: ""
 
 Conditions:
+  ApplyPermissionsBoundary: !Not [!Equals [!Ref PermissionsBoundaryPolicyArn, ""]]
   CreateUser: !And
     - !Not [!Equals [!Ref EmailAddress, ""]]
     - !Equals [!Ref UserPoolArn, ""]
@@ -167,6 +172,8 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
+    PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionsBoundaryPolicyArn, !Ref AWS::NoValue]
+    Runtime: nodejs14.x
 
 Resources:
   S3Bucket:
@@ -180,7 +187,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -189,7 +195,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -198,7 +203,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -207,7 +211,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -216,7 +219,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs14.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -235,6 +237,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionsBoundaryPolicyArn, !Ref AWS::NoValue]
 
   UsEast1Deployment:
     Type: Custom::UsEast1LambdaEdgeDeployment
@@ -255,7 +258,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/us-east-1-lambda-stack
       Handler: index.handler
-      Runtime: nodejs14.x
       Timeout: 900
       Policies:
         - Version: "2012-10-17"
@@ -480,7 +482,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -519,7 +520,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -549,7 +549,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -574,7 +573,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: index.handler
-      Runtime: nodejs14.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -621,7 +619,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: index.handler
-      Runtime: nodejs14.x
       Timeout: 300
       MemorySize: 3008
       Policies:
@@ -877,7 +874,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -904,7 +900,6 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
       Handler: index.handler
-      Runtime: nodejs14.x
 
 Outputs:
   S3Bucket:

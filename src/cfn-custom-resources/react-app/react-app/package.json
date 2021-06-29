@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@aws-amplify/auth": "^3.4.16",
-    "@aws-amplify/core": "^3.8.8",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1"
+    "@aws-amplify/auth": "^4.1.0",
+    "@aws-amplify/core": "^4.1.2",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -30,6 +30,6 @@
     ]
   },
   "devDependencies": {
-    "react-scripts": "^4.0.1"
+    "react-scripts": "^4.0.3"
   }
 }

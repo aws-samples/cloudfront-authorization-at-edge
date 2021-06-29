@@ -187,10 +187,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-<<<<<<< HEAD
-=======
-      Runtime: nodejs14.x
->>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -199,10 +195,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-<<<<<<< HEAD
-=======
-      Runtime: nodejs14.x
->>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -211,10 +203,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-<<<<<<< HEAD
-=======
-      Runtime: nodejs14.x
->>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -223,10 +211,6 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-<<<<<<< HEAD
-=======
-      Runtime: nodejs14.x
->>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 

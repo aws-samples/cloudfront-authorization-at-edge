@@ -8,8 +8,6 @@
   },
   "keywords": [],
   "author": "",
-  "dependencies": {
-    "axios": "^0.21.1"
-  },
+  "dependencies": {},
   "devDependencies": {}
 }

@@ -1,24 +1,17 @@
-// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
 import { randomBytes } from "crypto";
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceResponse,
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import axios from "axios";
+import { sendCfnResponse, Status } from "./cfn-response";
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
   console.log(JSON.stringify(event, undefined, 4));
-  const {
-    LogicalResourceId,
-    RequestId,
-    StackId,
-    ResponseURL,
-    ResourceProperties,
-  } = event;
+  const { ResourceProperties } = event;
 
   const { PhysicalResourceId } = event as
     | CloudFormationCustomResourceDeleteEvent
@@ -29,32 +22,28 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
     AllowedCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~",
   } = ResourceProperties;
 
-  let response: CloudFormationCustomResourceResponse;
+  let status = Status.SUCCESS;
+  let physicalResourceId: string | undefined;
+  let data: { [key: string]: any } | undefined;
+  let reason: string | undefined;
   try {
-    const physicalResourceId =
+    physicalResourceId =
       PhysicalResourceId ||
       [...new Array(parseInt(Length))]
         .map(() => randomChoiceFromIndexable(AllowedCharacters))
         .join("");
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId: physicalResourceId!,
-      Status: "SUCCESS",
-      RequestId,
-      StackId,
-    };
   } catch (err) {
-    response = {
-      LogicalResourceId,
-      PhysicalResourceId:
-        PhysicalResourceId || `failed-to-create-${Date.now()}`,
-      Status: "FAILED",
-      Reason: err.stack || err.message,
-      RequestId,
-      StackId,
-    };
+    console.error(err);
+    status = Status.FAILED;
+    reason = err;
   }
-  await axios.put(ResponseURL, response, { headers: { "content-type": "" } });
+  await sendCfnResponse({
+    event,
+    status,
+    data,
+    physicalResourceId,
+    reason,
+  });
 };
 
 function randomChoiceFromIndexable(indexable: string) {

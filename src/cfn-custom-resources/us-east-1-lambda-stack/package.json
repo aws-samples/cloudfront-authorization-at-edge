@@ -1,5 +1,5 @@
 {
-  "name": "user-pool-domain",
+  "name": "us-east-1-lambda-stack",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -7,6 +7,5 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
-  "devDependencies": {}
+  "author": ""
 }

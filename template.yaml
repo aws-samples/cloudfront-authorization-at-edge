@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 
 AWSTemplateFormatVersion: "2010-09-09"
@@ -124,8 +124,8 @@ Parameters:
     Default: ""
   Version:
     Type: String
-    Description: "Use for development: putting in a new version forces redeployment of Lambda@Edge functions"
-    Default: ""
+    Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
+    Default: "2.0.6"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -167,6 +167,7 @@ Conditions:
   UpdateUserPoolClient: !Or
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
+  RegionIsNotUsEast1: !Not [!Equals [!Ref AWS::Region, "us-east-1"]]
 
 Globals:
   Function:
@@ -186,6 +187,10 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
+<<<<<<< HEAD
+=======
+      Runtime: nodejs14.x
+>>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -194,6 +199,10 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
+<<<<<<< HEAD
+=======
+      Runtime: nodejs14.x
+>>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -202,6 +211,10 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
+<<<<<<< HEAD
+=======
+      Runtime: nodejs14.x
+>>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -210,6 +223,10 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
+<<<<<<< HEAD
+=======
+      Runtime: nodejs14.x
+>>>>>>> 6f458a9385f73854c793b8e0244482390194b2e0
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -235,8 +252,80 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  UsEast1Deployment:
+    Type: Custom::UsEast1LambdaEdgeDeployment
+    Condition: RegionIsNotUsEast1
+    Properties:
+      ServiceToken: !GetAtt UsEast1DeploymentHandler.Arn
+      LambdaRoleArn: !GetAtt LambdaEdgeExecutionRole.Arn
+      CheckAuthHandlerArn: !GetAtt CheckAuthHandler.Arn
+      ParseAuthHandlerArn: !GetAtt ParseAuthHandler.Arn
+      RefreshAuthHandlerArn: !GetAtt RefreshAuthHandler.Arn
+      HttpHeadersHandlerArn: !GetAtt HttpHeadersHandler.Arn
+      SignOutHandlerArn: !GetAtt SignOutHandler.Arn
+      Version: !Ref Version
+
+  UsEast1DeploymentHandler:
+    Type: AWS::Serverless::Function
+    Condition: RegionIsNotUsEast1
+    Properties:
+      CodeUri: src/cfn-custom-resources/us-east-1-lambda-stack
+      Handler: index.handler
+      Timeout: 900
       PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionBoundaryPolicyArn, !Ref AWS::NoValue]
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - cloudformation:CreateChangeSet
+                - cloudformation:CreateStack
+                - cloudformation:DeleteChangeSet
+                - cloudformation:DeleteStack
+                - cloudformation:DescribeChangeSet
+                - cloudformation:DescribeStacks
+                - cloudformation:ExecuteChangeSet
+                - cloudformation:UpdateStack
+              Resource:
+                - !Ref AWS::StackId
+                - !Sub "arn:${AWS::Partition}:cloudformation:us-east-1:${AWS::AccountId}:stack/${AWS::StackName}/*"
+                - !Sub "arn:${AWS::Partition}:cloudformation:us-east-1:${AWS::AccountId}:changeset/${AWS::StackName}/*"
+            - Effect: Allow
+              Action: cloudformation:GetTemplate
+              Resource: !Ref AWS::StackId
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:CreateBucket
+                - s3:DeleteBucket
+              Resource: !Sub "arn:${AWS::Partition}:s3:::*-authedgedeploymentbucket-*"
+            - Effect: Allow
+              Action: lambda:GetFunction
+              Resource:
+                - !GetAtt ParseAuthHandler.Arn
+                - !GetAtt CheckAuthHandler.Arn
+                - !GetAtt HttpHeadersHandler.Arn
+                - !GetAtt RefreshAuthHandler.Arn
+                - !GetAtt SignOutHandler.Arn
+            - Effect: Allow
+              Action:
+                - lambda:GetFunction
+                - lambda:CreateFunction
+                - lambda:DeleteFunction
+                - lambda:UpdateFunctionCode
+                - lambda:UpdateFunctionConfiguration
+              Resource:
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-CheckAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-ParseAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RefreshAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-SignOutHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-HttpHeadersHandler-*"
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: !GetAtt LambdaEdgeExecutionRole.Arn
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -285,7 +374,7 @@ Resources:
         Enabled: true
         DefaultRootObject: index.html
         Origins:
-          - DomainName: !Sub "${S3Bucket}.s3.amazonaws.com"
+          - DomainName: !GetAtt S3Bucket.RegionalDomainName
             Id: protected-bucket
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
@@ -454,7 +543,7 @@ Resources:
               Action:
                 - cognito-idp:UpdateUserPoolClient
                 - cognito-idp:DescribeUserPoolClient
-              Resource: "*"  # * to be able to clean up after myself, if you change the User Pool Client ID
+              Resource: "*" # * to be able to clean up after myself, if you change the User Pool Client ID
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval
@@ -499,7 +588,7 @@ Resources:
     Condition: CreateCloudFrontDistributionStaticSiteMode
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
-      Handler: bundle.handler
+      Handler: index.handler
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -545,7 +634,7 @@ Resources:
     Condition: CreateCloudFrontDistributionSpaMode
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
-      Handler: bundle.handler
+      Handler: index.handler
       Timeout: 300
       MemorySize: 3008
       Policies:
@@ -568,7 +657,10 @@ Resources:
     Type: Custom::LambdaCodeUpdate
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
-      LambdaFunction: !GetAtt ParseAuthHandler.Arn
+      LambdaFunction: !If
+        - RegionIsNotUsEast1
+        - !GetAtt UsEast1Deployment.ParseAuthHandler
+        - !GetAtt ParseAuthHandler.Arn
       Version: !Ref Version
       Configuration:
         Fn::Sub:
@@ -619,7 +711,10 @@ Resources:
     Type: Custom::LambdaCodeUpdate
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
-      LambdaFunction: !GetAtt CheckAuthHandler.Arn
+      LambdaFunction: !If
+        - RegionIsNotUsEast1
+        - !GetAtt UsEast1Deployment.CheckAuthHandler
+        - !GetAtt CheckAuthHandler.Arn
       Version: !Ref Version
       Configuration:
         Fn::Sub:
@@ -670,7 +765,10 @@ Resources:
     Type: Custom::LambdaCodeUpdate
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
-      LambdaFunction: !GetAtt HttpHeadersHandler.Arn
+      LambdaFunction: !If
+        - RegionIsNotUsEast1
+        - !GetAtt UsEast1Deployment.HttpHeadersHandler
+        - !GetAtt HttpHeadersHandler.Arn
       Version: !Ref Version
       Configuration:
         Fn::Sub: >
@@ -683,7 +781,10 @@ Resources:
     Type: Custom::LambdaCodeUpdate
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
-      LambdaFunction: !GetAtt RefreshAuthHandler.Arn
+      LambdaFunction: !If
+        - RegionIsNotUsEast1
+        - !GetAtt UsEast1Deployment.RefreshAuthHandler
+        - !GetAtt RefreshAuthHandler.Arn
       Version: !Ref Version
       Configuration:
         Fn::Sub:
@@ -734,7 +835,10 @@ Resources:
     Type: Custom::LambdaCodeUpdate
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
-      LambdaFunction: !GetAtt SignOutHandler.Arn
+      LambdaFunction: !If
+        - RegionIsNotUsEast1
+        - !GetAtt UsEast1Deployment.SignOutHandler
+        - !GetAtt SignOutHandler.Arn
       Version: !Ref Version
       Configuration:
         Fn::Sub:
@@ -794,11 +898,11 @@ Resources:
                 - lambda:GetFunction
                 - lambda:UpdateFunctionCode
               Resource:
-                - !GetAtt ParseAuthHandler.Arn
-                - !GetAtt CheckAuthHandler.Arn
-                - !GetAtt HttpHeadersHandler.Arn
-                - !GetAtt RefreshAuthHandler.Arn
-                - !GetAtt SignOutHandler.Arn
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-CheckAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-ParseAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RefreshAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-SignOutHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-HttpHeadersHandler-*"
 
   NonceSigningSecret:
     Type: Custom::NonceSigningSecret

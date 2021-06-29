@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 
 AWSTemplateFormatVersion: "2010-09-09"
@@ -75,7 +75,7 @@ Resources:
     Properties:
       Location:
         ApplicationId: arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge
-        SemanticVersion: 2.0.4
+        SemanticVersion: 2.0.6
       Parameters:
         UserPoolArn: !GetAtt UserPool.Arn
         UserPoolClientId: !Ref UserPoolClient

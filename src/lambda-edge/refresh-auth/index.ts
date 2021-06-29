@@ -1,4 +1,4 @@
-// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
 import {
@@ -10,7 +10,7 @@ import {
   getCompleteConfig,
   extractAndParseCookies,
   generateCookieHeaders,
-  httpPostWithRetry,
+  httpPostToCognitoWithRetry,
   createErrorHtml,
 } from "../shared/shared";
 
@@ -73,9 +73,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         client_id: CONFIG.clientId,
         refresh_token: refreshToken,
       });
-      const res = await httpPostWithRetry(
+      const res = await httpPostToCognitoWithRetry(
         `https://${CONFIG.cognitoAuthDomain}/oauth2/token`,
-        body,
+        Buffer.from(body),
         { headers },
         CONFIG.logger
       ).catch((err) => {

@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.6
+    SemanticVersion: 2.0.7
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -142,7 +142,7 @@ Parameters:
     Default: ""
 
 Conditions:
-  ApplyPermissionsBoundary: !Not !Equals [!Ref PermissionBoundaryPolicyArn, ""]
+  ApplyPermissionsBoundary: !Not [!Equals [!Ref PermissionBoundaryPolicyArn, ""]]
   CreateUser: !And
     - !Not [!Equals [!Ref EmailAddress, ""]]
     - !Equals [!Ref UserPoolArn, ""]

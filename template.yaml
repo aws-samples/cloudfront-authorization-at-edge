@@ -237,6 +237,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionBoundaryPolicyArn, !Ref AWS::NoValue]
 
   UsEast1Deployment:
     Type: Custom::UsEast1LambdaEdgeDeployment

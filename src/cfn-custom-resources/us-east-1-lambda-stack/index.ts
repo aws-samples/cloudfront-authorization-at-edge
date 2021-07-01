@@ -73,6 +73,11 @@ interface CfnLambdaResource {
 }
 
 const US_EAST_1_STACK_BASE_TEMPLATE = JSON.stringify({
+  Description: [
+    "Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge.",
+    `This is a peripheral stack to the main stack (with the same name) in region ${CFN_CLIENT.config.region}.`,
+    "This stack contains the Lambda@Edge functions, these must be deployed to us-east-1",
+  ].join(" "),
   Resources: {
     AuthEdgeDeploymentBucket: {
       Type: "AWS::S3::Bucket",
@@ -319,13 +324,13 @@ async function ensureDeploymentUsEast1Stack(props: {
   // (in a next step, Lambda fuctions will be added to this stack)
 
   console.log("Checking if us-east-1 stack already exists ...");
-  const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
+  const { Stacks: usEast1Stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
     StackName: props.stackName,
   })
     .promise()
     .catch(() => ({ Stacks: undefined }));
-  if (stacks?.length) {
-    const deploymentBucket = stacks[0].Outputs?.find(
+  if (usEast1Stacks?.length) {
+    const deploymentBucket = usEast1Stacks[0].Outputs?.find(
       (output) => output.OutputKey === "DeploymentBucket"
     )?.OutputValue;
     if (!deploymentBucket)
@@ -336,6 +341,17 @@ async function ensureDeploymentUsEast1Stack(props: {
     return deploymentBucket;
   }
 
+  // Get the stack tags, we'll add them to the peripheral stack in us-east-1 too
+  console.log("Getting CFN stack tags ...");
+  const { Stacks: mainRegionStacks } = await CFN_CLIENT.describeStacks({
+    StackName: props.stackId,
+  }).promise();
+  if (!mainRegionStacks?.length) {
+    throw new Error(
+      `Failed to describe stack ${props.stackName} (${props.stackId})`
+    );
+  }
+
   // Create the stack
   console.log("Creating change set for us-east-1 stack ...");
   const { Id: changeSetArn } = await CFN_CLIENT_US_EAST_1.createChangeSet({
@@ -344,6 +360,7 @@ async function ensureDeploymentUsEast1Stack(props: {
     TemplateBody: US_EAST_1_STACK_BASE_TEMPLATE,
     ChangeSetType: "CREATE",
     ResourceTypes: ["AWS::S3::Bucket"],
+    Tags: mainRegionStacks[0].Tags,
   }).promise();
   if (!changeSetArn)
     throw new Error("Failed to create change set for bucket deployment");

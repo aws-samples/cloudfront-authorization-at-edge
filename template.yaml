@@ -125,7 +125,7 @@ Parameters:
   Version:
     Type: String
     Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
-    Default: "2.0.6"
+    Default: "2.0.7"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -142,7 +142,8 @@ Parameters:
     Default: ""
 
 Conditions:
-  ApplyPermissionsBoundary: !Not [!Equals [!Ref PermissionsBoundaryPolicyArn, ""]]
+  ApplyPermissionsBoundary:
+    !Not [!Equals [!Ref PermissionsBoundaryPolicyArn, ""]]
   CreateUser: !And
     - !Not [!Equals [!Ref EmailAddress, ""]]
     - !Equals [!Ref UserPoolArn, ""]
@@ -172,7 +173,10 @@ Conditions:
 Globals:
   Function:
     Timeout: 60
-    PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionsBoundaryPolicyArn, !Ref AWS::NoValue]
+    PermissionsBoundary: !If
+      - ApplyPermissionsBoundary
+      - !Ref PermissionsBoundaryPolicyArn
+      - !Ref AWS::NoValue
     Runtime: nodejs14.x
 
 Resources:
@@ -237,7 +241,10 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-      PermissionsBoundary: !If [ApplyPermissionsBoundary, !Ref PermissionsBoundaryPolicyArn, !Ref AWS::NoValue]
+      PermissionsBoundary: !If
+        - ApplyPermissionsBoundary
+        - !Ref PermissionsBoundaryPolicyArn
+        - !Ref AWS::NoValue
 
   UsEast1Deployment:
     Type: Custom::UsEast1LambdaEdgeDeployment
@@ -273,11 +280,12 @@ Resources:
                 - cloudformation:ExecuteChangeSet
                 - cloudformation:UpdateStack
               Resource:
-                - !Ref AWS::StackId
                 - !Sub "arn:${AWS::Partition}:cloudformation:us-east-1:${AWS::AccountId}:stack/${AWS::StackName}/*"
                 - !Sub "arn:${AWS::Partition}:cloudformation:us-east-1:${AWS::AccountId}:changeset/${AWS::StackName}/*"
             - Effect: Allow
-              Action: cloudformation:GetTemplate
+              Action:
+                - cloudformation:DescribeStacks
+                - cloudformation:GetTemplate
               Resource: !Ref AWS::StackId
             - Effect: Allow
               Action:

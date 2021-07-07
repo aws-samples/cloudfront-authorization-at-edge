@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Sorry, there aren't any tests\"; exit 1",
-    "tsc": "tsc -b",
+    "tsc": "npx tsc -b",
     "webpack": "webpack --progress",
     "analyze": "webpack --profile --json > stats.json && webpack-bundle-analyzer ./stats.json",
     "build": "npm run tsc && npm run webpack",

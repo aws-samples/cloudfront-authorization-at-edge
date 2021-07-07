@@ -35,6 +35,7 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 - [refresh-auth](src/lambda-edge/refresh-auth): Lambda@Edge function that handles JWT refresh requests
 - [sign-out](src/lambda-edge/sign-out): Lambda@Edge function that handles sign-out
 - [http-headers](src/lambda-edge/http-headers): Lambda@Edge function that sets HTTP security headers (as good practice)
+- [rewrite-trailing-slash](src/lambda-edge/http-headers): Lambda@Edge function that appends "index.html" to paths that end with a slash (optional use, controlled via parameter, see below)
 
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
@@ -148,12 +149,14 @@ The default deployment mode of this sample application is "SPA mode" - which ent
 - The cookies with JWT's are not "http only", so that they can be read and used by the SPA (e.g. to display the user name, or to refresh tokens)
 - 404's (page not found on S3) will return index.html, to enable SPA-routing
 
-If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. Also, SPA routing is not needed then. To this end, upon deploying, set parameter "EnableSPAMode" to false (--parameter-overrides EnableSPAMode="false"). This will:
+If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. Also, SPA routing is not needed then. To this end, upon deploying, set parameter `EnableSPAMode` to false (`--parameter-overrides EnableSPAMode="false"`). This will:
 
 - Enforce use of a client secret
 - Set cookies to be http only by default (unless you've provided other cookie settings explicitly)
 - Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
 - Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
+
+In case you're choosing Static Site mode, it might make sense to set parameter `RewritePathWithTrailingSlashToIndex` to `true` (`--parameter-overrides RewritePathWithTrailingSlashToIndex="true"`). This will append `index.html` to all paths that include a trailing slash, so that e.g. when the user goes to `/some/sub/dir/`, this is translated to `/some/sub/dir/index.html` in the request to S3.
 
 ## Deploying changes to the react-app or static-site
 

@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.7
+    SemanticVersion: 2.0.8
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -125,7 +125,7 @@ Parameters:
   Version:
     Type: String
     Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
-    Default: "2.0.7"
+    Default: "2.0.8"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -140,6 +140,13 @@ Parameters:
     Description: ARN of a boundary policy if your organisation uses some for roles, optional.
     Type: String
     Default: ""
+  RewritePathWithTrailingSlashToIndex:
+    Description: Do you want to append "index.html" to paths that end with a slash ("/")?
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
 
 Conditions:
   ApplyPermissionsBoundary:
@@ -169,6 +176,7 @@ Conditions:
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
   RegionIsNotUsEast1: !Not [!Equals [!Ref AWS::Region, "us-east-1"]]
+  RewritePathWithTrailingSlashToIndex: !Equals [!Ref RewritePathWithTrailingSlashToIndex, "true"]
 
 Globals:
   Function:
@@ -226,6 +234,14 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
+  RewriteTrailingSlashHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda-edge/rewrite-trailing-slash/
+      Handler: bundle.handler
+      Role: !GetAtt LambdaEdgeExecutionRole.Arn
+      Timeout: 5
+
   LambdaEdgeExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -257,6 +273,7 @@ Resources:
       RefreshAuthHandlerArn: !GetAtt RefreshAuthHandler.Arn
       HttpHeadersHandlerArn: !GetAtt HttpHeadersHandler.Arn
       SignOutHandlerArn: !GetAtt SignOutHandler.Arn
+      RewriteTrailingSlashHandlerArn: !GetAtt RewriteTrailingSlashHandler.Arn
       Version: !Ref Version
 
   UsEast1DeploymentHandler:
@@ -302,6 +319,7 @@ Resources:
                 - !GetAtt HttpHeadersHandler.Arn
                 - !GetAtt RefreshAuthHandler.Arn
                 - !GetAtt SignOutHandler.Arn
+                - !GetAtt RewriteTrailingSlashHandler.Arn
             - Effect: Allow
               Action:
                 - lambda:GetFunction
@@ -315,6 +333,7 @@ Resources:
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RefreshAuthHandler-*"
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-SignOutHandler-*"
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-HttpHeadersHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RewriteTrailingSlashHandler-*"
             - Effect: Allow
               Action: iam:PassRole
               Resource: !GetAtt LambdaEdgeExecutionRole.Arn
@@ -361,6 +380,11 @@ Resources:
               LambdaFunctionARN: !GetAtt CheckAuthHandlerCodeUpdate.FunctionArn
             - EventType: origin-response
               LambdaFunctionARN: !GetAtt HttpHeadersHandlerCodeUpdate.FunctionArn
+            - !If
+              - RewritePathWithTrailingSlashToIndex
+              - EventType: origin-request
+                LambdaFunctionARN: !GetAtt RewriteTrailingSlashHandlerCodeUpdate.FunctionArn
+              - !Ref AWS::NoValue
           TargetOriginId: protected-bucket
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
@@ -769,6 +793,21 @@ Resources:
             "logLevel": "${LogLevel}"
           }
 
+  RewriteTrailingSlashHandlerCodeUpdate:
+    Type: Custom::LambdaCodeUpdate
+    Properties:
+      ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
+      LambdaFunction: !If
+        - RegionIsNotUsEast1
+        - !GetAtt UsEast1Deployment.RewriteTrailingSlashHandler
+        - !GetAtt RewriteTrailingSlashHandler.Arn
+      Version: !Ref Version
+      Configuration:
+        Fn::Sub: >
+          {
+            "logLevel": "${LogLevel}"
+          }
+
   RefreshAuthHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
     Properties:
@@ -895,6 +934,7 @@ Resources:
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RefreshAuthHandler-*"
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-SignOutHandler-*"
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-HttpHeadersHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RewriteTrailingSlashHandler-*"
 
   NonceSigningSecret:
     Type: Custom::NonceSigningSecret
@@ -989,6 +1029,11 @@ Outputs:
     Value: !GetAtt SignOutHandlerCodeUpdate.FunctionArn
     Export:
       Name: !Sub "${AWS::StackName}-SignOutHandler"
+  RewriteTrailingSlashHandler:
+    Description: The Lambda function ARN to use in Lambda@Edge for appending index.html to paths ending with a slash ("/")
+    Value: !GetAtt RewriteTrailingSlashHandlerCodeUpdate.FunctionArn
+    Export:
+      Name: !Sub "${AWS::StackName}-RewriteTrailingSlashHandler"
   CodeUpdateHandler:
     Description: The Lambda function ARN of the custom resource that adds configuration to a function and publishes a version for use as Lambda@Edge
     Value: !GetAtt LambdaCodeUpdateHandler.Arn

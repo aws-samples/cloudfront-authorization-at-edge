@@ -25,10 +25,17 @@ async function retrieveClientSecret(
       UserPoolId: userPoolId,
       ClientId: clientId,
     };
-  const res = await cognitoClient.describeUserPoolClient(input).promise();
+  const { UserPoolClient } = await cognitoClient
+    .describeUserPoolClient(input)
+    .promise();
+  if (!UserPoolClient?.ClientSecret) {
+    throw new Error(
+      `User Pool client ${clientId} is not set up with a client secret`
+    );
+  }
   return {
     physicalResourceId: `${userPoolId}-${clientId}-retrieved-client-secret`,
-    Data: { ClientSecret: res.UserPoolClient!.ClientSecret || "" },
+    Data: { ClientSecret: UserPoolClient.ClientSecret },
   };
 }
 

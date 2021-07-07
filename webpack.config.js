@@ -28,13 +28,20 @@ module.exports = {
       __dirname,
       "./src/lambda-edge/sign-out/index.ts"
     ),
+    "src/lambda-edge/rewrite-trailing-slash/bundle": path.resolve(
+      __dirname,
+      "./src/lambda-edge/rewrite-trailing-slash/index.ts"
+    ),
   },
   module: {
     rules: [
       {
         test: /\.ts$/,
-        use: "ts-loader",
+        loader: "ts-loader",
         exclude: /node_modules/,
+        options: {
+          configFile: "src/lambda-edge/tsconfig.json"
+        }
       },
       {
         test: /\.html$/i,

@@ -60,11 +60,14 @@ export interface HttpHeaders {
 type Mode = "spaMode" | "staticSiteMode";
 
 interface ConfigFromDisk {
-  httpHeaders: HttpHeaders;
   logLevel: keyof typeof LogLevel;
 }
 
-interface CompleteConfigFromDisk extends ConfigFromDisk {
+interface ConfigFromDiskWithHeaders extends ConfigFromDisk {
+  httpHeaders: HttpHeaders;
+}
+
+interface ConfigFromDiskComplete extends ConfigFromDiskWithHeaders {
   userPoolArn: string;
   clientId: string;
   oauthScopes: string[];
@@ -85,7 +88,11 @@ interface CompleteConfigFromDisk extends ConfigFromDisk {
   nonceMaxAge?: number;
 }
 
-function isCompleteConfig(config: any): config is CompleteConfigFromDisk {
+function isConfigWithHeaders(config: any): config is ConfigFromDiskComplete {
+  return config["httpHeaders"] !== undefined;
+}
+
+function isCompleteConfig(config: any): config is ConfigFromDiskComplete {
   return config["userPoolArn"] !== undefined;
 }
 
@@ -135,11 +142,16 @@ class Logger {
 }
 
 export interface Config extends ConfigFromDisk {
-  cloudFrontHeaders: CloudFrontHeaders;
   logger: Logger;
 }
 
-export interface CompleteConfig extends Config, CompleteConfigFromDisk {
+export interface ConfigWithHeaders extends Config, ConfigFromDiskWithHeaders {
+  cloudFrontHeaders: CloudFrontHeaders;
+}
+
+export interface CompleteConfig
+  extends ConfigWithHeaders,
+    ConfigFromDiskComplete {
   tokenIssuer: string;
   tokenJwksUri: string;
   cloudFrontHeaders: CloudFrontHeaders;
@@ -154,14 +166,26 @@ export function getConfig(): Config {
     readFileSync(`${__dirname}/configuration.json`).toString("utf8")
   ) as ConfigFromDisk;
   return {
-    cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
     logger: new Logger(LogLevel[config.logLevel]),
     ...config,
   };
 }
 
-export function getCompleteConfig(): CompleteConfig {
+export function getConfigWithHeaders(): ConfigWithHeaders {
   const config = getConfig();
+
+  if (!isConfigWithHeaders(config)) {
+    throw new Error("Incomplete config in configuration.json");
+  }
+
+  return {
+    cloudFrontHeaders: asCloudFrontHeaders(config.httpHeaders),
+    ...config,
+  };
+}
+
+export function getCompleteConfig(): CompleteConfig {
+  const config = getConfigWithHeaders();
 
   if (!isCompleteConfig(config)) {
     throw new Error("Incomplete config in configuration.json");
@@ -241,6 +265,7 @@ function withCookieDomain(
 }
 
 export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
+  if (!headers) return {};
   // Turn a regular key-value object into the explicit format expected by CloudFront
   return Object.entries(headers).reduce(
     (reduced, [key, value]) =>
@@ -536,7 +561,7 @@ export function createErrorHtml(props: {
   const params = { ...props, region: process.env.AWS_REGION };
   return html.replace(
     /\${([^}]*)}/g,
-    (_, v: keyof typeof params) => params[v] || ""
+    (_: any, v: keyof typeof params) => params[v] || ""
   );
 }
 

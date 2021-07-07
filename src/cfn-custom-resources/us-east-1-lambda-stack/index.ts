@@ -56,7 +56,7 @@ interface CfnTemplateWithLambdas extends CfnTemplateBase {
     RefreshAuthHandler: CfnLambdaResource;
     HttpHeadersHandler: CfnLambdaResource;
     SignOutHandler: CfnLambdaResource;
-    RewriteTrailingSlashHandler: CfnLambdaResource;
+    TrailingSlashHandler: CfnLambdaResource;
   };
 }
 
@@ -99,7 +99,7 @@ const LAMBDA_NAMES = [
   "RefreshAuthHandler",
   "HttpHeadersHandler",
   "SignOutHandler",
-  "RewriteTrailingSlashHandler",
+  "TrailingSlashHandler",
 ] as const;
 
 async function ensureUsEast1LambdaStack(props: {
@@ -110,7 +110,7 @@ async function ensureUsEast1LambdaStack(props: {
   refreshAuthHandlerArn: string;
   httpHeadersHandlerArn: string;
   signOutHandlerArn: string;
-  rewriteTrailingSlashHandlerArn: string;
+  trailingSlashHandlerArn: string;
   lambdaRoleArn: string;
   requestType: "Create" | "Update" | "Delete";
   physicalResourceId: string | undefined;
@@ -425,7 +425,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
       RefreshAuthHandlerArn: refreshAuthHandlerArn,
       HttpHeadersHandlerArn: httpHeadersHandlerArn,
       SignOutHandlerArn: signOutHandlerArn,
-      RewriteTrailingSlashHandlerArn: rewriteTrailingSlashHandlerArn,
+      TrailingSlashHandlerArn: trailingSlashHandlerArn,
     },
   } = event as
     | CloudFormationCustomResourceDeleteEvent
@@ -446,7 +446,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
       refreshAuthHandlerArn,
       httpHeadersHandlerArn,
       signOutHandlerArn,
-      rewriteTrailingSlashHandlerArn,
+      trailingSlashHandlerArn,
     });
   } catch (err) {
     console.error(err);

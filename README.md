@@ -35,7 +35,7 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 - [refresh-auth](src/lambda-edge/refresh-auth): Lambda@Edge function that handles JWT refresh requests
 - [sign-out](src/lambda-edge/sign-out): Lambda@Edge function that handles sign-out
 - [http-headers](src/lambda-edge/http-headers): Lambda@Edge function that sets HTTP security headers (as good practice)
-- [rewrite-trailing-slash](src/lambda-edge/http-headers): Lambda@Edge function that appends "index.html" to paths that end with a slash (optional use, controlled via parameter, see below)
+- [rewrite-trailing-slash](src/lambda-edge/rewrite-trailing-slash): Lambda@Edge function that appends "index.html" to paths that end with a slash (optional use, intended for static site hosting, controlled via parameter `RewritePathWithTrailingSlashToIndex`, see below)
 
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 

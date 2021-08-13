@@ -12,6 +12,9 @@ import {
   generateCookieHeaders,
   httpPostToCognitoWithRetry,
   createErrorHtml,
+  sign,
+  timestampInSeconds,
+  RequiresConfirmationError,
 } from "../shared/shared";
 
 const CONFIG = getCompleteConfig();
@@ -33,6 +36,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       accessToken,
       refreshToken,
       nonce: originalNonce,
+      nonceHmac,
     } = extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
@@ -41,6 +45,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
     validateRefreshRequest(
       currentNonce,
+      nonceHmac,
       originalNonce,
       idToken,
       accessToken,
@@ -132,6 +137,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
 function validateRefreshRequest(
   currentNonce?: string | string[],
+  nonceHmac?: string,
   originalNonce?: string,
   idToken?: string,
   accessToken?: string,
@@ -151,4 +157,27 @@ function validateRefreshRequest(
       }
     }
   );
+  // Nonce should not be too old
+  const nonceTimestamp = parseInt(
+    currentNonce.slice(0, currentNonce.indexOf("T"))
+  );
+  if (timestampInSeconds() - nonceTimestamp > CONFIG.nonceMaxAge) {
+    throw new RequiresConfirmationError(
+      `Nonce is too old (nonce is from ${new Date(
+        nonceTimestamp * 1000
+      ).toISOString()})`
+    );
+  }
+
+  // Nonce should have the right signature: proving we were the ones generating it (and e.g. not malicious JS on a subdomain)
+  const calculatedHmac = sign(
+    currentNonce,
+    CONFIG.nonceSigningSecret,
+    CONFIG.nonceLength
+  );
+  if (calculatedHmac !== nonceHmac) {
+    throw new RequiresConfirmationError(
+      `Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`
+    );
+  }
 }

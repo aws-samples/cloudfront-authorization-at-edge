@@ -561,8 +561,20 @@ export function createErrorHtml(props: {
   const params = { ...props, region: process.env.AWS_REGION };
   return html.replace(
     /\${([^}]*)}/g,
-    (_: any, v: keyof typeof params) => params[v] || ""
+    (_: any, v: keyof typeof params) => escapeHtml(params[v]) ?? ""
   );
+}
+
+function escapeHtml(unsafe: unknown) {
+  if (typeof unsafe !== "string") {
+    return undefined;
+  }
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 export const urlSafe = {
@@ -630,3 +642,5 @@ export async function validateAndCheckIdToken(
 }
 
 export class MissingRequiredGroupError extends Error {}
+
+export class RequiresConfirmationError extends Error {}

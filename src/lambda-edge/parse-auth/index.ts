@@ -17,6 +17,7 @@ import {
   timestampInSeconds,
   validateAndCheckIdToken,
   MissingRequiredGroupError,
+  RequiresConfirmationError,
 } from "../shared/shared";
 
 const CONFIG = getCompleteConfig();
@@ -287,5 +288,3 @@ function validateQueryStringAndCookies(props: {
 
   return { code, pkce, requestedUri: parsedState.requestedUri || "" };
 }
-
-class RequiresConfirmationError extends Error {}

@@ -18,7 +18,7 @@ import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityservi
 import { sendCfnResponse, Status } from "./cfn-response";
 
 const CUSTOM_RESOURCE_CURRENT_VERSION_NAME = "UpdatedUserPoolClientV2";
-const SENTINEL = "https://example.com/will-be-replaced";
+const SENTINEL_DOMAIN = "example.com";
 
 async function getUserPoolClient(props: Props) {
   const userPoolId = props.UserPoolArn.split("/")[1];
@@ -61,10 +61,10 @@ async function updateUserPoolClient(
   let AllowedOAuthScopes = props.OAuthScopes;
 
   const CallbackURLs = [...new Set(redirectUrisSignIn)].filter(
-    (uri) => uri !== SENTINEL
+    (uri) => new URL(uri).hostname !== SENTINEL_DOMAIN
   );
   const LogoutURLs = [...new Set(redirectUrisSignOut)].filter(
-    (uri) => uri !== SENTINEL
+    (uri) => new URL(uri).hostname !== SENTINEL_DOMAIN
   );
 
   // If there's no redirect URI's -- switch off OAuth (to avoid a Cognito exception)

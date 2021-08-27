@@ -124,7 +124,7 @@ Resources:
             Id: dummy-origin
             CustomOriginConfig:
               OriginProtocolPolicy: match-viewer
-          - DomainName: !Sub "${ApplicationBucket}.s3.amazonaws.com"
+          - DomainName: !GetAtt ApplicationBucket.RegionalDomainName
             Id: protected-origin
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"

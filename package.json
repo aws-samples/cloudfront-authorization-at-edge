@@ -20,8 +20,8 @@
     "@types/aws-lambda": "^8.10.77",
     "@types/cookie": "^0.4.0",
     "@types/fs-extra": "^9.0.11",
-    "@types/jsonwebtoken": "^8.5.2",
     "@types/node": "^15.12.5",
+    "aws-jwt-verify": "^1.0.1",
     "html-loader": "^2.1.2",
     "prettier": "^2.3.2",
     "terser-webpack-plugin": "^5.1.4",
@@ -35,7 +35,6 @@
     "adm-zip": "^0.5.5",
     "aws-sdk": "^2.935.0",
     "cookie": "^0.4.1",
-    "jsonwebtoken": "^8.5.1",
     "jwks-rsa": "^2.0.3"
   },
   "prettier": {

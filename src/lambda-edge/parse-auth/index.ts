@@ -7,7 +7,7 @@ import {
 } from "querystring";
 import { CloudFrontRequestHandler } from "aws-lambda";
 import {
-  getCompleteConfig,
+  getConfigWithJwtVerifier,
   extractAndParseCookies,
   generateCookieHeaders,
   httpPostToCognitoWithRetry,
@@ -15,12 +15,10 @@ import {
   urlSafe,
   sign,
   timestampInSeconds,
-  validateAndCheckIdToken,
-  MissingRequiredGroupError,
   RequiresConfirmationError,
 } from "../shared/shared";
 
-const CONFIG = getCompleteConfig();
+const CONFIG = getConfigWithJwtVerifier();
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -29,14 +27,14 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   const domainName = request.headers["host"][0].value;
   const cognitoTokenEndpoint = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
   let redirectedFromUri = `https://${domainName}`;
-  let idToken: string | undefined = undefined;
+  let idTokenInCookies: string | undefined = undefined;
   try {
     const cookies = extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
       CONFIG.cookieCompatibility
     );
-    ({ idToken } = cookies);
+    ({ idToken: idTokenInCookies } = cookies);
     const { code, pkce, requestedUri } = validateQueryStringAndCookies({
       querystring: request.querystring,
       cookies,
@@ -89,9 +87,12 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       tokens,
     });
 
-    // Validate the token and if a group is required make sure the token has it.
-    // If not throw an Error or MissingRequiredGroupError
-    await validateAndCheckIdToken(tokens.id_token, CONFIG);
+    // Verify the ID-token (JWT), this throws an error if the JWT is not valid
+    // Only useful to do this here, if the admin configured a group check.
+    // (otherwise, we'll trust the JWT is valid, checkAuth is gonna check that anyway)
+    if (CONFIG.requiredGroup) {
+      await CONFIG.jwtVerifier.verify(tokens.id_token);
+    }
 
     const response = {
       status: "307",
@@ -114,14 +115,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     CONFIG.logger.debug("Returning response:\n", response);
     return response;
   } catch (err) {
-    CONFIG.logger.error(err.stack || err);
-    if (idToken) {
-      // There is an ID token - maybe the user signed in already (e.g. in another browser tab)
+    CONFIG.logger.error(err);
+    if (idTokenInCookies) {
+      // There is an ID token in the cookies - maybe the user signed in already (e.g. in another browser tab)
       CONFIG.logger.debug("ID token found, will check if it is valid");
       try {
-        // Validate the token and if a group is required make sure the token has it.
-        // If not throw an Error or MissingRequiredGroupError
-        await validateAndCheckIdToken(idToken, CONFIG);
+        // Verify the ID-token (JWT), this throws an error if the JWT is not valid
+        await CONFIG.jwtVerifier.verify(idTokenInCookies);
 
         // Return user to where he/she came from
         const response = {
@@ -140,7 +140,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         CONFIG.logger.debug("Returning response:\n", response);
         return response;
       } catch (err) {
-        CONFIG.logger.debug("ID token not valid:", err.toString());
+        CONFIG.logger.debug("ID token not valid:", err);
       }
     }
     let htmlParams: Parameters<typeof createErrorHtml>[0];
@@ -153,13 +153,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         linkUri: redirectedFromUri,
         linkText: "Confirm",
       };
-    } else if (err instanceof MissingRequiredGroupError) {
+    } else if (`${err}`.includes("Cognito group")) {
       htmlParams = {
         title: "Not Authorized",
         message:
           "Your user is not authorized for this site. Please contact the admin.",
         expandText: "Click for details",
-        details: err.toString(),
+        details: `${err}`,
         linkUri: redirectedFromUri,
         linkText: "Try Again",
       };
@@ -168,7 +168,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         title: "Sign-in issue",
         message: "We can't sign you in because of a",
         expandText: "technical problem",
-        details: err.toString(),
+        details: `${err}`,
         linkUri: redirectedFromUri,
         linkText: "Try again",
       };

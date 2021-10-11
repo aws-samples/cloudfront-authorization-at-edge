@@ -8,7 +8,7 @@ import { parse } from "cookie";
 import { fetch } from "./https";
 import { Agent, RequestOptions } from "https";
 import html from "./error-page/template.html";
-import { validate } from "./validate-jwt";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
 
 export interface CookieSettings {
   idToken: string;
@@ -152,8 +152,6 @@ export interface ConfigWithHeaders extends Config, ConfigFromDiskWithHeaders {
 export interface CompleteConfig
   extends ConfigWithHeaders,
     ConfigFromDiskComplete {
-  tokenIssuer: string;
-  tokenJwksUri: string;
   cloudFrontHeaders: CloudFrontHeaders;
   secretAllowedCharacters: string;
   pkceLength: number;
@@ -191,12 +189,6 @@ export function getCompleteConfig(): CompleteConfig {
     throw new Error("Incomplete config in configuration.json");
   }
 
-  // Derive the issuer and JWKS uri all JWT's will be signed with from the User Pool's ID and region:
-  const userPoolId = config.userPoolArn.split("/")[1];
-  const userPoolRegion = userPoolId.match(/^(\S+?)_\S+$/)![1];
-  const tokenIssuer = `https://cognito-idp.${userPoolRegion}.amazonaws.com/${userPoolId}`;
-  const tokenJwksUri = `${tokenIssuer}/.well-known/jwks.json`;
-
   // Derive cookie settings by merging the defaults with the explicitly provided values
   const defaultCookieSettings = getDefaultCookieSettings({
     compatibility: config.cookieCompatibility,
@@ -230,8 +222,20 @@ export function getCompleteConfig(): CompleteConfig {
     ...defaults,
     ...config,
     cookieSettings,
-    tokenIssuer,
-    tokenJwksUri,
+  };
+}
+
+export function getConfigWithJwtVerifier() {
+  const config = getCompleteConfig();
+  const userPoolId = config.userPoolArn.split("/")[1];
+  return {
+    ...config,
+    jwtVerifier: CognitoJwtVerifier.create({
+      userPoolId,
+      clientId: config.clientId,
+      tokenUse: "id",
+      groups: config.requiredGroup || undefined,
+    }),
   };
 }
 
@@ -613,34 +617,5 @@ export function sign(
 export function timestampInSeconds() {
   return (Date.now() / 1000) | 0;
 }
-
-export async function validateAndCheckIdToken(
-  idToken: string,
-  config: CompleteConfig
-) {
-  config.logger.info("Validating JWT ...");
-  let idTokenPayload = await validate(
-    idToken,
-    config.tokenJwksUri,
-    config.tokenIssuer,
-    config.clientId
-  );
-  config.logger.info("JWT is valid");
-
-  // Check that the ID token has the required group.
-  if (config.requiredGroup) {
-    let cognitoGroups = idTokenPayload["cognito:groups"];
-    if (!cognitoGroups) {
-      throw new MissingRequiredGroupError("Token does not have any groups");
-    }
-
-    if (!cognitoGroups.includes(config.requiredGroup)) {
-      throw new MissingRequiredGroupError("Token does not have required group");
-    }
-    config.logger.info("JWT has requiredGroup");
-  }
-}
-
-export class MissingRequiredGroupError extends Error {}
 
 export class RequiresConfirmationError extends Error {}

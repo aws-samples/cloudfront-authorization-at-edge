@@ -5,16 +5,15 @@ import { stringify as stringifyQueryString } from "querystring";
 import { createHash, randomBytes } from "crypto";
 import { CloudFrontRequestHandler } from "aws-lambda";
 import {
-  getCompleteConfig,
+  getConfigWithJwtVerifier,
   extractAndParseCookies,
   decodeToken,
   urlSafe,
   sign,
   timestampInSeconds,
-  validateAndCheckIdToken,
 } from "../shared/shared";
 
-const CONFIG = getCompleteConfig();
+const CONFIG = getConfigWithJwtVerifier();
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -89,9 +88,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       return response;
     }
 
-    // Validate the token and if a group is required make sure the token has it.
-    // If not throw an Error or MissingRequiredGroupError
-    await validateAndCheckIdToken(idToken, CONFIG);
+    // Verify the ID-token (JWT), this throws an error if the JWT is not valid
+    await CONFIG.jwtVerifier.verify(idToken);
 
     // Return the request unaltered to allow access to the resource:
     CONFIG.logger.debug("Returning request:\n", request);

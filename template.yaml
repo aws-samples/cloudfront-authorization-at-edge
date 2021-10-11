@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.11
+    SemanticVersion: 2.0.12
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -125,7 +125,7 @@ Parameters:
   Version:
     Type: String
     Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
-    Default: "2.0.11"
+    Default: "2.0.12"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -176,7 +176,8 @@ Conditions:
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
   RegionIsNotUsEast1: !Not [!Equals [!Ref AWS::Region, "us-east-1"]]
-  RewritePathWithTrailingSlashToIndex: !Equals [!Ref RewritePathWithTrailingSlashToIndex, "true"]
+  RewritePathWithTrailingSlashToIndex:
+    !Equals [!Ref RewritePathWithTrailingSlashToIndex, "true"]
 
 Globals:
   Function:

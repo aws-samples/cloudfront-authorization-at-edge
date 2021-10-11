@@ -115,7 +115,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         title: "Refresh issue",
         message: "We can't refresh your sign-in because of a",
         expandText: "technical problem",
-        details: err.toString(),
+        details: `${err}`,
         linkUri: redirectedFromUri,
         linkText: "Try again",
       }),

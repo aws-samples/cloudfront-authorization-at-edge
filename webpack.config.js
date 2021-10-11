@@ -40,8 +40,8 @@ module.exports = {
         loader: "ts-loader",
         exclude: /node_modules/,
         options: {
-          configFile: "src/lambda-edge/tsconfig.json"
-        }
+          configFile: "src/lambda-edge/tsconfig.json",
+        },
       },
       {
         test: /\.html$/i,

@@ -32,7 +32,7 @@ Parameters:
   SemanticVersion:
     Type: String
     Description: Semantic version of the back end
-    Default: 2.0.12
+    Default: 2.0.13
 
   HttpHeaders:
     Type: String

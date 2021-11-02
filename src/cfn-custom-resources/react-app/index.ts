@@ -133,7 +133,7 @@ export const handler: CloudFormationCustomResourceHandler = async (
   } catch (err) {
     console.error(err);
     status = Status.FAILED;
-    reason = err;
+    reason = `${err}`;
   }
   await sendCfnResponse({
     event,

@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.0.13
+    SemanticVersion: 2.0.14
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -125,7 +125,7 @@ Parameters:
   Version:
     Type: String
     Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
-    Default: "2.0.13"
+    Default: "2.0.14"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -241,6 +241,7 @@ Resources:
 
   TrailingSlashHandler:
     Type: AWS::Serverless::Function
+    Condition: RewritePathWithTrailingSlashToIndex
     Properties:
       CodeUri: src/lambda-edge/rewrite-trailing-slash/
       Handler: bundle.handler
@@ -278,7 +279,10 @@ Resources:
       RefreshAuthHandlerArn: !GetAtt RefreshAuthHandler.Arn
       HttpHeadersHandlerArn: !GetAtt HttpHeadersHandler.Arn
       SignOutHandlerArn: !GetAtt SignOutHandler.Arn
-      TrailingSlashHandlerArn: !GetAtt TrailingSlashHandler.Arn
+      TrailingSlashHandlerArn: !If
+        - RewritePathWithTrailingSlashToIndex
+        - !GetAtt TrailingSlashHandler.Arn
+        - !Ref AWS::NoValue
       Version: !Ref Version
 
   UsEast1DeploymentHandler:
@@ -324,7 +328,10 @@ Resources:
                 - !GetAtt HttpHeadersHandler.Arn
                 - !GetAtt RefreshAuthHandler.Arn
                 - !GetAtt SignOutHandler.Arn
-                - !GetAtt TrailingSlashHandler.Arn
+                - !If
+                  - RewritePathWithTrailingSlashToIndex
+                  - !GetAtt TrailingSlashHandler.Arn
+                  - !Ref AWS::NoValue
             - Effect: Allow
               Action:
                 - lambda:GetFunction
@@ -800,6 +807,7 @@ Resources:
 
   TrailingSlashHandlerCodeUpdate:
     Type: Custom::LambdaCodeUpdate
+    Condition: RewritePathWithTrailingSlashToIndex
     Properties:
       ServiceToken: !GetAtt LambdaCodeUpdateHandler.Arn
       LambdaFunction: !If
@@ -1036,6 +1044,7 @@ Outputs:
       Name: !Sub "${AWS::StackName}-SignOutHandler"
   TrailingSlashHandler:
     Description: The Lambda function ARN to use in Lambda@Edge for appending index.html to paths ending with a slash ("/")
+    Condition: RewritePathWithTrailingSlashToIndex
     Value: !GetAtt TrailingSlashHandlerCodeUpdate.FunctionArn
     Export:
       Name: !Sub "${AWS::StackName}-TrailingSlashHandler"

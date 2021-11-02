@@ -56,7 +56,7 @@ interface CfnTemplateWithLambdas extends CfnTemplateBase {
     RefreshAuthHandler: CfnLambdaResource;
     HttpHeadersHandler: CfnLambdaResource;
     SignOutHandler: CfnLambdaResource;
-    TrailingSlashHandler: CfnLambdaResource;
+    TrailingSlashHandler?: CfnLambdaResource;
   };
 }
 
@@ -110,7 +110,7 @@ async function ensureUsEast1LambdaStack(props: {
   refreshAuthHandlerArn: string;
   httpHeadersHandlerArn: string;
   signOutHandlerArn: string;
-  trailingSlashHandlerArn: string;
+  trailingSlashHandlerArn?: string;
   lambdaRoleArn: string;
   requestType: "Create" | "Update" | "Delete";
   physicalResourceId: string | undefined;
@@ -169,22 +169,23 @@ async function ensureUsEast1LambdaStack(props: {
           key.toLowerCase().startsWith(lambdaName.toLowerCase()) && !!lambdaArn
       );
       if (!lambdaProperty) {
-        throw new Error(
+        console.log(
           `Couldn't locate ARN for lambda ${lambdaName} in input properties: ${JSON.stringify(
             props,
             null,
             2
           )}`
         );
+        return;
       }
       // Copy the Lambda code to us-east-1, and set that location in the new CloudFormation template
+      const lambdaResource = parsedOriginalTemplate.Resources[lambdaName]!;
       return copyLambdaCodeToUsEast1({
         lambdaArn: lambdaProperty[1]!,
         toBucket: deploymentBucket,
-        key: parsedOriginalTemplate.Resources[lambdaName].Properties.Code.S3Key,
+        key: lambdaResource.Properties.Code.S3Key,
       }).then(() => {
-        const updatedLambdaResource: CfnLambdaResource =
-          parsedOriginalTemplate.Resources[lambdaName];
+        const updatedLambdaResource: CfnLambdaResource = lambdaResource;
         updatedLambdaResource.Properties.Code.S3Bucket = deploymentBucket;
         delete updatedLambdaResource.Condition;
         updatedLambdaResource.Properties.Role = props.lambdaRoleArn;
@@ -310,12 +311,12 @@ function extractOutputsFromStackResponse(stacks?: CloudFormation.Stack[]) {
     const lambdaArn = stacks?.[0].Outputs?.find(
       (output) => output.OutputKey === lambdaName
     )?.OutputValue;
-    return { ...acc, [lambdaName]: lambdaArn };
+    if (lambdaArn) {
+      return { ...acc, [lambdaName]: lambdaArn };
+    } else {
+      return acc;
+    }
   }, {} as { [key: string]: string | undefined });
-  if (!Object.values(outputs).every((lambdaArn) => !!lambdaArn))
-    throw new Error(
-      `Failed to locate (all) lambda arns in us-east-1 stack: ${outputs}`
-    );
   return outputs;
 }
 
@@ -451,7 +452,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
   } catch (err) {
     console.error(err);
     status = Status.FAILED;
-    reason = err;
+    reason = `${err}`;
   }
   await sendCfnResponse({
     event,

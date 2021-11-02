@@ -529,7 +529,7 @@ export async function httpPostToCognitoWithRetry(
       });
     } catch (err) {
       logger.debug(`HTTP POST to ${url} failed (attempt ${attempts}):`);
-      logger.debug((err.response && err.response.data) || err);
+      logger.debug(err);
       if (attempts >= 5) {
         // Try 5 times at most
         logger.error(

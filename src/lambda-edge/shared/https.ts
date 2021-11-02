@@ -47,7 +47,7 @@ const collectBuffer = (callback: (collectedBuffer: Buffer) => void) => {
         chunks.push(chunk);
         done();
       } catch (err) {
-        done(err);
+        done(err as Error);
       }
     },
     final: (done) => {
@@ -55,7 +55,7 @@ const collectBuffer = (callback: (collectedBuffer: Buffer) => void) => {
         callback(Buffer.concat(chunks));
         done();
       } catch (err) {
-        done(err);
+        done(err as Error);
       }
     },
   });

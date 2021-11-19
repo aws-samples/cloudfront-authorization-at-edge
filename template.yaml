@@ -152,15 +152,15 @@ Parameters:
     Type: String
     Default: ""
   DefaultRootObject:
-    Description: The object that you want CloudFront to request from your origin (for example, index.html) when a viewer requests the root URL for your distribution (http://www.example.com) instead of an object in your distribution (http://www.example.com/product-description.html).
+    Description: The object that you want CloudFront to request from your origin (for example, index.html) when a viewer requests the root URL for your distribution (http://www.example.com).
     Type: String
     Default: index.html
   OriginDomainName:
-    Description: The origin domain you want to front with CloudFront. If left unspecified, an S3 bucket will be created for you. If using an existing S3 bucket in non-wesbite mode, specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com, and make sure to also specify the parameter OriginAccessIdentity.
+    Description: The origin domain you want to front with CloudFront. If left unspecified, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you. If using an existing S3 bucket (in non-website mode), specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com, and make sure to also specify the parameter OriginAccessIdentity.
     Type: String
     Default: ""
   OriginAccessIdentity:
-    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'. Only specify this if you've specified an existing bucket's region specific hostname in pramater OriginDomainName. If left unspecified, and parameter OriginDomainName is also unspecified, an OAI will be created for you and associated with the S3 origin this solution will create.
+    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'. Only specify this if you've specified an existing S3 bucket (in non-website mode) in parameter OriginDomainName. If left unspecified, and parameter OriginDomainName is also unspecified, an Origin Access Identity will be created for you and associated with the S3 bucket this solution will create.
     Type: String
     Default: ""
 

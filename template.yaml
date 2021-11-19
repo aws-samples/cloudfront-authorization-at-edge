@@ -160,7 +160,7 @@ Parameters:
     Type: String
     Default: ""
   OriginAccessIdentity:
-    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'. Only specify this if you've specified an existing S3 bucket (in non-website mode) in parameter OriginDomainName. If left unspecified, and parameter OriginDomainName is also unspecified, an Origin Access Identity will be created for you and associated with the S3 bucket this solution will create.
+    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'. Specify this, and only then, if you've specified an existing S3 bucket (in non-website mode) in parameter OriginDomainName. If left unspecified, and parameter OriginDomainName is also unspecified, an Origin Access Identity will be created for you and associated with the S3 bucket this solution will create.
     Type: String
     Default: ""
 

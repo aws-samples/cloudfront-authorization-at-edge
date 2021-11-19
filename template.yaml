@@ -147,6 +147,22 @@ Parameters:
     AllowedValues:
       - "true"
       - "false"
+  WebACLId:
+    Description: AWS WAF Web ACL Id, if any, to associate with this distribution
+    Type: String
+    Default: ""
+  DefaultRootObject:
+    Description: The object that you want CloudFront to request from your origin (for example, index.html) when a viewer requests the root URL for your distribution (http://www.example.com) instead of an object in your distribution (http://www.example.com/product-description.html).
+    Type: String
+    Default: index.html
+  OriginDomainName:
+    Description: The origin domain you want to front with CloudFront. If left unspecified, an S3 bucket will be created for you. If using an existing S3 bucket in non-wesbite mode, specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com, and make sure to also specify the parameter OriginAccessIdentity.
+    Type: String
+    Default: ""
+  OriginAccessIdentity:
+    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'. Only specify this if you've specified an existing bucket's region specific hostname in pramater OriginDomainName. If left unspecified, and parameter OriginDomainName is also unspecified, an OAI will be created for you and associated with the S3 origin this solution will create.
+    Type: String
+    Default: ""
 
 Conditions:
   ApplyPermissionsBoundary:
@@ -162,9 +178,11 @@ Conditions:
   CreateCloudFrontDistributionStaticSiteMode: !And
     - !Equals [!Ref EnableSPAMode, "false"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+    - !Equals [!Ref OriginDomainName, ""]
   CreateCloudFrontDistributionSpaMode: !And
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+    - !Equals [!Ref OriginDomainName, ""]
   CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
   CreateUserPoolGroup: !And
     - !Condition CreateUserPoolAndClient
@@ -178,6 +196,21 @@ Conditions:
   RegionIsNotUsEast1: !Not [!Equals [!Ref AWS::Region, "us-east-1"]]
   RewritePathWithTrailingSlashToIndex:
     !Equals [!Ref RewritePathWithTrailingSlashToIndex, "true"]
+  CreateS3Bucket: !And
+    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+    - !Equals [!Ref OriginDomainName, ""]
+  OriginAccessIdentityProvided: !And
+    - !Not [!Equals [!Ref OriginDomainName, ""]]
+    - !Not [!Equals [!Ref OriginAccessIdentity, ""]]
+  UseS3Origin: !Or
+    - !And
+      - !Not [!Equals [!Ref OriginDomainName, ""]]
+      - !Not [!Equals [!Ref OriginAccessIdentity, ""]]
+    - !And
+      - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+      - !Equals [!Ref OriginDomainName, ""]
+  UseWAF: !Not [!Equals [!Ref WebACLId, ""]]
+  DefaultRootObjectProvided: !Not [!Equals [!Ref DefaultRootObject, ""]]
 
 Globals:
   Function:
@@ -191,7 +224,7 @@ Globals:
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
-    Condition: CreateCloudFrontDistribution
+    Condition: CreateS3Bucket
     Properties:
       AccessControl: Private
       BucketEncryption:
@@ -400,12 +433,31 @@ Resources:
           TargetOriginId: protected-bucket
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
-        DefaultRootObject: index.html
+        DefaultRootObject: !If
+          - DefaultRootObjectProvided
+          - !Ref DefaultRootObject
+          - !Ref AWS::NoValue
+        WebACLId: !If
+          - UseWAF
+          - !Ref WebACLId
+          - !Ref AWS::NoValue
         Origins:
-          - DomainName: !GetAtt S3Bucket.RegionalDomainName
-            Id: protected-bucket
-            S3OriginConfig:
-              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+          - DomainName: !If
+              - CreateS3Bucket
+              - !GetAtt S3Bucket.RegionalDomainName
+              - !Ref OriginDomainName
+            Id: protected-origin
+            CustomOriginConfig: !If
+              - UseS3Origin
+              - !Ref AWS::NoValue
+              - OriginProtocolPolicy: https-only
+            S3OriginConfig: !If
+              - UseS3Origin
+              - OriginAccessIdentity: !If
+                  - OriginAccessIdentityProvided
+                  - !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
+                  - !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+              - !Ref AWS::NoValue
           - DomainName: will-never-be-reached.org
             Id: dummy-origin
             CustomOriginConfig:
@@ -420,14 +472,14 @@ Resources:
 
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Condition: CreateCloudFrontDistribution
+    Condition: CreateS3Bucket
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: "CloudFront OAI"
 
   CloudfrontBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: CreateCloudFrontDistribution
+    Condition: CreateS3Bucket
     Properties:
       Bucket: !Ref S3Bucket
       PolicyDocument:
@@ -438,13 +490,19 @@ Resources:
             Effect: "Allow"
             Resource: !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
             Principal:
-              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+              CanonicalUser: !If
+                - CreateS3Bucket
+                - !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+                - !Ref OriginAccessIdentity
           - Action:
               - "s3:ListBucket"
             Effect: "Allow"
             Resource: !GetAtt S3Bucket.Arn
             Principal:
-              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+              CanonicalUser: !If
+                - CreateS3Bucket
+                - !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+                - !Ref OriginAccessIdentity
 
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -965,7 +1023,7 @@ Resources:
 Outputs:
   S3Bucket:
     Description: The S3 Bucket where the SPA (React, Angular, Vue, ...) is uploaded to
-    Condition: CreateCloudFrontDistribution
+    Condition: CreateS3Bucket
     Value: !Ref S3Bucket
     Export:
       Name: !Sub "${AWS::StackName}-S3Bucket"

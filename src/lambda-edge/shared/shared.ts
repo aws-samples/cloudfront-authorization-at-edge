@@ -3,6 +3,7 @@
 
 import { CloudFrontHeaders } from "aws-lambda";
 import { readFileSync } from "fs";
+import { formatWithOptions } from "util";
 import { createHmac } from "crypto";
 import { parse } from "cookie";
 import { fetch } from "./https";
@@ -107,36 +108,28 @@ enum LogLevel {
 class Logger {
   constructor(private logLevel: LogLevel) {}
 
-  private jsonify(args: any[]) {
-    return args.map((arg: any) => {
-      if (typeof arg === "object") {
-        try {
-          return JSON.stringify(arg);
-        } catch {
-          return arg;
-        }
-      }
-      return arg;
-    });
+  private format(args: unknown[], depth = 10) {
+    return args.map((arg) => formatWithOptions({ depth }, arg)).join(" ");
   }
-  public info(...args: any) {
+
+  public info(...args: unknown[]) {
     if (this.logLevel >= LogLevel.info) {
-      console.log(...this.jsonify(args));
+      console.log(this.format(args));
     }
   }
-  public warn(...args: any) {
+  public warn(...args: unknown[]) {
     if (this.logLevel >= LogLevel.warn) {
-      console.warn(...this.jsonify(args));
+      console.warn(this.format(args));
     }
   }
-  public error(...args: any) {
+  public error(...args: unknown[]) {
     if (this.logLevel >= LogLevel.error) {
-      console.error(...this.jsonify(args));
+      console.error(this.format(args));
     }
   }
-  public debug(...args: any) {
+  public debug(...args: unknown[]) {
     if (this.logLevel >= LogLevel.debug) {
-      console.trace(...this.jsonify(args));
+      console.trace(this.format(args));
     }
   }
 }

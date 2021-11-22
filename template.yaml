@@ -155,12 +155,24 @@ Parameters:
     Description: The object that you want CloudFront to request from your origin (for example, index.html) when a viewer requests the root URL for your distribution (http://www.example.com).
     Type: String
     Default: index.html
-  OriginDomainName:
-    Description: The origin domain you want to front with CloudFront. If left unspecified, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you. If using an existing S3 bucket (in non-website mode), specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com, and make sure to also specify the parameter OriginAccessIdentity.
+  S3OriginDomainName:
+    Description: The S3 origin you want to front with CloudFront. Specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com, and (optionally) also specify the parameter OriginAccessIdentity. If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
+    Type: String
+    Default: ""
+  CustomOriginDomainName:
+    Description: The custom origin you want to front with CloudFront. If using an existing S3 bucket (in non-website mode), don't use this parameter, specify parameter "S3OriginDomainName" instead. If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
+    Type: String
+    Default: ""
+  CustomOriginSecretHeader:
+    Description: 'The HTTP header name and value that you want CloudFront to send to your custom origin. Specify name and value in one string, separated by = like so: "myheadername=myheadervalue". Only of use if you are also specifying parameter "CustomOriginDomainName"'
     Type: String
     Default: ""
   OriginAccessIdentity:
-    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'. Specify this, and only then, if you've specified an existing S3 bucket (in non-website mode) in parameter OriginDomainName. If left unspecified, and parameter OriginDomainName is also unspecified, an Origin Access Identity will be created for you and associated with the S3 bucket this solution will create.
+    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'.
+    Type: String
+    Default: ""
+  CloudFrontAccessLogsBucket:
+    Description: The (pre-existing) Amazon S3 bucket to store CloudFront access logs in, for example, myawslogbucket.s3.amazonaws.com. Only of use if "CreateCloudFrontDistribution" is set to "true" (the default).
     Type: String
     Default: ""
 
@@ -175,14 +187,16 @@ Conditions:
     !Equals [!Ref CreateCloudFrontDistribution, "true"]
   SPAMode: !Equals [!Ref EnableSPAMode, "true"]
   StaticSiteMode: !Equals [!Ref EnableSPAMode, "false"]
-  CreateCloudFrontDistributionStaticSiteMode: !And
+  CreateSampleStaticSite: !And
     - !Equals [!Ref EnableSPAMode, "false"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
-    - !Equals [!Ref OriginDomainName, ""]
-  CreateCloudFrontDistributionSpaMode: !And
+    - !Equals [!Ref CustomOriginDomainName, ""]
+    - !Equals [!Ref S3OriginDomainName, ""]
+  CreateSampleReactApp: !And
     - !Equals [!Ref EnableSPAMode, "true"]
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
-    - !Equals [!Ref OriginDomainName, ""]
+    - !Equals [!Ref CustomOriginDomainName, ""]
+    - !Equals [!Ref S3OriginDomainName, ""]
   CreateUserPoolAndClient: !Equals [!Ref UserPoolArn, ""]
   CreateUserPoolGroup: !And
     - !Condition CreateUserPoolAndClient
@@ -198,19 +212,22 @@ Conditions:
     !Equals [!Ref RewritePathWithTrailingSlashToIndex, "true"]
   CreateS3Bucket: !And
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
-    - !Equals [!Ref OriginDomainName, ""]
-  OriginAccessIdentityProvided: !And
-    - !Not [!Equals [!Ref OriginDomainName, ""]]
-    - !Not [!Equals [!Ref OriginAccessIdentity, ""]]
-  UseS3Origin: !Or
-    - !And
-      - !Not [!Equals [!Ref OriginDomainName, ""]]
-      - !Not [!Equals [!Ref OriginAccessIdentity, ""]]
-    - !And
-      - !Equals [!Ref CreateCloudFrontDistribution, "true"]
-      - !Equals [!Ref OriginDomainName, ""]
+    - !Equals [!Ref CustomOriginDomainName, ""]
+    - !Equals [!Ref S3OriginDomainName, ""]
+  CreateOriginAccessIdentity: !And
+    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+    - !Equals [!Ref CustomOriginDomainName, ""]
+    - !Equals [!Ref S3OriginDomainName, ""]
+    - !Equals [!Ref OriginAccessIdentity, ""]
+  OriginAccessIdentityProvided: !Not [!Equals [!Ref OriginAccessIdentity, ""]]
+  UseS3Origin: !And
+    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+    - !Equals [!Ref CustomOriginDomainName, ""]
   UseWAF: !Not [!Equals [!Ref WebACLId, ""]]
   DefaultRootObjectProvided: !Not [!Equals [!Ref DefaultRootObject, ""]]
+  CloudFrontAccessLogsBucketProvided: !Not [!Equals [!Ref CloudFrontAccessLogsBucket, ""]]
+  CustomOriginSecretHeaderProvided:
+    !Not [!Equals [!Ref CustomOriginSecretHeader, ""]]
 
 Globals:
   Function:
@@ -430,7 +447,7 @@ Resources:
               - EventType: origin-request
                 LambdaFunctionARN: !GetAtt TrailingSlashHandlerCodeUpdate.FunctionArn
               - !Ref AWS::NoValue
-          TargetOriginId: protected-bucket
+          TargetOriginId: protected-origin
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
         DefaultRootObject: !If
@@ -441,22 +458,42 @@ Resources:
           - UseWAF
           - !Ref WebACLId
           - !Ref AWS::NoValue
+        Logging: !If
+          - CloudFrontAccessLogsBucketProvided
+          - Bucket: !Ref CloudFrontAccessLogsBucket
+          - !Ref AWS::NoValue
         Origins:
           - DomainName: !If
-              - CreateS3Bucket
-              - !GetAtt S3Bucket.RegionalDomainName
-              - !Ref OriginDomainName
+              - UseS3Origin
+              - !If
+                - CreateS3Bucket
+                - !GetAtt S3Bucket.RegionalDomainName
+                - !Ref S3OriginDomainName
+              - !Ref CustomOriginDomainName
             Id: protected-origin
             CustomOriginConfig: !If
               - UseS3Origin
               - !Ref AWS::NoValue
               - OriginProtocolPolicy: https-only
+            OriginCustomHeaders: !If
+              - UseS3Origin
+              - !Ref AWS::NoValue
+              - !If
+                - CustomOriginSecretHeaderProvided
+                - - HeaderName:
+                      !Select [0, !Split ["=", !Ref CustomOriginSecretHeader]]
+                    HeaderValue:
+                      !Select [1, !Split ["=", !Ref CustomOriginSecretHeader]]
+                - !Ref AWS::NoValue
             S3OriginConfig: !If
               - UseS3Origin
               - OriginAccessIdentity: !If
-                  - OriginAccessIdentityProvided
-                  - !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
+                  - CreateOriginAccessIdentity
                   - !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+                  - !If
+                    - OriginAccessIdentityProvided
+                    - !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
+                    - !Ref AWS::NoValue
               - !Ref AWS::NoValue
           - DomainName: will-never-be-reached.org
             Id: dummy-origin
@@ -472,7 +509,7 @@ Resources:
 
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Condition: CreateS3Bucket
+    Condition: CreateOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: "CloudFront OAI"
@@ -491,7 +528,7 @@ Resources:
             Resource: !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
             Principal:
               CanonicalUser: !If
-                - CreateS3Bucket
+                - CreateOriginAccessIdentity
                 - !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
                 - !Ref OriginAccessIdentity
           - Action:
@@ -500,7 +537,7 @@ Resources:
             Resource: !GetAtt S3Bucket.Arn
             Principal:
               CanonicalUser: !If
-                - CreateS3Bucket
+                - CreateOriginAccessIdentity
                 - !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
                 - !Ref OriginAccessIdentity
 
@@ -664,14 +701,14 @@ Resources:
 
   StaticSite:
     Type: Custom::StaticSite
-    Condition: CreateCloudFrontDistributionStaticSiteMode
+    Condition: CreateSampleStaticSite
     Properties:
       ServiceToken: !GetAtt StaticSiteHandler.Arn
       BucketName: !Ref S3Bucket
 
   StaticSiteHandler:
     Type: AWS::Serverless::Function
-    Condition: CreateCloudFrontDistributionStaticSiteMode
+    Condition: CreateSampleStaticSite
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: index.handler
@@ -695,7 +732,7 @@ Resources:
 
   ReactApp:
     Type: Custom::ReactApp
-    Condition: CreateCloudFrontDistributionSpaMode
+    Condition: CreateSampleReactApp
     Properties:
       ServiceToken: !GetAtt ReactAppHandler.Arn
       BucketName: !Ref S3Bucket
@@ -717,7 +754,7 @@ Resources:
 
   ReactAppHandler:
     Type: AWS::Serverless::Function
-    Condition: CreateCloudFrontDistributionSpaMode
+    Condition: CreateSampleReactApp
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: index.handler

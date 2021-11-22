@@ -164,11 +164,11 @@ Parameters:
     Type: String
     Default: ""
   CustomOriginHeaderName:
-    Description: The HTTP header name of the (possibly secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginSecretHeaderValue". Only of use if you are also specifying parameter "CustomOriginDomainName".
+    Description: The HTTP header name of the (secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginHeaderValue". Only of use if you are also specifying parameter "CustomOriginDomainName".
     Type: String
     Default: ""
   CustomOriginHeaderValue:
-    Description: The HTTP header value of the (possibly secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginSecretHeaderName". Only of use if you are also specifying parameter "CustomOriginDomainName".
+    Description: The HTTP header value of the (secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginHeaderName". Only of use if you are also specifying parameter "CustomOriginDomainName".
     Type: String
     Default: ""
   OriginAccessIdentity:

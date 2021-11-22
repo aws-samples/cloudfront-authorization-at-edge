@@ -163,8 +163,12 @@ Parameters:
     Description: The custom origin you want to front with CloudFront. If using an existing S3 bucket (in non-website mode), don't use this parameter, specify parameter "S3OriginDomainName" instead. If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
     Type: String
     Default: ""
-  CustomOriginSecretHeader:
-    Description: 'The HTTP header name and value that you want CloudFront to send to your custom origin. Specify name and value in one string, separated by = like so: "myheadername=myheadervalue". Only of use if you are also specifying parameter "CustomOriginDomainName"'
+  CustomOriginHeaderName:
+    Description: The HTTP header name of the (possibly secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginSecretHeaderValue". Only of use if you are also specifying parameter "CustomOriginDomainName".
+    Type: String
+    Default: ""
+  CustomOriginHeaderValue:
+    Description: The HTTP header value of the (possibly secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginSecretHeaderName". Only of use if you are also specifying parameter "CustomOriginDomainName".
     Type: String
     Default: ""
   OriginAccessIdentity:
@@ -225,9 +229,11 @@ Conditions:
     - !Equals [!Ref CustomOriginDomainName, ""]
   UseWAF: !Not [!Equals [!Ref WebACLId, ""]]
   DefaultRootObjectProvided: !Not [!Equals [!Ref DefaultRootObject, ""]]
-  CloudFrontAccessLogsBucketProvided: !Not [!Equals [!Ref CloudFrontAccessLogsBucket, ""]]
-  CustomOriginSecretHeaderProvided:
-    !Not [!Equals [!Ref CustomOriginSecretHeader, ""]]
+  CloudFrontAccessLogsBucketProvided:
+    !Not [!Equals [!Ref CloudFrontAccessLogsBucket, ""]]
+  CustomOriginHeaderProvided: !And
+    - !Not [!Equals [!Ref CustomOriginHeaderName, ""]]
+    - !Not [!Equals [!Ref CustomOriginHeaderValue, ""]]
 
 Globals:
   Function:
@@ -479,11 +485,9 @@ Resources:
               - UseS3Origin
               - !Ref AWS::NoValue
               - !If
-                - CustomOriginSecretHeaderProvided
-                - - HeaderName:
-                      !Select [0, !Split ["=", !Ref CustomOriginSecretHeader]]
-                    HeaderValue:
-                      !Select [1, !Split ["=", !Ref CustomOriginSecretHeader]]
+                - CustomOriginHeaderProvided
+                - - HeaderName: !Ref CustomOriginHeaderName
+                    HeaderValue: !Ref CustomOriginHeaderValue
                 - !Ref AWS::NoValue
             S3OriginConfig: !If
               - UseS3Origin

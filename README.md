@@ -116,11 +116,15 @@ When following this route, also provide parameter `AlternateDomainNames` upon de
 
 ## I already have an S3 bucket, I want to use that one
 
-Go for the more barebone deployment, so you can do more yourself––i.e. reuse your bucket. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
+You can use a pre-existing S3 bucket (e.g. from another region), by providing the buckets regional endpoint domain through parameter "S3OriginDomainName" upon deploying. In this case it's a good practice to also use a CloudFront Origin Access Identity, so you don't have to make your bucket public. If you indeed have a CloudFront Origin Access Identity (make sure to grant it access in the bucket policy), specify its ID in parameter "OriginAccessIdentity".
 
-## I want to use another (S3 / HTTP) origin behind the CloudFront distribution
+Alternatively, go for the more barebone deployment, so you can do more yourself––i.e. reuse your bucket. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
 
-Go for the more barebone deployment, so you can do more yourself––i.e. bring your own origins. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
+## I want to use another origin behind the CloudFront distribution
+
+You can use a pre-existing HTTPS origin (e.g. https://example.com), by providing the origins domain name (e.g. example.com) through parameter "CustomOriginDomainName" upon deploying. If you want to make sure requests to your origin come from this CloudFront distribution only (you probably do), configure a secret HTTP header that your custom origin can check for, through parameters "CustomOriginHeaderName" and "CustomOriginHeaderValue".
+
+Alternatively, go for the more barebone deployment, so you can do more yourself––i.e. bring your own origins. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
 
 ## I already have a Cognito User Pool, I want to reuse that one
 

@@ -11,7 +11,6 @@
 
 import {
   CloudFormationCustomResourceHandler,
-  CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
 import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
@@ -218,15 +217,17 @@ async function updateCognitoUserPoolClient(
 export const handler: CloudFormationCustomResourceHandler = async (event) => {
   console.log(JSON.stringify(event, undefined, 4));
   const { ResourceProperties, RequestType } = event;
-
-  const { PhysicalResourceId } = event as
-    | CloudFormationCustomResourceDeleteEvent
-    | CloudFormationCustomResourceUpdateEvent;
   const { OldResourceProperties } =
     event as CloudFormationCustomResourceUpdateEvent;
 
+  let physicalResourceId: string;
+  if (event.RequestType === "Create") {
+    physicalResourceId = CUSTOM_RESOURCE_CURRENT_VERSION_NAME;
+  } else {
+    physicalResourceId = event.PhysicalResourceId;
+  }
+
   let status = Status.SUCCESS;
-  let physicalResourceId: string | undefined;
   let data: { [key: string]: any } | undefined;
   let reason: string | undefined;
   try {
@@ -234,7 +235,7 @@ export const handler: CloudFormationCustomResourceHandler = async (event) => {
       RequestType,
       ResourceProperties as unknown as Props,
       OldResourceProperties as unknown as Props,
-      PhysicalResourceId
+      physicalResourceId
     );
   } catch (err) {
     console.error(err);

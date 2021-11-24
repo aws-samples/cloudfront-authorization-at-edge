@@ -52,14 +52,6 @@ async function updateUserPoolClient(
     region: userPoolRegion,
   });
 
-  // To be able to set the redirect URL's, we must enable OAuth––required by Cognito
-  // Vice versa, when removing redirect URL's, we must disable OAuth if there's no more redirect URL's left
-
-  // Merge OAuth scopes and flows with what is already there on the existing User Pool Client
-  let AllowedOAuthFlows = ["code"];
-  let AllowedOAuthFlowsUserPoolClient = true;
-  let AllowedOAuthScopes = props.OAuthScopes;
-
   const CallbackURLs = [...new Set(redirectUrisSignIn)].filter(
     (uri) => new URL(uri).hostname !== SENTINEL_DOMAIN
   );
@@ -67,15 +59,30 @@ async function updateUserPoolClient(
     (uri) => new URL(uri).hostname !== SENTINEL_DOMAIN
   );
 
-  // If there's no redirect URI's -- switch off OAuth (to avoid a Cognito exception)
-  if (!CallbackURLs.length) {
+  // To be able to set the redirect URL's, we must enable OAuth––required by Cognito
+  // Vice versa, when removing redirect URL's, we must disable OAuth if there's no more redirect URL's left
+  let AllowedOAuthFlows: string[];
+  let AllowedOAuthFlowsUserPoolClient: boolean;
+  let AllowedOAuthScopes: string[];
+  if (CallbackURLs.length) {
+    AllowedOAuthFlows = ["code"];
+    AllowedOAuthFlowsUserPoolClient = true;
+    AllowedOAuthScopes = props.OAuthScopes;
+  } else {
     AllowedOAuthFlows = [];
     AllowedOAuthFlowsUserPoolClient = false;
     AllowedOAuthScopes = [];
   }
 
+  // Provide existing fields as well, experience teaches this prevents errors when calling the Cognito API
+  // https://github.com/aws-samples/cloudfront-authorization-at-edge/issues/144
+  const existingFields = { ...existingUserPoolClient };
+  delete existingFields.CreationDate;
+  delete existingFields.LastModifiedDate;
+
   const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest =
     {
+      ...existingFields,
       AllowedOAuthFlows,
       AllowedOAuthFlowsUserPoolClient,
       AllowedOAuthScopes,
@@ -83,8 +90,6 @@ async function updateUserPoolClient(
       UserPoolId: userPoolId,
       CallbackURLs,
       LogoutURLs,
-      SupportedIdentityProviders:
-        existingUserPoolClient.SupportedIdentityProviders, // Need to provide existing values otherwise they get cleared out :|
     };
   console.debug("Updating User Pool Client", JSON.stringify(input, null, 4));
   await cognitoClient.updateUserPoolClient(input).promise();

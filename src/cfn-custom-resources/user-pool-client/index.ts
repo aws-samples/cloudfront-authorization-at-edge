@@ -73,11 +73,13 @@ async function updateUserPoolClient(
     AllowedOAuthScopes = [];
   }
 
-  // Provide existing fields as well, experience teaches this prevents errors when calling the Cognito API
+  // Provide existing fields as well (excluding properties not valid for Update operations), experience teaches this prevents errors when calling the Cognito API
   // https://github.com/aws-samples/cloudfront-authorization-at-edge/issues/144
+  // https://github.com/aws-samples/cloudfront-authorization-at-edge/issues/172
   const existingFields = { ...existingUserPoolClient };
   delete existingFields.CreationDate;
   delete existingFields.LastModifiedDate;
+  delete existingFields.ClientSecret;
 
   const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest =
     {

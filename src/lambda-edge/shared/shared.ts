@@ -10,6 +10,7 @@ import { fetch } from "./https";
 import { Agent, RequestOptions } from "https";
 import html from "./error-page/template.html";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
+export { CognitoJwtInvalidGroupError } from "aws-jwt-verify/error";
 
 export interface CookieSettings {
   idToken: string;

@@ -16,6 +16,7 @@ import {
   sign,
   timestampInSeconds,
   RequiresConfirmationError,
+  CognitoJwtInvalidGroupError,
 } from "../shared/shared";
 
 const CONFIG = getConfigWithJwtVerifier();
@@ -153,11 +154,11 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         linkUri: redirectedFromUri,
         linkText: "Confirm",
       };
-    } else if (`${err}`.includes("Cognito group")) {
+    } else if (err instanceof CognitoJwtInvalidGroupError) {
       htmlParams = {
         title: "Not Authorized",
         message:
-          "Your user is not authorized for this site. Please contact the admin.",
+          "You are not authorized for this site. Please contact the admin.",
         expandText: "Click for details",
         details: `${err}`,
         linkUri: redirectedFromUri,

@@ -19,7 +19,7 @@ const authAtEdge = new sam.CfnApplication(stack, "AuthorizationAtEdge", {
   location: {
     applicationId:
       "arn:aws:serverlessrepo:us-east-1:520945424137:applications/cloudfront-authorization-at-edge",
-    semanticVersion: "2.0.18",
+    semanticVersion: "2.0.19",
   },
   parameters: {
     EmailAddress: "johndoe@example.com",

@@ -9,9 +9,9 @@
   "keywords": [],
   "author": "",
   "dependencies": {
-    "adm-zip": "^0.4.13"
+    "adm-zip": "^0.5.9"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.4.32"
+    "@types/adm-zip": "^0.4.34"
   }
 }

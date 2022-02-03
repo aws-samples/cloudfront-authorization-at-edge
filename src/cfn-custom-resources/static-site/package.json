@@ -5,6 +5,6 @@
   "scripts": {},
   "devDependencies": {},
   "dependencies": {
-    "s3-spa-upload": "^1.1.6"
+    "s3-spa-upload": "^1.1.7"
   }
 }

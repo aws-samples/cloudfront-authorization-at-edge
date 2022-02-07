@@ -755,6 +755,7 @@ Resources:
         - ","
         - !Ref OAuthScopes
       SignOutUrl: !Ref SignOutUrl
+      CookieSettings: !Ref CookieSettings
 
   ReactAppHandler:
     Type: AWS::Serverless::Function

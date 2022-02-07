@@ -37,7 +37,7 @@ function getDefaultCookieSettings(props: {
       return {
         idToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
         accessToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
-        refreshToken: "Path=/; Secure; HttpOnly; SameSite=Lax",
+        refreshToken: `Path=${props.redirectPathAuthRefresh}; Secure; HttpOnly; SameSite=Lax`,
         nonce: "Path=/; Secure; HttpOnly; SameSite=Lax",
       };
     }
@@ -187,6 +187,7 @@ export function getCompleteConfig(): CompleteConfig {
   const defaultCookieSettings = getDefaultCookieSettings({
     compatibility: config.cookieCompatibility,
     mode: config.mode,
+    redirectPathAuthRefresh: config.redirectPathAuthRefresh,
   });
   const cookieSettings = config.cookieSettings
     ? (Object.fromEntries(

@@ -2,7 +2,7 @@
 
 This repo accompanies the [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/authorizationedge-using-cookies-protect-your-amazon-cloudfront-content-from-being-downloaded-by-unauthenticated-users/).
 
-In that blog post a solution is explained, that puts **Cognito** authentication in front of (S3) downloads from **CloudFront**, using **Lambda@Edge**. **JWT's** are transferred using **cookies** to make authorization transparent to clients.
+In that blog post a solution is explained, that puts **Cognito** authentication in front of (S3) downloads from **CloudFront**, using **Lambda@Edge**. **JWTs** are transferred using **cookies** to make authorization transparent to clients.
 
 The sources in this repo implement that solution.
 
@@ -22,7 +22,7 @@ More deployment options below: [Deploying the solution](#deploying-the-solution)
 
 ### Alternative: use HTTP headers
 
-This repo is the "sibling" of another repo here on aws-samples ([authorization-lambda-at-edge](https://github.com/aws-samples/authorization-lambda-at-edge)). The difference is that the solution in that repo uses http headers (not cookies) to transfer JWT's. While also a valid approach, the downside of it is that your Web App (SPA) needs to be altered to pass these headers, as browsers do not send these along automatically (which they do for cookies).
+This repo is the "sibling" of another repo here on aws-samples ([authorization-lambda-at-edge](https://github.com/aws-samples/authorization-lambda-at-edge)). The difference is that the solution in that repo uses http headers (not cookies) to transfer JWTs. While also a valid approach, the downside of it is that your Web App (SPA) needs to be altered to pass these headers, as browsers do not send these along automatically (which they do for cookies).
 
 ### Alternative: build an Auth@Edge solution yourself, using NPM library [cognito-at-edge](https://github.com/awslabs/cognito-at-edge)
 
@@ -36,7 +36,7 @@ This repo contains (a.o.) the following files and directories:
 
 Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 
-- [check-auth](src/lambda-edge/check-auth): Lambda@Edge function that checks each incoming request for valid JWT's in the request cookies
+- [check-auth](src/lambda-edge/check-auth): Lambda@Edge function that checks each incoming request for valid JWTs in the request cookies
 - [parse-auth](src/lambda-edge/parse-auth): Lambda@Edge function that handles the redirect from the Cognito hosted UI, after the user signed in
 - [refresh-auth](src/lambda-edge/refresh-auth): Lambda@Edge function that handles JWT refresh requests
 - [sign-out](src/lambda-edge/sign-out): Lambda@Edge function that handles sign-out
@@ -46,7 +46,7 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
 - [us-east-1-lambda-stack](src/cfn-custom-resources/us-east-1-lambda-stack): Lambda function that implements a CloudFormation custom resource that makes sure the Lambda@Edge functions are deployed to us-east-1 (which is a CloudFront requirement, see below.)
-- [react-app](src/cfn-custom-resources/react-app): A sample React app that is protected by the solution. It uses AWS Amplify Framework to read the JWT's from cookies. The directory also contains a Lambda function that implements a CloudFormation custom resource to build the React app and upload it to S3
+- [react-app](src/cfn-custom-resources/react-app): A sample React app that is protected by the solution. It uses AWS Amplify Framework to read the JWTs from cookies. The directory also contains a Lambda function that implements a CloudFormation custom resource to build the React app and upload it to S3
 - [static-site](src/cfn-custom-resources/static-site): A sample static site (see [SPA mode or Static Site mode?](#spa-mode-or-static-site-mode)) that is protected by the solution. The directory also contains a Lambda function that implements a CloudFormation custom resource to upload the static site to S3
 - [user-pool-client](src/cfn-custom-resources/user-pool-client): Lambda function that implements a CloudFormation custom resource to update the User Pool client with OAuth config
 - [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to lookup the User Pool's domain, at which the Hosted UI is available
@@ -156,7 +156,7 @@ You can deploy this solution to any AWS region of your liking (that supports the
 The default deployment mode of this sample application is "SPA mode" - which entails some settings that make the deployment suitable for hosting a SPA such as a React/Angular/Vue app:
 
 - The User Pool client does not use a client secret, as that would not make sense for JavaScript running in the browser
-- The cookies with JWT's are not "http only", so that they can be read and used by the SPA (e.g. to display the user name, or to refresh tokens)
+- The cookies with JWTs are not "http only", so that they can be read and used by the SPA (e.g. to display the user name, or to refresh tokens)
 - 404's (page not found on S3) will return index.html, to enable SPA-routing
 
 If you do not want to deploy a SPA but rather a static site, then it is more secure to use a client secret and http-only cookies. Also, SPA routing is not needed then. To this end, upon deploying, set parameter `EnableSPAMode` to false (`--parameter-overrides EnableSPAMode="false"`). This will:
@@ -165,6 +165,7 @@ If you do not want to deploy a SPA but rather a static site, then it is more sec
 - Set cookies to be http only by default (unless you've provided other cookie settings explicitly)
 - Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
 - Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
+- Set the refresh token's path explicitly to the refresh path, `"/refreshauth"` instead of `"/"` (unless you've provided other cookie settings explicitly), and thus the refresh token will not be sent to other paths (more secure and more performant)
 
 In case you're choosing Static Site mode, it might make sense to set parameter `RewritePathWithTrailingSlashToIndex` to `true` (`--parameter-overrides RewritePathWithTrailingSlashToIndex="true"`). This will append `index.html` to all paths that include a trailing slash, so that e.g. when the user goes to `/some/sub/dir/`, this is translated to `/some/sub/dir/index.html` in the request to S3.
 

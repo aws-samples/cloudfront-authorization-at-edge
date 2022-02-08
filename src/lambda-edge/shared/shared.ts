@@ -4,13 +4,16 @@
 import { CloudFrontHeaders } from "aws-lambda";
 import { readFileSync } from "fs";
 import { formatWithOptions } from "util";
-import { createHmac } from "crypto";
+import { createHmac, randomInt } from "crypto";
 import { parse } from "cookie";
 import { fetch } from "./https";
 import { Agent, RequestOptions } from "https";
 import html from "./error-page/template.html";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
-export { CognitoJwtInvalidGroupError } from "aws-jwt-verify/error";
+export {
+  CognitoJwtInvalidGroupError,
+  JwtExpiredError,
+} from "aws-jwt-verify/error";
 
 export interface CookieSettings {
   idToken: string;
@@ -23,6 +26,7 @@ export interface CookieSettings {
 function getDefaultCookieSettings(props: {
   mode: "spaMode" | "staticSiteMode";
   compatibility: "amplify" | "elasticsearch";
+  redirectPathAuthRefresh: string;
 }): CookieSettings {
   // Defaults can be overridden by the user (CloudFormation Stack parameter) but should be solid enough for most purposes
   if (props.compatibility === "amplify") {
@@ -251,18 +255,6 @@ function extractCookiesFromHeaders(headers: CloudFrontHeaders) {
   return cookies;
 }
 
-function withCookieDomain(
-  distributionDomainName: string,
-  cookieSettings: string
-) {
-  // Add the domain to the cookiesetting
-  if (cookieSettings.toLowerCase().indexOf("domain") === -1) {
-    // Add leading dot for compatibility with Amplify (or js-cookie really)
-    return `${cookieSettings}; Domain=.${distributionDomainName}`;
-  }
-  return cookieSettings;
-}
-
 export function asCloudFrontHeaders(headers: HttpHeaders): CloudFrontHeaders {
   if (!headers) return {};
   // Turn a regular key-value object into the explicit format expected by CloudFront
@@ -337,36 +329,50 @@ export function extractAndParseCookies(
     nonce: cookies["spa-auth-edge-nonce"],
     nonceHmac: cookies["spa-auth-edge-nonce-hmac"],
     pkce: cookies["spa-auth-edge-pkce"],
+    refreshFailed: cookies["spa-auth-edge-refreshFailed"],
   };
 }
 
 interface GenerateCookieHeadersParam {
   clientId: string;
   oauthScopes: string[];
-  domainName: string;
   cookieSettings: CookieSettings;
-  mode: Mode;
   cookieCompatibility: "amplify" | "elasticsearch";
   additionalCookies: { [name: string]: string };
   tokens: {
-    id_token: string;
-    access_token: string;
-    refresh_token: string;
+    id: string;
+    access?: string;
+    refresh?: string;
   };
 }
 
 export const generateCookieHeaders = {
-  newTokens: (param: GenerateCookieHeadersParam) =>
-    _generateCookieHeaders({ ...param, event: "newTokens" }),
+  signIn: (
+    param: GenerateCookieHeadersParam & {
+      tokens: { id: string; access: string; refresh: string };
+    }
+  ) => _generateCookieHeaders({ ...param, event: "signIn" }),
+  refresh: (
+    param: GenerateCookieHeadersParam & {
+      tokens: { id: string; access: string };
+    }
+  ) => _generateCookieHeaders({ ...param, event: "refresh" }),
   signOut: (param: GenerateCookieHeadersParam) =>
     _generateCookieHeaders({ ...param, event: "signOut" }),
   refreshFailed: (param: GenerateCookieHeadersParam) =>
     _generateCookieHeaders({ ...param, event: "refreshFailed" }),
+  invalidGroupMembership: (param: GenerateCookieHeadersParam) =>
+    _generateCookieHeaders({ ...param, event: "invalidGroupMembership" }),
 };
 
 function _generateCookieHeaders(
   param: GenerateCookieHeadersParam & {
-    event: "newTokens" | "signOut" | "refreshFailed";
+    event:
+      | "signIn"
+      | "signOut"
+      | "refresh"
+      | "refreshFailed"
+      | "invalidGroupMembership";
   }
 ) {
   /*
@@ -378,11 +384,13 @@ function _generateCookieHeaders(
     Note that there are other places besides this helper function where cookies can be set (search codebase for "set-cookie")
     */
 
-  const decodedIdToken = decodeToken(param.tokens.id_token);
+  const decodedIdToken = decodeToken(param.tokens.id);
   const tokenUserName = decodedIdToken["cognito:username"];
 
-  let cookies: Cookies;
-  let cookieNames: { [name: string]: string };
+  const cookies: Cookies = {};
+  let cookieNames:
+    | ReturnType<typeof getAmplifyCookieNames>
+    | ReturnType<typeof getElasticsearchCookieNames>;
   if (param.cookieCompatibility === "amplify") {
     cookieNames = getAmplifyCookieNames(param.clientId, tokenUserName);
     const userData = JSON.stringify({
@@ -400,49 +408,37 @@ function _generateCookieHeaders(
     });
 
     // Construct object with the cookies
-    cookies = {
-      [cookieNames.lastUserKey]: `${tokenUserName}; ${withCookieDomain(
-        param.domainName,
+    Object.assign(cookies, {
+      [cookieNames.lastUserKey]: `${tokenUserName}; ${param.cookieSettings.idToken}`,
+      [cookieNames.scopeKey]: `${param.oauthScopes.join(" ")}; ${
+        param.cookieSettings.accessToken
+      }`,
+      [cookieNames.userDataKey]: `${encodeURIComponent(userData)}; ${
         param.cookieSettings.idToken
-      )}`,
-      [cookieNames.scopeKey]: `${param.oauthScopes.join(
-        " "
-      )}; ${withCookieDomain(
-        param.domainName,
-        param.cookieSettings.accessToken
-      )}`,
-      [cookieNames.userDataKey]: `${encodeURIComponent(
-        userData
-      )}; ${withCookieDomain(param.domainName, param.cookieSettings.idToken)}`,
-      "amplify-signin-with-hostedUI": `true; ${withCookieDomain(
-        param.domainName,
-        param.cookieSettings.accessToken
-      )}`,
-    };
+      }`,
+      "amplify-signin-with-hostedUI": `true; ${param.cookieSettings.accessToken}`,
+    });
   } else {
     cookieNames = getElasticsearchCookieNames();
-    cookies = {
-      [cookieNames.cognitoEnabledKey]: `True; ${withCookieDomain(
-        param.domainName,
-        param.cookieSettings.cognitoEnabled
-      )}`,
-    };
+    cookies[
+      cookieNames.cognitoEnabledKey
+    ] = `True; ${param.cookieSettings.cognitoEnabled}`;
   }
-  Object.assign(cookies, {
-    [cookieNames.idTokenKey]: `${param.tokens.id_token}; ${withCookieDomain(
-      param.domainName,
-      param.cookieSettings.idToken
-    )}`,
-    [cookieNames.accessTokenKey]: `${
-      param.tokens.access_token
-    }; ${withCookieDomain(param.domainName, param.cookieSettings.accessToken)}`,
-    [cookieNames.refreshTokenKey]: `${
-      param.tokens.refresh_token
-    }; ${withCookieDomain(
-      param.domainName,
-      param.cookieSettings.refreshToken
-    )}`,
-  });
+
+  // Set JWTs in the cookies
+  cookies[
+    cookieNames.idTokenKey
+  ] = `${param.tokens.id}; ${param.cookieSettings.idToken}`;
+  if (param.tokens.access) {
+    cookies[
+      cookieNames.accessTokenKey
+    ] = `${param.tokens.access}; ${param.cookieSettings.accessToken}`;
+  }
+  if (param.tokens.refresh) {
+    cookies[
+      cookieNames.refreshTokenKey
+    ] = `${param.tokens.refresh}; ${param.cookieSettings.refreshToken}`;
+  }
 
   if (param.event === "signOut") {
     // Expire all cookies
@@ -454,6 +450,19 @@ function _generateCookieHeaders(
     cookies[cookieNames.refreshTokenKey] = expireCookie(
       cookies[cookieNames.refreshTokenKey]
     );
+    // Add our own (short lived) cookie to signal ourselves (check auth) that refreshing the JWTs failed, so it won't try refreshing again
+    cookies[
+      "spa-auth-edge-refreshFailed"
+    ] = `true; ${param.cookieSettings.nonce}; Max-Age=60`;
+  } else if (param.event === "invalidGroupMembership") {
+    // Clear JWTs, the user should get the admin to add him/her to the right Cognito group, and sign-in again
+    for (const cookieName of [
+      cookieNames.idTokenKey,
+      cookieNames.accessTokenKey,
+      cookieNames.refreshTokenKey,
+    ]) {
+      cookies[cookieName] = expireCookie(cookies[cookieName]);
+    }
   }
 
   // Always expire nonce, nonceHmac and pkce - this is valid in all scenario's:
@@ -486,7 +495,7 @@ function expireCookie(cookie: string = "") {
   return ["", ...settings, expires].join("; ");
 }
 
-export function decodeToken(jwt: string) {
+function decodeToken(jwt: string) {
   const tokenBody = jwt.split(".")[1];
   const decodableTokenBody = tokenBody.replace(/-/g, "+").replace(/_/g, "/");
   return JSON.parse(Buffer.from(decodableTokenBody, "base64").toString());
@@ -614,3 +623,12 @@ export function timestampInSeconds() {
 }
 
 export class RequiresConfirmationError extends Error {}
+
+export function generateSecret(
+  allowedCharacters: string,
+  secretLength: number
+) {
+  return [...new Array(secretLength)]
+    .map(() => allowedCharacters[randomInt(0, allowedCharacters.length)])
+    .join("");
+}

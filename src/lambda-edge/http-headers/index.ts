@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT-0
 
 import { CloudFrontResponseHandler } from "aws-lambda";
-import { getConfigWithHeaders } from "../shared/shared";
+import * as common from "../shared/shared";
 
-const CONFIG = getConfigWithHeaders();
+const CONFIG = common.getConfigWithHeaders();
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
 
 export const handler: CloudFrontResponseHandler = async (event) => {

@@ -49,11 +49,6 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     return response;
   }
 
-  let tokens = {
-    id_token: idToken!,
-    access_token: accessToken!,
-    refresh_token: refreshToken!,
-  };
   const qs = {
     logout_uri: `https://${domainName}${CONFIG.redirectPathSignOut}`,
     client_id: CONFIG.clientId,
@@ -72,8 +67,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         },
       ],
       "set-cookie": generateCookieHeaders.signOut({
-        tokens,
-        domainName,
+        tokens: {
+          id: idToken,
+        },
         ...CONFIG,
       }),
       ...CONFIG.cloudFrontHeaders,

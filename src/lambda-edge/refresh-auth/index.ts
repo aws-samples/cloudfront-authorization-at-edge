@@ -6,18 +6,9 @@ import {
   stringify as stringifyQueryString,
 } from "querystring";
 import { CloudFrontRequestHandler } from "aws-lambda";
-import {
-  getCompleteConfig,
-  extractAndParseCookies,
-  generateCookieHeaders,
-  httpPostToCognitoWithRetry,
-  createErrorHtml,
-  sign,
-  timestampInSeconds,
-  RequiresConfirmationError,
-} from "../shared/shared";
+import * as common from "../shared/shared";
 
-const CONFIG = getCompleteConfig();
+const CONFIG = common.getCompleteConfig();
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -30,14 +21,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const { requestedUri, nonce: currentNonce } = parseQueryString(
       request.querystring
     );
-    redirectedFromUri += requestedUri || "";
+    redirectedFromUri += typeof requestedUri === "string" ? requestedUri : "";
     const {
       idToken,
-      accessToken,
       refreshToken,
       nonce: originalNonce,
       nonceHmac,
-    } = extractAndParseCookies(
+    } = common.extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
       CONFIG.cookieCompatibility
@@ -48,11 +38,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       nonceHmac,
       originalNonce,
       idToken,
-      accessToken,
       refreshToken
     );
 
-    let headers: { "Content-Type": string; Authorization?: string } = {
+    const headers: { "Content-Type": string; Authorization?: string } = {
       "Content-Type": "application/x-www-form-urlencoded",
     };
 
@@ -63,31 +52,38 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       headers["Authorization"] = `Basic ${encodedSecret}`;
     }
 
-    let tokens = {
-      id_token: idToken!,
-      access_token: accessToken!,
-      refresh_token: refreshToken!,
-    };
-    let cookieHeadersEventType: keyof typeof generateCookieHeaders;
+    let newIdToken: string | undefined;
+    let newAccessToken: string | undefined;
+    let cookieHeaders: ReturnType<
+      typeof common.generateCookieHeaders.refreshFailed
+    >;
     try {
       const body = stringifyQueryString({
         grant_type: "refresh_token",
         client_id: CONFIG.clientId,
         refresh_token: refreshToken,
       });
-      const res = await httpPostToCognitoWithRetry(
-        `https://${CONFIG.cognitoAuthDomain}/oauth2/token`,
-        Buffer.from(body),
-        { headers },
-        CONFIG.logger
-      ).catch((err) => {
-        throw new Error(`Failed to refresh tokens: ${err}`);
+      const res = await common
+        .httpPostToCognitoWithRetry(
+          `https://${CONFIG.cognitoAuthDomain}/oauth2/token`,
+          Buffer.from(body),
+          { headers },
+          CONFIG.logger
+        )
+        .catch((err) => {
+          throw new Error(`Failed to refresh tokens: ${err}`);
+        });
+      newIdToken = res.data.id_token as string;
+      newAccessToken = res.data.access_token as string;
+      cookieHeaders = common.generateCookieHeaders.refresh({
+        ...CONFIG,
+        tokens: { id: newIdToken, access: newAccessToken },
       });
-      tokens.id_token = res.data.id_token;
-      tokens.access_token = res.data.access_token;
-      cookieHeadersEventType = "newTokens";
     } catch (err) {
-      cookieHeadersEventType = "refreshFailed";
+      cookieHeaders = common.generateCookieHeaders.refreshFailed({
+        ...CONFIG,
+        tokens: { id: idToken! },
+      });
     }
     const response = {
       status: "307",
@@ -99,11 +95,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             value: redirectedFromUri,
           },
         ],
-        "set-cookie": generateCookieHeaders[cookieHeadersEventType]({
-          tokens,
-          domainName,
-          ...CONFIG,
-        }),
+        "set-cookie": cookieHeaders,
         ...CONFIG.cloudFrontHeaders,
       },
     };
@@ -111,7 +103,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     return response;
   } catch (err) {
     const response = {
-      body: createErrorHtml({
+      body: common.createErrorHtml({
         title: "Refresh issue",
         message: "We can't refresh your sign-in because of a",
         expandText: "technical problem",
@@ -140,29 +132,28 @@ function validateRefreshRequest(
   nonceHmac?: string,
   originalNonce?: string,
   idToken?: string,
-  accessToken?: string,
   refreshToken?: string
 ) {
   if (!originalNonce) {
     throw new Error(
       "Your browser didn't send the nonce cookie along, but it is required for security (prevent CSRF)."
     );
-  } else if (currentNonce !== originalNonce) {
+  }
+  if (currentNonce !== originalNonce) {
     throw new Error("Nonce mismatch");
   }
-  Object.entries({ idToken, accessToken, refreshToken }).forEach(
-    ([tokenType, token]) => {
-      if (!token) {
-        throw new Error(`Missing ${tokenType}`);
-      }
-    }
-  );
+  if (!idToken) {
+    throw new Error("Missing ID token");
+  }
+  if (!refreshToken) {
+    throw new Error("Missing refresh token");
+  }
   // Nonce should not be too old
   const nonceTimestamp = parseInt(
     currentNonce.slice(0, currentNonce.indexOf("T"))
   );
-  if (timestampInSeconds() - nonceTimestamp > CONFIG.nonceMaxAge) {
-    throw new RequiresConfirmationError(
+  if (common.timestampInSeconds() - nonceTimestamp > CONFIG.nonceMaxAge) {
+    throw new common.RequiresConfirmationError(
       `Nonce is too old (nonce is from ${new Date(
         nonceTimestamp * 1000
       ).toISOString()})`
@@ -170,13 +161,13 @@ function validateRefreshRequest(
   }
 
   // Nonce should have the right signature: proving we were the ones generating it (and e.g. not malicious JS on a subdomain)
-  const calculatedHmac = sign(
+  const calculatedHmac = common.sign(
     currentNonce,
     CONFIG.nonceSigningSecret,
     CONFIG.nonceLength
   );
   if (calculatedHmac !== nonceHmac) {
-    throw new RequiresConfirmationError(
+    throw new common.RequiresConfirmationError(
       `Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`
     );
   }

@@ -6,20 +6,9 @@ import {
   stringify as stringifyQueryString,
 } from "querystring";
 import { CloudFrontRequestHandler } from "aws-lambda";
-import {
-  getConfigWithJwtVerifier,
-  extractAndParseCookies,
-  generateCookieHeaders,
-  httpPostToCognitoWithRetry,
-  createErrorHtml,
-  urlSafe,
-  sign,
-  timestampInSeconds,
-  RequiresConfirmationError,
-  CognitoJwtInvalidGroupError,
-} from "../shared/shared";
+import * as common from "../shared/shared";
 
-const CONFIG = getConfigWithJwtVerifier();
+const CONFIG = common.getCompleteConfig();
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
 
 export const handler: CloudFrontRequestHandler = async (event) => {
@@ -30,7 +19,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   let redirectedFromUri = `https://${domainName}`;
   let idTokenInCookies: string | undefined = undefined;
   try {
-    const cookies = extractAndParseCookies(
+    const cookies = common.extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
       CONFIG.cookieCompatibility
@@ -51,7 +40,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       code_verifier: pkce,
     });
 
-    const requestConfig: Parameters<typeof httpPostToCognitoWithRetry>[2] = {
+    const requestConfig: Parameters<
+      typeof common.httpPostToCognitoWithRetry
+    >[2] = {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
@@ -70,30 +61,31 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const {
       status,
       headers,
-      data: tokens,
-    } = await httpPostToCognitoWithRetry(
-      cognitoTokenEndpoint,
-      Buffer.from(body),
-      requestConfig,
-      CONFIG.logger
-    ).catch((err) => {
-      throw new Error(
-        `Failed to exchange authorization code for tokens: ${err}`
-      );
-    });
+      data: {
+        id_token: idToken,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      },
+    } = await common
+      .httpPostToCognitoWithRetry(
+        cognitoTokenEndpoint,
+        Buffer.from(body),
+        requestConfig,
+        CONFIG.logger
+      )
+      .catch((err) => {
+        throw new Error(
+          `Failed to exchange authorization code for tokens: ${err}`
+        );
+      });
     CONFIG.logger.info("Successfully exchanged authorization code for tokens");
     CONFIG.logger.debug("Response from Cognito token endpoint:\n", {
       status,
       headers,
-      tokens,
+      idToken,
+      accessToken,
+      refreshToken,
     });
-
-    // Verify the ID-token (JWT), this throws an error if the JWT is not valid
-    // Only useful to do this here, if the admin configured a group check.
-    // (otherwise, we'll trust the JWT is valid, checkAuth is gonna check that anyway)
-    if (CONFIG.requiredGroup) {
-      await CONFIG.jwtVerifier.verify(tokens.id_token);
-    }
 
     const response = {
       status: "307",
@@ -105,9 +97,12 @@ export const handler: CloudFrontRequestHandler = async (event) => {
             value: redirectedFromUri,
           },
         ],
-        "set-cookie": generateCookieHeaders.newTokens({
-          tokens,
-          domainName,
+        "set-cookie": common.generateCookieHeaders.signIn({
+          tokens: {
+            id: idToken,
+            access: accessToken,
+            refresh: refreshToken,
+          },
           ...CONFIG,
         }),
         ...CONFIG.cloudFrontHeaders,
@@ -119,33 +114,30 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     CONFIG.logger.error(err);
     if (idTokenInCookies) {
       // There is an ID token in the cookies - maybe the user signed in already (e.g. in another browser tab)
-      CONFIG.logger.debug("ID token found, will check if it is valid");
-      try {
-        // Verify the ID-token (JWT), this throws an error if the JWT is not valid
-        await CONFIG.jwtVerifier.verify(idTokenInCookies);
-
-        // Return user to where he/she came from
-        const response = {
-          status: "307",
-          statusDescription: "Temporary Redirect",
-          headers: {
-            location: [
-              {
-                key: "location",
-                value: redirectedFromUri,
-              },
-            ],
-            ...CONFIG.cloudFrontHeaders,
-          },
-        };
-        CONFIG.logger.debug("Returning response:\n", response);
-        return response;
-      } catch (err) {
-        CONFIG.logger.debug("ID token not valid:", err);
-      }
+      // We'll redirect the user back to where they came from, and let checkAuth worry about whether the JWT is valid
+      CONFIG.logger.debug(
+        "ID token found, redirecting back to:",
+        redirectedFromUri
+      );
+      // Return user to where he/she came from (the JWT will be checked there)
+      const response = {
+        status: "307",
+        statusDescription: "Temporary Redirect",
+        headers: {
+          location: [
+            {
+              key: "location",
+              value: redirectedFromUri,
+            },
+          ],
+          ...CONFIG.cloudFrontHeaders,
+        },
+      };
+      CONFIG.logger.debug("Returning response:\n", response);
+      return response;
     }
-    let htmlParams: Parameters<typeof createErrorHtml>[0];
-    if (err instanceof RequiresConfirmationError) {
+    let htmlParams: Parameters<typeof common.createErrorHtml>[0];
+    if (err instanceof common.RequiresConfirmationError) {
       htmlParams = {
         title: "Confirm sign-in",
         message: "We need your confirmation to sign you in –– to ensure",
@@ -153,16 +145,6 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         details: err.toString(),
         linkUri: redirectedFromUri,
         linkText: "Confirm",
-      };
-    } else if (err instanceof CognitoJwtInvalidGroupError) {
-      htmlParams = {
-        title: "Not Authorized",
-        message:
-          "You are not authorized for this site. Please contact the admin.",
-        expandText: "Click for details",
-        details: `${err}`,
-        linkUri: redirectedFromUri,
-        linkText: "Try Again",
       };
     } else {
       htmlParams = {
@@ -175,7 +157,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       };
     }
     const response = {
-      body: createErrorHtml(htmlParams),
+      body: common.createErrorHtml(htmlParams),
       status: "200",
       headers: {
         ...CONFIG.cloudFrontHeaders,
@@ -194,7 +176,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
 function validateQueryStringAndCookies(props: {
   querystring: string;
-  cookies: ReturnType<typeof extractAndParseCookies>;
+  cookies: ReturnType<typeof common.extractAndParseCookies>;
 }) {
   // Check if Cognito threw an Error. Cognito puts the error in the query string
   const {
@@ -226,7 +208,7 @@ function validateQueryStringAndCookies(props: {
   let parsedState: { nonce?: string; requestedUri?: string };
   try {
     parsedState = JSON.parse(
-      Buffer.from(urlSafe.parse(state), "base64").toString()
+      Buffer.from(common.urlSafe.parse(state), "base64").toString()
     );
   } catch {
     throw new Error(
@@ -249,11 +231,11 @@ function validateQueryStringAndCookies(props: {
     parsedState.nonce !== originalNonce
   ) {
     if (!originalNonce) {
-      throw new RequiresConfirmationError(
+      throw new common.RequiresConfirmationError(
         "Your browser didn't send the nonce cookie along, but it is required for security (prevent CSRF)."
       );
     }
-    throw new RequiresConfirmationError(
+    throw new common.RequiresConfirmationError(
       "Nonce mismatch. This can happen if you start multiple authentication attempts in parallel (e.g. in separate tabs)"
     );
   }
@@ -267,8 +249,8 @@ function validateQueryStringAndCookies(props: {
   const nonceTimestamp = parseInt(
     parsedState.nonce.slice(0, parsedState.nonce.indexOf("T"))
   );
-  if (timestampInSeconds() - nonceTimestamp > CONFIG.nonceMaxAge) {
-    throw new RequiresConfirmationError(
+  if (common.timestampInSeconds() - nonceTimestamp > CONFIG.nonceMaxAge) {
+    throw new common.RequiresConfirmationError(
       `Nonce is too old (nonce is from ${new Date(
         nonceTimestamp * 1000
       ).toISOString()})`
@@ -276,16 +258,16 @@ function validateQueryStringAndCookies(props: {
   }
 
   // Nonce should have the right signature: proving we were the ones generating it (and e.g. not malicious JS on a subdomain)
-  const calculatedHmac = sign(
+  const calculatedHmac = common.sign(
     parsedState.nonce,
     CONFIG.nonceSigningSecret,
     CONFIG.nonceLength
   );
   if (calculatedHmac !== nonceHmac) {
-    throw new RequiresConfirmationError(
+    throw new common.RequiresConfirmationError(
       `Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`
     );
   }
 
-  return { code, pkce, requestedUri: parsedState.requestedUri || "" };
+  return { code, pkce, requestedUri: parsedState.requestedUri ?? "" };
 }

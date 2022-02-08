@@ -12,7 +12,11 @@ Amplify.configure({
     userPoolId: process.env.REACT_APP_USER_POOL_ID,
     userPoolWebClientId: process.env.REACT_APP_USER_POOL_WEB_CLIENT_ID,
     cookieStorage: {
-      domain: process.env.REACT_APP_COOKIE_DOMAIN,
+      domain: process.env.REACT_APP_COOKIE_DOMAIN, // Use a single space " " for host-only cookies
+      expires: null, // null means session cookies
+      path: "/",
+      secure: true, // for developing on localhost over http: set to false
+      sameSite: "lax",
     },
     oauth: {
       domain: process.env.REACT_APP_USER_POOL_AUTH_DOMAIN,
@@ -96,7 +100,13 @@ const App = () => {
     userPoolId: "${process.env.REACT_APP_USER_POOL_ID}",
     userPoolWebClientId: "${process.env.REACT_APP_USER_POOL_WEB_CLIENT_ID}",
     cookieStorage: {
-      domain: "${process.env.REACT_APP_COOKIE_DOMAIN}",
+      domain: "${
+        process.env.REACT_APP_COOKIE_DOMAIN
+      }", // Use a single space " " for host-only cookies
+      expires: null, // null means session cookies
+      path: "/",
+      secure: true, // for developing on localhost over http: set to false
+      sameSite: "lax"
     },
     oauth: {
       domain: "${process.env.REACT_APP_USER_POOL_AUTH_DOMAIN}",

@@ -80,6 +80,7 @@ interface ConfigFromDiskComplete extends ConfigFromDiskWithHeaders {
   cognitoAuthDomain: string;
   redirectPathSignIn: string;
   redirectPathSignOut: string;
+  signOutUrl: string;
   redirectPathAuthRefresh: string;
   cookieSettings: CookieSettings;
   mode: Mode;
@@ -329,7 +330,6 @@ export function extractAndParseCookies(
     nonce: cookies["spa-auth-edge-nonce"],
     nonceHmac: cookies["spa-auth-edge-nonce-hmac"],
     pkce: cookies["spa-auth-edge-pkce"],
-    refreshFailed: cookies["spa-auth-edge-refreshFailed"],
   };
 }
 
@@ -359,30 +359,21 @@ export const generateCookieHeaders = {
   ) => _generateCookieHeaders({ ...param, event: "refresh" }),
   signOut: (param: GenerateCookieHeadersParam) =>
     _generateCookieHeaders({ ...param, event: "signOut" }),
-  refreshFailed: (param: GenerateCookieHeadersParam) =>
-    _generateCookieHeaders({ ...param, event: "refreshFailed" }),
-  invalidGroupMembership: (param: GenerateCookieHeadersParam) =>
-    _generateCookieHeaders({ ...param, event: "invalidGroupMembership" }),
 };
 
 function _generateCookieHeaders(
   param: GenerateCookieHeadersParam & {
-    event:
-      | "signIn"
-      | "signOut"
-      | "refresh"
-      | "refreshFailed"
-      | "invalidGroupMembership";
+    event: "signIn" | "signOut" | "refresh";
   }
 ) {
-  /*
-    Generate cookie headers for the following scenario's:
-      - new tokens: called from Parse Auth and Refresh Auth lambda, when receiving fresh JWT's from Cognito
-      - sign out: called from Sign Out Lambda, when the user visits the sign out URL
-      - refresh failed: called from Refresh Auth lambda when the refresh failed (e.g. because the refresh token has expired)
-
-    Note that there are other places besides this helper function where cookies can be set (search codebase for "set-cookie")
-    */
+  /**
+   * Generate cookie headers for the following scenario's:
+   *  - signIn: called from Parse Auth lambda, when receiving fresh JWT's from Cognito
+   *  - sign out: called from Sign Out Lambda, when the user visits the sign out URL
+   *  - refresh: called from Refresh Auth lambda, when receiving fresh ID and Access JWT's from Cognito
+   *
+   *   Note that there are other places besides this helper function where cookies can be set (search codebase for "set-cookie")
+   */
 
   const decodedIdToken = decodeToken(param.tokens.id);
   const tokenUserName = decodedIdToken["cognito:username"];
@@ -445,24 +436,6 @@ function _generateCookieHeaders(
     Object.keys(cookies).forEach(
       (key) => (cookies[key] = expireCookie(cookies[key]))
     );
-  } else if (param.event === "refreshFailed") {
-    // Expire refresh token (so the browser will not send it in vain again)
-    cookies[cookieNames.refreshTokenKey] = expireCookie(
-      cookies[cookieNames.refreshTokenKey]
-    );
-    // Add our own (short lived) cookie to signal ourselves (check auth) that refreshing the JWTs failed, so it won't try refreshing again
-    cookies[
-      "spa-auth-edge-refreshFailed"
-    ] = `true; ${param.cookieSettings.nonce}; Max-Age=60`;
-  } else if (param.event === "invalidGroupMembership") {
-    // Clear JWTs, the user should get the admin to add him/her to the right Cognito group, and sign-in again
-    for (const cookieName of [
-      cookieNames.idTokenKey,
-      cookieNames.accessTokenKey,
-      cookieNames.refreshTokenKey,
-    ]) {
-      cookies[cookieName] = expireCookie(cookies[cookieName]);
-    }
   }
 
   // Always expire nonce, nonceHmac and pkce - this is valid in all scenario's:

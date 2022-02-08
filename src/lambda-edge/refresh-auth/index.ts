@@ -15,13 +15,11 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   CONFIG.logger.debug("Event:", event);
   const request = event.Records[0].cf.request;
   const domainName = request.headers["host"][0].value;
-  let redirectedFromUri = `https://${domainName}`;
 
   try {
     const { requestedUri, nonce: currentNonce } = parseQueryString(
       request.querystring
     );
-    redirectedFromUri += typeof requestedUri === "string" ? requestedUri : "";
     const {
       idToken,
       refreshToken,
@@ -54,37 +52,23 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
     let newIdToken: string | undefined;
     let newAccessToken: string | undefined;
-    let cookieHeaders: ReturnType<
-      typeof common.generateCookieHeaders.refreshFailed
-    >;
-    try {
-      const body = stringifyQueryString({
-        grant_type: "refresh_token",
-        client_id: CONFIG.clientId,
-        refresh_token: refreshToken,
+    const body = stringifyQueryString({
+      grant_type: "refresh_token",
+      client_id: CONFIG.clientId,
+      refresh_token: refreshToken,
+    });
+    const res = await common
+      .httpPostToCognitoWithRetry(
+        `https://${CONFIG.cognitoAuthDomain}/oauth2/token`,
+        Buffer.from(body),
+        { headers },
+        CONFIG.logger
+      )
+      .catch((err) => {
+        throw new Error(`Failed to refresh tokens: ${err}`);
       });
-      const res = await common
-        .httpPostToCognitoWithRetry(
-          `https://${CONFIG.cognitoAuthDomain}/oauth2/token`,
-          Buffer.from(body),
-          { headers },
-          CONFIG.logger
-        )
-        .catch((err) => {
-          throw new Error(`Failed to refresh tokens: ${err}`);
-        });
-      newIdToken = res.data.id_token as string;
-      newAccessToken = res.data.access_token as string;
-      cookieHeaders = common.generateCookieHeaders.refresh({
-        ...CONFIG,
-        tokens: { id: newIdToken, access: newAccessToken },
-      });
-    } catch (err) {
-      cookieHeaders = common.generateCookieHeaders.refreshFailed({
-        ...CONFIG,
-        tokens: { id: idToken! },
-      });
-    }
+    newIdToken = res.data.id_token as string;
+    newAccessToken = res.data.access_token as string;
     const response = {
       status: "307",
       statusDescription: "Temporary Redirect",
@@ -92,10 +76,15 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         location: [
           {
             key: "location",
-            value: redirectedFromUri,
+            value: `https://${domainName}${
+              typeof requestedUri === "string" ? requestedUri : "/"
+            }`,
           },
         ],
-        "set-cookie": cookieHeaders,
+        "set-cookie": common.generateCookieHeaders.refresh({
+          ...CONFIG,
+          tokens: { id: newIdToken, access: newAccessToken },
+        }),
         ...CONFIG.cloudFrontHeaders,
       },
     };
@@ -105,11 +94,11 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const response = {
       body: common.createErrorHtml({
         title: "Refresh issue",
-        message: "We can't refresh your sign-in because of a",
+        message: "We can't refresh your sign-in automatically because of a",
         expandText: "technical problem",
         details: `${err}`,
-        linkUri: redirectedFromUri,
-        linkText: "Try again",
+        linkUri: `https://${domainName}${CONFIG.signOutUrl}`,
+        linkText: "Sign in",
       }),
       status: "200",
       headers: {

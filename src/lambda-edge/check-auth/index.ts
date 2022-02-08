@@ -16,22 +16,18 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   const requestedUri = `${request.uri}${
     request.querystring ? "?" + request.querystring : ""
   }`;
-  let refreshFailed = false;
-  let idToken: string | undefined;
   try {
     const cookies = common.extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
       CONFIG.cookieCompatibility
     );
-    refreshFailed = !!cookies.refreshFailed;
     CONFIG.logger.debug("Extracted cookies:", cookies);
 
     // If there's no ID token in your cookies, then you are not signed in yet
     if (!cookies.idToken) {
       throw new Error("No ID token present in cookies");
     }
-    idToken = cookies.idToken;
 
     // Verify the ID-token (JWT), this throws an error if the JWT is not valid
     const payload = await CONFIG.jwtVerifier.verify(cookies.idToken);
@@ -45,19 +41,22 @@ export const handler: CloudFrontRequestHandler = async (event) => {
 
     // If the JWT is expired we can try to refresh it
     // This is done by redirecting the user to the refresh path.
-    // We shouldn't do this though, if refresh failed earlier––to prevent an infinite loop
-    if (err instanceof common.JwtExpiredError && !refreshFailed) {
+    // If the refresh works, the user will be redirected back here (this time with valid JWTs)
+    if (err instanceof common.JwtExpiredError) {
+      CONFIG.logger.debug("Redirecting user to refresh path");
       return redirectToRefreshPath({ domainName, requestedUri });
     }
 
     // If the user is not in the right Cognito group, (s)he needs to contact an admin
     // If legitimate, the admin should add the user to the Cognito group,
     // after that the user will need to re-attempt sign-in
-    if (idToken && err instanceof common.CognitoJwtInvalidGroupError) {
-      return showContactAdminErrorPage({ err, requestedUri, idToken });
+    if (err instanceof common.CognitoJwtInvalidGroupError) {
+      CONFIG.logger.debug("User isn't in the right Cognito group");
+      return showContactAdminErrorPage({ err, domainName });
     }
 
     // Send the user to the Cognito Hosted UI to sign-in
+    CONFIG.logger.debug("Redirecting user to Cognito Hosted UI to sign-in");
     return redirectToCognitoHostedUI({ domainName, requestedUri });
   }
 };
@@ -157,12 +156,10 @@ function redirectToRefreshPath({
 
 function showContactAdminErrorPage({
   err,
-  requestedUri,
-  idToken,
+  domainName,
 }: {
   err: unknown;
-  requestedUri: string;
-  idToken: string;
+  domainName: string;
 }) {
   const response = {
     body: common.createErrorHtml({
@@ -171,16 +168,12 @@ function showContactAdminErrorPage({
         "You are not authorized for this site. Please contact the admin.",
       expandText: "Click for details",
       details: `${err}`,
-      linkUri: requestedUri,
-      linkText: "Try Again",
+      linkUri: `https://${domainName}${CONFIG.signOutUrl}`,
+      linkText: "Try again",
     }),
     status: "200",
     headers: {
       ...CONFIG.cloudFrontHeaders,
-      "set-cookie": common.generateCookieHeaders.invalidGroupMembership({
-        ...CONFIG,
-        tokens: { id: idToken },
-      }),
       "content-type": [
         {
           key: "Content-Type",

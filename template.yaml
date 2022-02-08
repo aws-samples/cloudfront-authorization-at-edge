@@ -10,7 +10,7 @@ Metadata:
     Name: cloudfront-authorization-at-edge
     Description: >
       Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge.
-      Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWT's and handle OAuth2 redirects.
+      Includes: S3 Bucket w. sample SPA, Cognito User Pool with hosted UI set up, Lambda@Edge functions to validate JWTs and handle OAuth2 redirects.
     Author: AWS Samples
     SpdxLicenseId: MIT-0
     LicenseUrl: LICENSE
@@ -57,7 +57,7 @@ Parameters:
     Default: ""
   CookieSettings:
     Type: String
-    Description: The settings for the cookies holding e.g. the JWT's. To be provided as a JSON object, mapping cookie type to setting. Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax". If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
+    Description: The settings for the cookies holding e.g. the JWTs. To be provided as a JSON object, mapping cookie type to setting. Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax". If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
     Default: >-
       {
         "idToken": null,
@@ -1137,7 +1137,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-HttpHeadersHandler"
   RefreshAuthHandler:
-    Description: The Lambda function ARN to use in Lambda@Edge for getting new JWT's using the refresh token
+    Description: The Lambda function ARN to use in Lambda@Edge for getting new JWTs using the refresh token
     Value: !GetAtt RefreshAuthHandlerCodeUpdate.FunctionArn
     Export:
       Name: !Sub "${AWS::StackName}-RefreshAuthHandler"

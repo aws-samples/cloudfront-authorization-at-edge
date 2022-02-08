@@ -368,9 +368,9 @@ function _generateCookieHeaders(
 ) {
   /**
    * Generate cookie headers for the following scenario's:
-   *  - signIn: called from Parse Auth lambda, when receiving fresh JWT's from Cognito
+   *  - signIn: called from Parse Auth lambda, when receiving fresh JWTs from Cognito
    *  - sign out: called from Sign Out Lambda, when the user visits the sign out URL
-   *  - refresh: called from Refresh Auth lambda, when receiving fresh ID and Access JWT's from Cognito
+   *  - refresh: called from Refresh Auth lambda, when receiving fresh ID and Access JWTs from Cognito
    *
    *   Note that there are other places besides this helper function where cookies can be set (search codebase for "set-cookie")
    */

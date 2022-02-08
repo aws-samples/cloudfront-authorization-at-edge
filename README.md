@@ -165,6 +165,7 @@ If you do not want to deploy a SPA but rather a static site, then it is more sec
 - Set cookies to be http only by default (unless you've provided other cookie settings explicitly)
 - Skip deployment of the sample React app. Rather a sample index.html is uploaded, that you can replace with your own pages
 - Skip setting up the custom error document mapping 404's to index.html (404's will instead show the plain S3 404 page)
+- Set the refresh token's path explicitly to the refresh path, `"/refreshauth"` instead of `"/"` (unless you've provided other cookie settings explicitly), and thus the refresh token will not be sent to other paths (more secure and more performant)
 
 In case you're choosing Static Site mode, it might make sense to set parameter `RewritePathWithTrailingSlashToIndex` to `true` (`--parameter-overrides RewritePathWithTrailingSlashToIndex="true"`). This will append `index.html` to all paths that include a trailing slash, so that e.g. when the user goes to `/some/sub/dir/`, this is translated to `/some/sub/dir/index.html` in the request to S3.
 

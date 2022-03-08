@@ -128,9 +128,18 @@ Alternatively, go for the more barebone deployment, so you can do more yourselfâ
 
 ## I already have a Cognito User Pool, I want to reuse that one
 
-You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. Make sure you have already configured the User Pool with a domain for the Cognito Hosted UI.
+You can use a pre-existing Cognito User Pool (e.g. from another region), by providing the User Pool's ARN as a parameter upon deploying. Make sure you have already configured the User Pool with a domain for the Cognito Hosted UI. In this case, also specify a pre-existing User Pool Client ID.
 
-In this case, also specify a pre-existing User Pool Client ID. Note that the solution's callback URLs wil be added to the User Pool Client you provide.
+If the pre-existing User Pool is in the same AWS account, the solution's callback URLs wil be added to the User Pool Client you provide automatically.
+
+If the pre-existing User Pool is another AWS account:
+
+- Also specify parameter `UserPoolAuthDomain`, with the domain name of the existing User Pool, e.g. `my-domain-name.auth.<region>.amazoncognito.com`
+- Also specify parameter `UserPoolClientSecret` (only needed if `EnableSPAMode` is set to `false`, i.e. for static site mode)
+- Add the redirect URIs to the pre-existing User Pool Client, otherwise users won't be able to log in ("redirect mismatch"). The redirect URIs you'll need to enter are:
+  - For callback URL: `https://${domain-name-of-your-cloudfront-distribution}${value-you-specified-for-RedirectPathSignIn-parameter}`
+  - For sign-out URL: `https://${domain-name-of-your-cloudfront-distribution}${value-you-specified-for-RedirectPathSignOut-parameter}`
+- Ensure the existing User Pool Client is configured to allow the scopes you provided for parameter `OAuthScopes`
 
 ## I want to use a social identity provider
 

@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.1.0
+    SemanticVersion: 2.1.1
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -53,11 +53,17 @@ Parameters:
     Default: /signout
   AlternateDomainNames:
     Type: CommaDelimitedList
-    Description: "If you intend to use one or more custom domain names for the CloudFront distribution, please set that up yourself on the CloudFront distribution after deployment. If you provide those domain names now (comma-separated) the necessary Cognito configuration will already be done for you. Alternatively, update the Cognito configuration yourself after deployment: add sign in and sign out URLs for your custom domains to the user pool app client settings."
+    Description: >
+      If you intend to use one or more custom domain names for the CloudFront distribution, please set that up yourself on the CloudFront distribution after deployment.
+      If you provide those domain names now (comma-separated) the necessary Cognito configuration will already be done for you (unless you're bring your own User Pool from a different AWS account).
+      Alternatively, update the Cognito configuration yourself after deployment: add sign in and sign out URLs for your custom domains to the user pool app client settings.
     Default: ""
   CookieSettings:
     Type: String
-    Description: The settings for the cookies holding e.g. the JWTs. To be provided as a JSON object, mapping cookie type to setting. Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax". If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
+    Description: >
+      The settings for the cookies holding e.g. the JWTs. To be provided as a JSON object, mapping cookie type to setting.
+      Provide the setting for the particular cookie type as a string, e.g. "Path=/; Secure; HttpOnly; Max-Age=1800; SameSite=Lax".
+      If left to null, a default setting will be used that should be suitable given the value of "EnableSPAMode" parameter.
     Default: >-
       {
         "idToken": null,
@@ -90,14 +96,17 @@ Parameters:
       - "false"
   CreateCloudFrontDistribution:
     Type: String
-    Description: Set to 'false' to skip the creation of a CloudFront distribution and associated resources, such as the private S3 bucket and the sample React app. This may be of use to you, if you just want to create the Lambda@Edge functions to use with your own CloudFront distribution.
+    Description: >
+      Set to 'false' to skip the creation of a CloudFront distribution and associated resources, such as the private S3 bucket and the sample React app.
+      This may be of use to you, if you just want to create the Lambda@Edge functions to use with your own CloudFront distribution.
     Default: "true"
     AllowedValues:
       - "true"
       - "false"
   CookieCompatibility:
     Type: String
-    Description: "Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service. In case of the latter, turn off SPA mode too: set parameter EnableSPAMode to false"
+    Description: >
+      Specify whether naming of cookies should be compatible with AWS Amplify (default) or Amazon Elasticsearch Service. In case of the latter, turn off SPA mode too: set parameter EnableSPAMode to false
     Default: "amplify"
     AllowedValues:
       - "amplify"
@@ -111,9 +120,25 @@ Parameters:
     Type: String
     Description: "Specify the ARN of an existing user pool to use that one instead of creating a new one. If specified, then UserPoolClientId must also be specified. Also, the User Pool should have a domain configured"
     Default: ""
+  UserPoolAuthDomain:
+    Type: String
+    Description: >
+      The auth domain of the existing User Pool, whose ARN you specified as UserPoolArn, e.g. "my-domain.auth.<region>.amazoncognito.com".
+      If you don't provide this value, it will be looked up for you automatically. This automatic lookup only works if the pre-existing User Pool is in the same AWS account as this stack,
+      so if it's not, make sure to explictly specify the UserPoolAuthDomain.
+    Default: ""
   UserPoolClientId:
     Type: String
-    Description: "Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified. Note: new callback URL's will be added to the pre-existing user pool client"
+    Description: >
+      Specify the ID of an existing user pool client to use that one instead of creating a new one. If specified, then UserPoolArn must also be specified.
+      Note: new callback URL's will be added to the pre-existing user pool client (but only if it's in the same AWS account as this stack)
+    Default: ""
+  UserPoolClientSecret:
+    Type: String
+    Description: >
+      The client secret of the existing User Pool Client, whose ClientId you specified as UserPoolClientId.
+      If you don't provide this value, it will be looked up for you automatically. This automatic lookup only works if the pre-existing User Pool Client is in the same AWS account as this stack,
+      so if it's not, make sure to explictly specify the UserPoolClientSecret.
     Default: ""
   UserPoolGroupName:
     Type: String
@@ -125,7 +150,7 @@ Parameters:
   Version:
     Type: String
     Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
-    Default: "2.1.0"
+    Default: "2.1.1"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -156,19 +181,28 @@ Parameters:
     Type: String
     Default: index.html
   S3OriginDomainName:
-    Description: The S3 origin you want to front with CloudFront. Specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com, and (optionally) also specify the parameter OriginAccessIdentity. If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
+    Description: >
+      The S3 origin you want to front with CloudFront. Specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com,
+      and (optionally) also specify the parameter OriginAccessIdentity.
+      If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
     Type: String
     Default: ""
   CustomOriginDomainName:
-    Description: The custom origin you want to front with CloudFront. If using an existing S3 bucket (in non-website mode), don't use this parameter, specify parameter "S3OriginDomainName" instead. If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
+    Description: >
+      The custom origin you want to front with CloudFront. If using an existing S3 bucket (in non-website mode), don't use this parameter, specify parameter "S3OriginDomainName" instead.
+      If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
     Type: String
     Default: ""
   CustomOriginHeaderName:
-    Description: The HTTP header name of the (secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginHeaderValue". Only of use if you are also specifying parameter "CustomOriginDomainName".
+    Description: >
+      The HTTP header name of the (secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginHeaderValue".
+      Only of use if you are also specifying parameter "CustomOriginDomainName".
     Type: String
     Default: ""
   CustomOriginHeaderValue:
-    Description: The HTTP header value of the (secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginHeaderName". Only of use if you are also specifying parameter "CustomOriginDomainName".
+    Description: >
+      The HTTP header value of the (secret) custom header that you want CloudFront to send to your custom origin. Also specify parameter "CustomOriginHeaderName".
+      Only of use if you are also specifying parameter "CustomOriginDomainName".
     Type: String
     Default: ""
   OriginAccessIdentity:
@@ -208,9 +242,16 @@ Conditions:
   AttachUserToPoolGroup: !And
     - !Condition CreateUser
     - !Condition CreateUserPoolGroup
-  UpdateUserPoolClient: !Or
-    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
-    - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
+  NoExistingUserPoolProvidedOrExistingUserPoolIsInThisAccount: !Or
+    - !Equals [!Ref UserPoolArn, ""]
+    - !Equals
+      - !Ref AWS::AccountId
+      - !Select [4, !Split [":", !Sub "${UserPoolArn}::::otheraccount"]] # Appending :::::otheraccount is a trick to make the select work even if UserPoolArn is empty
+  UpdateUserPoolClient: !And
+    - !Or
+      - !Equals [!Ref CreateCloudFrontDistribution, "true"]
+      - !Not [!Equals [!Join ["", !Ref AlternateDomainNames], ""]]
+    - !Condition NoExistingUserPoolProvidedOrExistingUserPoolIsInThisAccount
   RegionIsNotUsEast1: !Not [!Equals [!Ref AWS::Region, "us-east-1"]]
   RewritePathWithTrailingSlashToIndex:
     !Equals [!Ref RewritePathWithTrailingSlashToIndex, "true"]
@@ -234,6 +275,13 @@ Conditions:
   CustomOriginHeaderProvided: !And
     - !Not [!Equals [!Ref CustomOriginHeaderName, ""]]
     - !Not [!Equals [!Ref CustomOriginHeaderValue, ""]]
+  LookupAuthDomain: !And
+    - !Condition NoExistingUserPoolProvidedOrExistingUserPoolIsInThisAccount
+    - !Equals [!Ref UserPoolAuthDomain, ""]
+  LookupClientSecret: !And
+    - !Condition StaticSiteMode
+    - !Condition NoExistingUserPoolProvidedOrExistingUserPoolIsInThisAccount
+    - !Equals [!Ref UserPoolClientSecret, ""]
 
 Globals:
   Function:
@@ -613,6 +661,7 @@ Resources:
 
   UserPoolDomainLookup:
     Type: Custom::UserPoolDomainLookup
+    Condition: LookupAuthDomain
     Properties:
       ServiceToken: !GetAtt UserPoolDomainLookupHandler.Arn
       UserPoolArn: !If
@@ -622,6 +671,7 @@ Resources:
 
   UserPoolDomainLookupHandler:
     Type: AWS::Serverless::Function
+    Condition: LookupAuthDomain
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
@@ -674,7 +724,7 @@ Resources:
 
   ClientSecretRetrieval:
     Type: Custom::ClientSecretRetrieval
-    Condition: StaticSiteMode
+    Condition: LookupClientSecret
     Properties:
       ServiceToken: !GetAtt ClientSecretRetrievalHandler.Arn
       UserPoolArn: !If
@@ -688,7 +738,7 @@ Resources:
 
   ClientSecretRetrievalHandler:
     Type: AWS::Serverless::Function
-    Condition: StaticSiteMode
+    Condition: LookupClientSecret
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
@@ -748,7 +798,10 @@ Resources:
         - CreateUserPoolAndClient
         - !Ref UserPoolClient
         - !Ref UserPoolClientId
-      CognitoAuthDomain: !Ref UserPoolDomainLookup
+      CognitoAuthDomain: !If
+        - LookupAuthDomain
+        - !Ref UserPoolDomainLookup
+        - !Ref UserPoolAuthDomain
       RedirectPathSignIn: !Ref RedirectPathSignIn
       RedirectPathSignOut: !Ref RedirectPathSignOut
       OAuthScopes: !Join
@@ -798,7 +851,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomainLookup}",
+              "cognitoAuthDomain": "${UserPoolDomain}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "signOutUrl": "${SignOutUrl}",
@@ -816,9 +869,16 @@ Resources:
               - SPAMode
               - "spaMode"
               - "staticSiteMode"
+            UserPoolDomain: !If
+              - LookupAuthDomain
+              - !Ref UserPoolDomainLookup
+              - !Ref UserPoolAuthDomain
             ClientSecret: !If
               - StaticSiteMode
-              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - !If
+                - LookupClientSecret
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - !Ref UserPoolClientSecret
               - ""
             UserPoolArn: !If
               - CreateUserPoolAndClient
@@ -853,7 +913,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomainLookup}",
+              "cognitoAuthDomain": "${UserPoolDomain}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "signOutUrl": "${SignOutUrl}",
@@ -871,9 +931,16 @@ Resources:
               - SPAMode
               - "spaMode"
               - "staticSiteMode"
+            UserPoolDomain: !If
+              - LookupAuthDomain
+              - !Ref UserPoolDomainLookup
+              - !Ref UserPoolAuthDomain
             ClientSecret: !If
               - StaticSiteMode
-              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - !If
+                - LookupClientSecret
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - !Ref UserPoolClientSecret
               - ""
             UserPoolArn: !If
               - CreateUserPoolAndClient
@@ -940,7 +1007,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomainLookup}",
+              "cognitoAuthDomain": "${UserPoolDomain}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "signOutUrl": "${SignOutUrl}",
@@ -958,9 +1025,16 @@ Resources:
               - SPAMode
               - "spaMode"
               - "staticSiteMode"
+            UserPoolDomain: !If
+              - LookupAuthDomain
+              - !Ref UserPoolDomainLookup
+              - !Ref UserPoolAuthDomain
             ClientSecret: !If
               - StaticSiteMode
-              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - !If
+                - LookupClientSecret
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - !Ref UserPoolClientSecret
               - ""
             UserPoolArn: !If
               - CreateUserPoolAndClient
@@ -995,7 +1069,7 @@ Resources:
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
-              "cognitoAuthDomain": "${UserPoolDomainLookup}",
+              "cognitoAuthDomain": "${UserPoolDomain}",
               "redirectPathSignIn": "${RedirectPathSignIn}",
               "redirectPathSignOut": "${RedirectPathSignOut}",
               "signOutUrl": "${SignOutUrl}",
@@ -1013,9 +1087,16 @@ Resources:
               - SPAMode
               - "spaMode"
               - "staticSiteMode"
+            UserPoolDomain: !If
+              - LookupAuthDomain
+              - !Ref UserPoolDomainLookup
+              - !Ref UserPoolAuthDomain
             ClientSecret: !If
               - StaticSiteMode
-              - !GetAtt ClientSecretRetrieval.ClientSecret
+              - !If
+                - LookupClientSecret
+                - !GetAtt ClientSecretRetrieval.ClientSecret
+                - !Ref UserPoolClientSecret
               - ""
             UserPoolArn: !If
               - CreateUserPoolAndClient
@@ -1100,13 +1181,19 @@ Outputs:
   ClientSecret:
     Description: The client secret associated with the User Pool Client. This will be empty in SPA mode.
     Condition: StaticSiteMode
-    Value: !GetAtt ClientSecretRetrieval.ClientSecret
+    Value: !If
+      - LookupClientSecret
+      - !GetAtt ClientSecretRetrieval.ClientSecret
+      - !Ref UserPoolClientSecret
     Export:
       Name: !Sub "${AWS::StackName}-ClientSecret"
   CognitoAuthDomain:
     Description: The domain where the Cognito Hosted UI is served
     Condition: CreateUserPoolAndClient
-    Value: !Ref UserPoolDomainLookup
+    Value: !If
+      - LookupAuthDomain
+      - !Ref UserPoolDomainLookup
+      - !Ref UserPoolAuthDomain
     Export:
       Name: !Sub "${AWS::StackName}-CognitoAuthDomain"
   RedirectUrisSignIn:

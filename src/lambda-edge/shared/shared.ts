@@ -447,7 +447,7 @@ function _generateCookieHeaders(
     "spa-auth-edge-nonce-hmac",
     "spa-auth-edge-pkce",
   ].forEach((key) => {
-    cookies[key] = expireCookie();
+    cookies[key] = expireCookie(`;${param.cookieSettings.nonce}`);
   });
 
   // Return cookie object in format of CloudFront headers

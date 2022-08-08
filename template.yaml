@@ -443,6 +443,7 @@ Resources:
                 - lambda:DeleteFunction
                 - lambda:UpdateFunctionCode
                 - lambda:UpdateFunctionConfiguration
+                - lambda:TagResource
               Resource:
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-CheckAuthHandler-*"
                 - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-ParseAuthHandler-*"

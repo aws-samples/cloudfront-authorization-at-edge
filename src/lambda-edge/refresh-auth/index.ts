@@ -76,9 +76,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         location: [
           {
             key: "location",
-            value: `https://${domainName}${
-              typeof requestedUri === "string" ? requestedUri : "/"
-            }`,
+            value: `https://${domainName}${common.ensureValidRedirectPath(
+              requestedUri
+            )}`,
           },
         ],
         "set-cookie": common.generateCookieHeaders.refresh({

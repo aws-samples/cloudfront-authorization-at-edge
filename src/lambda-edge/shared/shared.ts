@@ -605,3 +605,8 @@ export function generateSecret(
     .map(() => allowedCharacters[randomInt(0, allowedCharacters.length)])
     .join("");
 }
+
+export function ensureValidRedirectPath(path: unknown) {
+  if (typeof path !== "string") return "/";
+  return path.startsWith("/") ? path : `/${path}`;
+}

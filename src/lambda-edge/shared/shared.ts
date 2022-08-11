@@ -10,6 +10,7 @@ import { fetch } from "./https";
 import { Agent, RequestOptions } from "https";
 import html from "./error-page/template.html";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
+import { Jwks } from "aws-jwt-verify/jwk";
 export {
   CognitoJwtInvalidGroupError,
   JwtExpiredError,
@@ -75,6 +76,7 @@ interface ConfigFromDiskWithHeaders extends ConfigFromDisk {
 
 interface ConfigFromDiskComplete extends ConfigFromDiskWithHeaders {
   userPoolArn: string;
+  jwks: Jwks;
   clientId: string;
   oauthScopes: string[];
   cognitoAuthDomain: string;
@@ -228,14 +230,21 @@ export function getCompleteConfig(): CompleteConfig {
 export function getConfigWithJwtVerifier() {
   const config = getCompleteConfig();
   const userPoolId = config.userPoolArn.split("/")[1];
+  const jwtVerifier = CognitoJwtVerifier.create({
+    userPoolId,
+    clientId: config.clientId,
+    tokenUse: "id",
+    groups: config.requiredGroup || undefined,
+  });
+
+  // Optimization: load the JWKS (as it was at deploy-time) into the cache.
+  // Then, the JWKS does not need to be fetched at runtime,
+  // as long as only JWTs come by with a kid that is in this cached JWKS:
+  jwtVerifier.cacheJwks(config.jwks);
+
   return {
     ...config,
-    jwtVerifier: CognitoJwtVerifier.create({
-      userPoolId,
-      clientId: config.clientId,
-      tokenUse: "id",
-      groups: config.requiredGroup || undefined,
-    }),
+    jwtVerifier,
   };
 }
 

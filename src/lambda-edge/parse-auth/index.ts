@@ -30,7 +30,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       cookies,
     });
     CONFIG.logger.debug("Query string and cookies are valid");
-    redirectedFromUri += requestedUri;
+    redirectedFromUri += common.ensureValidRedirectPath(requestedUri);
 
     const body = stringifyQueryString({
       grant_type: "authorization_code",

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 
 import React, { useState, useEffect } from "react";
-import Amplify from "@aws-amplify/core";
-import Auth from "@aws-amplify/auth";
+import { Amplify } from "@aws-amplify/core";
+import { Auth } from "@aws-amplify/auth";
 import "./App.css";
 
 Amplify.configure({
@@ -32,19 +32,60 @@ const App = () => {
   const [state, setState] = useState({
     email: undefined,
     username: undefined,
+    authenticated: undefined,
   });
 
   useEffect(() => {
-    Auth.currentSession().then((user) =>
-      setState({
-        username: user.username,
-        email: user.getIdToken().decodePayload().email,
-      })
-    );
+    Auth.currentSession()
+      .then((user) =>
+        setState({
+          username: user.username,
+          email: user.getIdToken().decodePayload().email,
+          authenticated: true,
+        })
+      )
+      .catch(() => setState({ authenticated: false }));
+
     // Schedule check and refresh (when needed) of JWT's every 5 min:
     const i = setInterval(() => Auth.currentSession(), 5 * 60 * 1000);
     return () => clearInterval(i);
   }, []);
+
+  if (state.authenticated === undefined) {
+    return (
+      <div className="App">
+        <p className="explanation">One moment please ...</p>
+      </div>
+    );
+  }
+
+  if (state.authenticated === false) {
+    return (
+      <div className="App">
+        <h1>Signed out</h1>
+        <p className="explanation-tight">You're signed out.</p>
+        <p className="explanation-tight">
+          You're able to view this page, because it is in your browser's local
+          cache––you didn't actually download it from CloudFront just now.
+          Authorization@Edge wouldn't allow that.
+        </p>
+        <p className="explanation-tight">
+          If you force your browser to reload the page, you'll trigger
+          Authorization@Edge again, redirecting you to the login page:&nbsp;
+          <button onClick={() => window.location.reload(true)}>
+            Reload page
+          </button>
+        </p>
+        <p className="explanation-tight">
+          If you never want to cache content, set the right cache headers on the
+          objects in S3; those headers will be respected by CloudFront and web
+          browsers:
+          <pre>Cache-Control: no-cache</pre>
+          At the expense of some performance for end-users of course.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="App">

@@ -148,7 +148,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -157,7 +157,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -166,7 +166,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -175,7 +175,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -184,7 +184,7 @@ Resources:
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
@@ -337,7 +337,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -373,7 +373,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -396,7 +396,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -418,7 +418,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -457,7 +457,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
       Handler: bundle.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -682,7 +682,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaCodeUpdateHandlerRole.Arn
 
 
@@ -698,7 +698,7 @@ Resources:
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
       Handler: index.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs16.x
 
 Outputs:
   S3Bucket:

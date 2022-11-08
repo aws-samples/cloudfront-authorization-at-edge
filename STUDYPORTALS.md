@@ -19,6 +19,8 @@ Run `sam build --region us-east-1` to build the infrastructure consisting of an 
 
 Run `sam package --region us-east-1 --s3-bucket devops-sam-deployments-us-east-1 --output-template-file packaged.yaml` to prepare for deployment
 
+Run  `sam publish --template packaged.yaml --region us-east-1`
+
 Deploy it with `sam deploy --stack-name portal-experiments --region us-east-1 --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --parameter-overrides BucketNameParameter="portal-experiments" AlternateDomainNames="portal-experiments.studyportals.xyz" --s3-bucket devops-sam-deployments-us-east-1`
 
 Take note of the `UserPoolId` and `CognitoAuthDomain` and proceed further

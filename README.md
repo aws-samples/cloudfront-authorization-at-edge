@@ -90,7 +90,7 @@ NOTE: Run the deployment commands below in a Unix-like shell such as sh, bash, z
 3. TypeScript compile and run Webpack: `npm run build`
 4. Run SAM build. `sam build`
 5. Run SAM package: `sam package --output-template-file packaged.yaml --s3-bucket <Your SAM bucket>`
-6. Run SAM deploy: `sam deploy --template-file packaged.yaml --stack-name <Your Stack Name> --capabilities CAPABILITY_IAM --parameter-overrides EmailAddress=<your email>`
+6. Run SAM deploy: `sam deploy --s3-bucket <Your SAM bucket> --stack-name <Your Stack Name> --capabilities CAPABILITY_IAM --parameter-overrides EmailAddress=<your email>`
 
 Providing an email address (as above in step 6) is optional. If you provide it, a user will be created in the Cognito User Pool that you can sign-in with.
 

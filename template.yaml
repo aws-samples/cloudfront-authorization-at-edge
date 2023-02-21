@@ -166,7 +166,7 @@ Parameters:
     Type: String
     Default: ""
   RewritePathWithTrailingSlashToIndex:
-    Description: Do you want to append "index.html" to paths that end with a slash ("/")?
+    Description: Do you want to append "index.html" to paths that end with a slash ("/") or a word that doesn't contains a dot (".")?
     Type: String
     Default: "false"
     AllowedValues:
@@ -1256,7 +1256,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-SignOutHandler"
   TrailingSlashHandler:
-    Description: The Lambda function ARN to use in Lambda@Edge for appending index.html to paths ending with a slash ("/")
+    Description: The Lambda function ARN to use in Lambda@Edge for appending index.html to paths ending with a slash ("/") or a word that doesn't contains a dot (".")
     Condition: RewritePathWithTrailingSlashToIndex
     Value: !GetAtt TrailingSlashHandlerCodeUpdate.FunctionArn
     Export:

@@ -5,6 +5,8 @@ import { IncomingHttpHeaders } from "http";
 import { request, RequestOptions } from "https";
 import { Writable, pipeline } from "stream";
 
+const DEFAULT_REQUEST_TIMEOUT = 4000; // 4 seconds
+
 export async function fetch(
   uri: string,
   data?: Buffer,
@@ -15,7 +17,12 @@ export async function fetch(
     headers: IncomingHttpHeaders;
     data: Buffer;
   }>((resolve, reject) => {
-    const req = request(uri, options ?? {}, (res) =>
+    const requestOptions = {
+      signal: AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT),
+      ...(options ?? {}),
+    };
+
+    const req = request(uri, requestOptions, (res) =>
       pipeline(
         [
           res,

@@ -1,5 +1,5 @@
 {
-  "extends": "@tsconfig/node14",
+  "extends": "@tsconfig/node16",
   "include": [
     /* Specify files to transpile explicitly because other ts files in this project are transpiled directly by webpack */
     "src/cfn-custom-resources"

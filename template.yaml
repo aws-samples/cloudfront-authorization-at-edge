@@ -290,7 +290,7 @@ Globals:
       - ApplyPermissionsBoundary
       - !Ref PermissionsBoundaryPolicyArn
       - !Ref AWS::NoValue
-    Runtime: nodejs14.x
+    Runtime: nodejs16.x
 
 Resources:
   S3Bucket:
@@ -827,6 +827,7 @@ Resources:
         - !Ref OAuthScopes
       SignOutUrl: !Ref SignOutUrl
       CookieSettings: !Ref CookieSettings
+      Version: !Ref Version
 
   ReactAppHandler:
     Type: AWS::Serverless::Function
@@ -836,6 +837,8 @@ Resources:
       Handler: index.handler
       Timeout: 300
       MemorySize: 3008
+      EphemeralStorage:
+        Size: 2048
       Policies:
         - Version: "2012-10-17"
           Statement:

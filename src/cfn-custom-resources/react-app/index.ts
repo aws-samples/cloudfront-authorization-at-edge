@@ -93,6 +93,12 @@ async function buildSpa(config: Configuration) {
   console.log(`Creating React environment file ${temp_dir}/.env ...`);
   writeFileSync(`${temp_dir}/.env`, reactEnv);
 
+  console.log("NPM version:");
+  execSync("npm -v", {
+    cwd: temp_dir,
+    stdio: "inherit",
+    env: { ...process.env, HOME: home_dir },
+  });
   console.log(`Installing dependencies to build React app in ${temp_dir} ...`);
   execSync("npm ci", {
     cwd: temp_dir,

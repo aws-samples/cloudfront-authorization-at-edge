@@ -128,6 +128,12 @@ async function ensureUsEast1LambdaStack(props: {
       .catch(() => ({ Stacks: undefined }));
     if (stacks?.length) {
       console.log("Deleting us-east-1 stack ...");
+      const deploymentBucket = stacks[0].Outputs?.find(
+        (output) => output.OutputKey === "DeploymentBucket"
+      )?.OutputValue;
+      if (deploymentBucket) {
+        await emptyBucket({ bucket: deploymentBucket });
+      }
       await CFN_CLIENT_US_EAST_1.deleteStack({
         StackName: props.stackName,
       }).promise();
@@ -410,6 +416,33 @@ async function copyLambdaCodeToUsEast1(props: {
     Body: data,
   }).promise();
   return props;
+}
+
+async function emptyBucket(props: { bucket: string }) {
+  const params: S3.ListObjectsV2Request = {
+    Bucket: props.bucket,
+  };
+  do {
+    console.log(`Listing objects in bucket ${props.bucket} ...`);
+    const { Contents: s3objects, NextContinuationToken } =
+      await S3_CLIENT_US_EAST_1.listObjectsV2(params).promise();
+
+    if (!s3objects?.length) break;
+    console.log(`Deleting ${s3objects.length} S3 objects ...`);
+
+    const { Errors: errors } = await S3_CLIENT_US_EAST_1.deleteObjects({
+      Bucket: props.bucket,
+      Delete: {
+        Objects: s3objects.filter((o) => !!o.Key).map((o) => ({ Key: o.Key! })),
+      },
+    }).promise();
+
+    if (errors?.length) {
+      console.log("Failed to delete objects:", JSON.stringify(errors));
+    }
+
+    params.ContinuationToken = NextContinuationToken;
+  } while (params.ContinuationToken);
 }
 
 export const handler: CloudFormationCustomResourceHandler = async (event) => {

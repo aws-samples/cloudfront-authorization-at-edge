@@ -6,10 +6,18 @@ import {
   stringify as stringifyQueryString,
 } from "querystring";
 import { CloudFrontRequestHandler } from "aws-lambda";
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import * as common from "../shared/shared";
 
+
 const CONFIG = common.getCompleteConfig();
+const TABLE_NAME = "index-testing-tokens"
+const REGION = "us-east-1"
+
+const dynamodbClient = new DynamoDBClient({ region: REGION });
+
 CONFIG.logger.debug("Configuration loaded:", CONFIG);
+
 
 export const handler: CloudFrontRequestHandler = async (event) => {
   CONFIG.logger.debug("Event:", event);
@@ -18,6 +26,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   const cognitoTokenEndpoint = `https://${CONFIG.cognitoAuthDomain}/oauth2/token`;
   let redirectedFromUri = `https://${domainName}`;
   let idTokenInCookies: string | undefined = undefined;
+
   try {
     const cookies = common.extractAndParseCookies(
       request.headers,
@@ -25,6 +34,55 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       CONFIG.cookieCompatibility
     );
     ({ idToken: idTokenInCookies } = cookies);
+
+    var params = {
+      TableName : TABLE_NAME,
+      Key : {
+        "token" : {
+          "S" : idTokenInCookies
+        }
+      },
+      ProjectionExpression: "valid"
+    };
+
+    dynamodbClient.getItem(params, function(err, data) {
+      if (err) {
+        throw new Error(
+          "Error retrieving token validity information from table " + TABLE_NAME
+          + ": " + err.message
+        );
+      } else {
+        if (data && data.Item && data.Item.valid.S) {
+          CONFIG.logger.debug("Authentication successful: token found in sessions database is valid")
+          const response = {
+            status: "307",
+            statusDescription: "Temporary Redirect",
+            headers: {
+              location: [
+                {
+                  key: "location",
+                  value: redirectedFromUri,
+                },
+              ],
+              "set-cookie": common.generateCookieHeaders.signIn({
+                tokens: {
+                  id: idToken,
+                  access: accessToken,
+                  refresh: refreshToken,
+                },
+                ...CONFIG,
+              }),
+              ...CONFIG.cloudFrontHeaders,
+            },
+          };
+          CONFIG.logger.debug("Returning response:\n", response);
+          return response;
+        } else {
+          throw new Error("Authentication failed: invalid token");
+        }
+      }
+    });
+
     const { code, pkce, requestedUri } = validateQueryStringAndCookies({
       querystring: request.querystring,
       cookies,

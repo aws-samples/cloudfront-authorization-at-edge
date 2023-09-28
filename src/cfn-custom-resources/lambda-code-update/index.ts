@@ -64,6 +64,28 @@ async function updateLambdaCode(
     })
     .promise();
   console.log({ CodeSha256, Version, FunctionArn });
+  let attempts = 0;
+  while (++attempts <= 30) {
+    const { State } = await lambdaClient
+      .getFunctionConfiguration({
+        FunctionName: FunctionArn!,
+      })
+      .promise();
+    if (!State || State === "Pending") {
+      console.log(
+        `Waiting for updated Lambda function to become Active, is: ${State} (attempts: ${attempts})`
+      );
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(5000, 1000 * attempts))
+      );
+      continue;
+    }
+    if (State === "Active") {
+      console.log("Function is now Active!");
+      break;
+    }
+    throw new Error(`Lambda function state is: ${State}`);
+  }
   return {
     physicalResourceId: lambdaFunction,
     Data: { CodeSha256, Version, FunctionArn },

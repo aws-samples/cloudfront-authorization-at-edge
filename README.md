@@ -42,7 +42,8 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 - [sign-out](src/lambda-edge/sign-out): Lambda@Edge function that handles sign-out
 - [http-headers](src/lambda-edge/http-headers): Lambda@Edge function that sets HTTP security headers (as good practice)
 - [rewrite-trailing-slash](src/lambda-edge/rewrite-trailing-slash): Lambda@Edge function that appends "index.html" to paths that end with a slash (optional use, intended for static site hosting, controlled via parameter `RewritePathWithTrailingSlashToIndex`, see below)
-
+- [shared](src/lambda-edge/shared): Utility functions used by several Lambda@Edge functions
+  
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
 - [us-east-1-lambda-stack](src/cfn-custom-resources/us-east-1-lambda-stack): Lambda function that implements a CloudFormation custom resource that makes sure the Lambda@Edge functions are deployed to us-east-1 (which is a CloudFront requirement, see below.)
@@ -52,7 +53,6 @@ CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-res
 - [user-pool-domain](src/cfn-custom-resources/user-pool-domain): Lambda function that implements a CloudFormation custom resource to lookup the User Pool's domain, at which the Hosted UI is available
 - [lambda-code-update](src/cfn-custom-resources/lambda-code-update): Lambda function that implements a CloudFormation custom resource to inject configuration into the lambda@Edge functions and publish versions
 - [generate-secret](src/cfn-custom-resources/generate-secret): Lambda function that implements a CloudFormation custom resource that generates a unique secret upon deploying
-- [shared](src/lambda-edge/shared): Utility functions used by several Lambda@Edge functions
 
 Other files and directories:
 

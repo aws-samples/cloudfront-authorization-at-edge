@@ -217,18 +217,6 @@ Parameters:
     Description: The lambda suffix to use, will be common to lambdas and logs
     Type: String
     Default: !Ref "AWS::StackId"
-  LogsDeletionPolicy:
-    Description: Retain Policy for logs when deleting stack
-    Type: String
-    Default: "Retain"
-    AllowedValues:
-      - "Delete"
-      - "Retain"
-      - "RetainExceptOnCreate"
-  LogsRetentionInDays:
-    Description: "Retention in days for logs"
-    Type: Integer
-    Default: 3653
 
 Conditions:
   ApplyPermissionsBoundary:
@@ -319,19 +307,8 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
-  CheckAuthHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: !Ref LogsDeletionPolicy
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ""
-          - ["/aws/lambda/", "CheckAuthHandler", !Ref: "ResourceSuffix"]
-      RetentionInDays": !Ref LogsRetentionInDays
-
   CheckAuthHandler:
     Type: AWS::Serverless::Function
-    DependsOn: CheckAuthHandlerLogGroup
     FunctionName:
       Fn::Join:
         - ""
@@ -342,19 +319,8 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
-  ParseAuthHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: !Ref LogsDeletionPolicy
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ""
-          - ["/aws/lambda/", "ParseAuthHandler", !Ref: "ResourceSuffix"]
-      RetentionInDays": !Ref LogsRetentionInDays
-
   ParseAuthHandler:
     Type: AWS::Serverless::Function
-    DependsOn: ParseAuthHandlerLogGroup
     FunctionName:
       Fn::Join:
         - ""
@@ -365,19 +331,8 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
-  RefreshAuthHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: !Ref LogsDeletionPolicy
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ""
-          - ["/aws/lambda/", "RefreshAuthHandler", !Ref: "ResourceSuffix"]
-      RetentionInDays": !Ref LogsRetentionInDays
-
   RefreshAuthHandler:
     Type: AWS::Serverless::Function
-    DependsOn: RefreshAuthHandlerLogGroup
     FunctionName:
       Fn::Join:
         - ""
@@ -388,19 +343,8 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
-  HttpHeadersHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: !Ref LogsDeletionPolicy
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ""
-          - ["/aws/lambda/", "HttpHeadersHandler", !Ref: "ResourceSuffix"]
-      RetentionInDays": !Ref LogsRetentionInDays
-
   HttpHeadersHandler:
     Type: AWS::Serverless::Function
-    DependsOn: HttpHeadersHandlerLogGroup
     FunctionName:
       Fn::Join:
         - ""
@@ -411,19 +355,8 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
-  SignOutHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: !Ref LogsDeletionPolicy
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ""
-          - ["/aws/lambda/", "SignOutHandler", !Ref: "ResourceSuffix"]
-      RetentionInDays": !Ref LogsRetentionInDays
-
   SignOutHandler:
     Type: AWS::Serverless::Function
-    DependsOn: SignOutHandlerLogGroup
     FunctionName:
       Fn::Join:
         - ""
@@ -434,19 +367,8 @@ Resources:
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
 
-  TrailingSlashHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: !Ref LogsDeletionPolicy
-    Properties:
-      LogGroupName:
-        Fn::Join:
-          - ""
-          - ["/aws/lambda/", "TrailingSlashHandler", !Ref: "ResourceSuffix"]
-      RetentionInDays": !Ref LogsRetentionInDays
-
   TrailingSlashHandler:
     Type: AWS::Serverless::Function
-    DependsOn: TrailingSlashHandlerLogGroup
     FunctionName:
       Fn::Join:
         - ""

@@ -213,6 +213,10 @@ Parameters:
     Description: The (pre-existing) Amazon S3 bucket to store CloudFront access logs in, for example, myawslogbucket.s3.amazonaws.com. Only of use if "CreateCloudFrontDistribution" is set to "true" (the default).
     Type: String
     Default: ""
+  ResourceSuffix:
+    Description: The lambda suffix to use, will be common to lambdas and logs
+    Type: String
+    Default: ""
 
 Conditions:
   ApplyPermissionsBoundary:
@@ -269,6 +273,7 @@ Conditions:
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Equals [!Ref CustomOriginDomainName, ""]
   UseWAF: !Not [!Equals [!Ref WebACLId, ""]]
+  UseResourceSuffix: !Not [!Equals [!Ref ResourceSuffix, ""]] # Use "" as default value for ResourceSuffix
   DefaultRootObjectProvided: !Not [!Equals [!Ref DefaultRootObject, ""]]
   CloudFrontAccessLogsBucketProvided:
     !Not [!Equals [!Ref CloudFrontAccessLogsBucket, ""]]
@@ -305,6 +310,13 @@ Resources:
 
   CheckAuthHandler:
     Type: AWS::Serverless::Function
+    FunctionName:
+      !If
+        - UseResourceSuffix
+        - Fn::Join:
+            - ""
+            - ["CheckAuthHandler", !Ref: "ResourceSuffix"]
+        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
@@ -313,6 +325,13 @@ Resources:
 
   ParseAuthHandler:
     Type: AWS::Serverless::Function
+    FunctionName:
+      !If
+        - UseResourceSuffix
+        - Fn::Join:
+            - ""
+            - ["ParseAuthHandler", !Ref: "ResourceSuffix"]
+        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
@@ -321,6 +340,13 @@ Resources:
 
   RefreshAuthHandler:
     Type: AWS::Serverless::Function
+    FunctionName:
+     !If
+        - UseResourceSuffix
+        - Fn::Join:
+            - ""
+            - ["RefreshAuthHandler", !Ref: "ResourceSuffix"]
+        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
@@ -329,6 +355,13 @@ Resources:
 
   HttpHeadersHandler:
     Type: AWS::Serverless::Function
+    FunctionName:
+     !If
+        - UseResourceSuffix
+        - Fn::Join:
+            - ""
+            - ["HttpHeadersHandler", !Ref: "ResourceSuffix"]
+        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
@@ -337,6 +370,13 @@ Resources:
 
   SignOutHandler:
     Type: AWS::Serverless::Function
+    FunctionName:
+     !If
+        - UseResourceSuffix
+        - Fn::Join:
+            - ""
+            - ["SignOutHandler", !Ref: "ResourceSuffix"]
+        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
@@ -345,6 +385,12 @@ Resources:
 
   TrailingSlashHandler:
     Type: AWS::Serverless::Function
+    FunctionName:
+     !If
+        - UseResourceSuffix
+        - Fn::Join:
+            - ""
+            - ["TrailingSlashHandler", !Ref: "ResourceSuffix"]
     Condition: RewritePathWithTrailingSlashToIndex
     Properties:
       CodeUri: src/lambda-edge/rewrite-trailing-slash/

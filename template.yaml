@@ -27,7 +27,7 @@ Metadata:
         "amplify",
       ]
     HomePageUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
-    SemanticVersion: 2.1.8
+    SemanticVersion: 2.1.9
     SourceCodeUrl: https://github.com/aws-samples/cloudfront-authorization-at-edge
 
 Parameters:
@@ -150,7 +150,7 @@ Parameters:
   Version:
     Type: String
     Description: "Changing this parameter after initial deployment forces redeployment of Lambda@Edge functions"
-    Default: "2.1.8"
+    Default: "2.1.9"
   LogLevel:
     Type: String
     Description: "Use for development: setting to a value other than none turns on logging at that level. Warning! This will log sensitive data, use for development only"
@@ -214,7 +214,7 @@ Parameters:
     Type: String
     Default: ""
   ResourceSuffix:
-    Description: The lambda suffix to use, will be common to lambdas and logs
+    Description: The suffix to use for Lambda function names. Use this to disambiguate between multiple deployments of this application
     Type: String
     Default: ""
 
@@ -273,7 +273,7 @@ Conditions:
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Equals [!Ref CustomOriginDomainName, ""]
   UseWAF: !Not [!Equals [!Ref WebACLId, ""]]
-  UseResourceSuffix: !Not [!Equals [!Ref ResourceSuffix, ""]] # Use "" as default value for ResourceSuffix
+  UseResourceSuffix: !Not [!Equals [!Ref ResourceSuffix, ""]]
   DefaultRootObjectProvided: !Not [!Equals [!Ref DefaultRootObject, ""]]
   CloudFrontAccessLogsBucketProvided:
     !Not [!Equals [!Ref CloudFrontAccessLogsBucket, ""]]
@@ -310,93 +310,76 @@ Resources:
 
   CheckAuthHandler:
     Type: AWS::Serverless::Function
-    FunctionName:
-      !If
-        - UseResourceSuffix
-        - Fn::Join:
-            - ""
-            - ["CheckAuthHandler", !Ref: "ResourceSuffix"]
-        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/check-auth/
       Handler: bundle.handler
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
+      FunctionName: !If
+        - UseResourceSuffix
+        - !Sub "CheckAuthHandler-${ResourceSuffix}"
+        - !Ref AWS::NoValue
 
   ParseAuthHandler:
     Type: AWS::Serverless::Function
-    FunctionName:
-      !If
-        - UseResourceSuffix
-        - Fn::Join:
-            - ""
-            - ["ParseAuthHandler", !Ref: "ResourceSuffix"]
-        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/parse-auth/
       Handler: bundle.handler
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
+      FunctionName: !If
+        - UseResourceSuffix
+        - !Sub "ParseAuthHandler-${ResourceSuffix}"
+        - !Ref AWS::NoValue
 
   RefreshAuthHandler:
     Type: AWS::Serverless::Function
-    FunctionName:
-     !If
-        - UseResourceSuffix
-        - Fn::Join:
-            - ""
-            - ["RefreshAuthHandler", !Ref: "ResourceSuffix"]
-        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/refresh-auth/
       Handler: bundle.handler
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
+      FunctionName: !If
+        - UseResourceSuffix
+        - !Sub "RefreshAuthHandler-${ResourceSuffix}"
+        - !Ref AWS::NoValue
 
   HttpHeadersHandler:
     Type: AWS::Serverless::Function
-    FunctionName:
-     !If
-        - UseResourceSuffix
-        - Fn::Join:
-            - ""
-            - ["HttpHeadersHandler", !Ref: "ResourceSuffix"]
-        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/http-headers/
       Handler: bundle.handler
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
+      FunctionName: !If
+        - UseResourceSuffix
+        - !Sub "HttpHeadersHandler-${ResourceSuffix}"
+        - !Ref AWS::NoValue
 
   SignOutHandler:
     Type: AWS::Serverless::Function
-    FunctionName:
-     !If
-        - UseResourceSuffix
-        - Fn::Join:
-            - ""
-            - ["SignOutHandler", !Ref: "ResourceSuffix"]
-        - AWS::NoValue
     Properties:
       CodeUri: src/lambda-edge/sign-out/
       Handler: bundle.handler
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
+      FunctionName: !If
+        - UseResourceSuffix
+        - !Sub "SignOutHandler-${ResourceSuffix}"
+        - !Ref AWS::NoValue
 
   TrailingSlashHandler:
     Type: AWS::Serverless::Function
-    FunctionName:
-     !If
-        - UseResourceSuffix
-        - Fn::Join:
-            - ""
-            - ["TrailingSlashHandler", !Ref: "ResourceSuffix"]
     Condition: RewritePathWithTrailingSlashToIndex
     Properties:
       CodeUri: src/lambda-edge/rewrite-trailing-slash/
       Handler: bundle.handler
       Role: !GetAtt LambdaEdgeExecutionRole.Arn
       Timeout: 5
+      FunctionName: !If
+        - UseResourceSuffix
+        - !Sub "TrailingSlashHandler-${ResourceSuffix}"
+        - !Ref AWS::NoValue
 
   LambdaEdgeExecutionRole:
     Type: AWS::IAM::Role
@@ -494,12 +477,12 @@ Resources:
                 - lambda:TagResource
                 - lambda:ListTags
               Resource:
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-CheckAuthHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-ParseAuthHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RefreshAuthHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-SignOutHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-HttpHeadersHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-TrailingSlashHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*CheckAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*ParseAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*RefreshAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*SignOutHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*HttpHeadersHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*TrailingSlashHandler-*"
             - Effect: Allow
               Action: iam:PassRole
               Resource: !GetAtt LambdaEdgeExecutionRole.Arn
@@ -1201,12 +1184,12 @@ Resources:
                 - lambda:GetFunctionConfiguration
                 - lambda:UpdateFunctionCode
               Resource:
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-CheckAuthHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-ParseAuthHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-RefreshAuthHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-SignOutHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-HttpHeadersHandler-*"
-                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*-TrailingSlashHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*CheckAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*ParseAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*RefreshAuthHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*SignOutHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*HttpHeadersHandler-*"
+                - !Sub "arn:${AWS::Partition}:lambda:us-east-1:${AWS::AccountId}:function:*TrailingSlashHandler-*"
 
   NonceSigningSecret:
     Type: Custom::NonceSigningSecret

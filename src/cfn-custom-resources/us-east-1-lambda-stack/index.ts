@@ -174,7 +174,8 @@ async function ensureUsEast1LambdaStack(props: {
         ([key, lambdaArn]) =>
           key.toLowerCase().startsWith(lambdaName.toLowerCase()) && !!lambdaArn
       );
-      if (!lambdaProperty) {
+      const lambdaArn = lambdaProperty && lambdaProperty[1];
+      if (!lambdaArn) {
         console.log(
           `Couldn't locate ARN for lambda ${lambdaName} in input properties: ${JSON.stringify(
             props,
@@ -187,7 +188,7 @@ async function ensureUsEast1LambdaStack(props: {
       // Copy the Lambda code to us-east-1, and set that location in the new CloudFormation template
       const lambdaResource = parsedOriginalTemplate.Resources[lambdaName]!;
       return copyLambdaCodeToUsEast1({
-        lambdaArn: lambdaProperty[1]!,
+        lambdaArn,
         toBucket: deploymentBucket,
         key: lambdaResource.Properties.Code.S3Key,
       }).then(() => {
@@ -195,6 +196,9 @@ async function ensureUsEast1LambdaStack(props: {
         updatedLambdaResource.Properties.Code.S3Bucket = deploymentBucket;
         delete updatedLambdaResource.Condition;
         updatedLambdaResource.Properties.Role = props.lambdaRoleArn;
+        updatedLambdaResource.Properties.FunctionName = lambdaArn
+          .split(":")
+          .pop();
         templateForUsEast1.Resources[lambdaName] = updatedLambdaResource;
         templateForUsEast1.Outputs[lambdaName] = {
           Value: {

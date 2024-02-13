@@ -302,7 +302,6 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: CreateS3Bucket
     Properties:
-      AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:

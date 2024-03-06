@@ -422,7 +422,7 @@ Resources:
     Condition: RegionIsNotUsEast1
     Properties:
       CodeUri: src/cfn-custom-resources/us-east-1-lambda-stack
-      Handler: index.handler
+      Handler: bundle.handler
       Timeout: 900
       Policies:
         - Version: "2012-10-17"
@@ -707,7 +707,7 @@ Resources:
     Condition: LookupAuthDomain
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-domain/
-      Handler: index.handler
+      Handler: bundle.handler
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -745,7 +745,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/user-pool-client/
-      Handler: index.handler
+      Handler: bundle.handler
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -774,7 +774,7 @@ Resources:
     Condition: LookupClientSecret
     Properties:
       CodeUri: src/cfn-custom-resources/client-secret-retrieval/
-      Handler: index.handler
+      Handler: bundle.handler
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -790,7 +790,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/fetch-jwks/
-      Handler: index.handler
+      Handler: bundle.handler
 
   FetchedJwks:
     Type: Custom::FetchedJwks
@@ -814,7 +814,7 @@ Resources:
     Condition: CreateSampleStaticSite
     Properties:
       CodeUri: src/cfn-custom-resources/static-site/
-      Handler: index.handler
+      Handler: bundle.handler
       Timeout: 180
       MemorySize: 2048
       Policies:
@@ -865,7 +865,7 @@ Resources:
     Condition: CreateSampleReactApp
     Properties:
       CodeUri: src/cfn-custom-resources/react-app/
-      Handler: index.handler
+      Handler: bundle.handler
       Timeout: 300
       MemorySize: 3008
       EphemeralStorage:
@@ -1174,7 +1174,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/lambda-code-update/
-      Handler: index.handler
+      Handler: bundle.handler
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -1202,7 +1202,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/cfn-custom-resources/generate-secret/
-      Handler: index.handler
+      Handler: bundle.handler
 
 Outputs:
   S3Bucket:

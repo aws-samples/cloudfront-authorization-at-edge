@@ -100,13 +100,15 @@ async function buildSpa(config: Configuration) {
     env: { ...process.env, HOME: home_dir },
   });
   console.log(`Installing dependencies to build React app in ${temp_dir} ...`);
-  execSync("npm ci", {
+  // Force use of NPM v8 to escape from https://github.com/npm/cli/issues/4783
+  execSync("npx -p npm@8 npm ci", {
     cwd: temp_dir,
     stdio: "inherit",
     env: { ...process.env, HOME: home_dir },
   });
   console.log(`Running build of React app in ${temp_dir} ...`);
-  execSync("npm run build", {
+  // Force use of NPM v8 to escape from https://github.com/npm/cli/issues/4783
+  execSync("npx -p npm@8 npm run build", {
     cwd: temp_dir,
     stdio: "inherit",
     env: { ...process.env, HOME: home_dir },

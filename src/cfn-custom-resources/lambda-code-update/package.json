@@ -9,7 +9,8 @@
   "keywords": [],
   "author": "",
   "dependencies": {
-    "adm-zip": "^0.5.9"
+    "adm-zip": "^0.5.9",
+    "aws-sdk": "^2.1571.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.4.34"

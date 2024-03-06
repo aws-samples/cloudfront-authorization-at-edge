@@ -8,5 +8,7 @@
   },
   "keywords": [],
   "author": "",
-  "devDependencies": {}
+  "dependencies": {
+    "aws-sdk": "^2.1571.0"
+  }
 }

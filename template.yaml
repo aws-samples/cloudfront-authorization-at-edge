@@ -453,6 +453,7 @@ Resources:
                 - s3:DeleteBucket
                 - s3:DeleteObject
                 - s3:ListBucket
+                - s3:PutBucketTagging
               Resource: !Sub "arn:${AWS::Partition}:s3:::*-authedgedeploymentbucket-*"
             - Effect: Allow
               Action: lambda:GetFunction

@@ -7,8 +7,5 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
-  "dependencies": {
-    "aws-sdk": "^2.1571.0"
-  }
+  "author": ""
 }

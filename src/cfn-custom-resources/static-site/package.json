@@ -2,9 +2,5 @@
   "name": "static-site",
   "version": "0.1.0",
   "private": true,
-  "scripts": {},
-  "devDependencies": {},
-  "dependencies": {
-    "s3-spa-upload": "^1.1.7"
-  }
+  "scripts": {}
 }

@@ -1,7 +1,13 @@
 {
-  "extends": "@tsconfig/node16",
-  "include": [
-    /* Specify files to transpile explicitly because other ts files in this project are transpiled directly by webpack */
-    "src/cfn-custom-resources"
-  ]
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ES2022",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "outDir": "dist"
+  },
+  "include": ["src"]
 }

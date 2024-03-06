@@ -18,6 +18,7 @@ export async function fetch(
     data: Buffer;
   }>((resolve, reject) => {
     const requestOptions = {
+      // @ts-ignore
       signal: AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT),
       ...(options ?? {}),
     };

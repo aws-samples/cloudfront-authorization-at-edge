@@ -1,28 +1,24 @@
 {
   "name": "cloudfront-authorization-at-edge",
-  "version": "2.0.18",
+  "version": "2.2.1",
   "description": "Protect downloads of your content hosted on CloudFront with Cognito authentication using Lambda@Edge",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Sorry, there aren't any tests\"; exit 1",
-    "tsc": "npx tsc -b",
     "webpack": "webpack --progress",
     "analyze": "webpack --profile --json > stats.json && webpack-bundle-analyzer ./stats.json",
-    "build": "npm run tsc && npm run webpack",
-    "update-dependencies": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && rm -rf node_modules package-lock.json && npm install --prune); done;",
-    "postinstall": "for DIR in $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*); do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm install --prune --ignore-scripts); done",
-    "audit-fix": "for DIR in . $(ls -d src/cfn-custom-resources/*) $(ls -d src/lambda-edge/*) src/cfn-custom-resources/react-app/react-app/; do [ ! -f ${DIR}/package.json ] || (cd ${DIR} && echo \"Updating ${DIR} ...\" && npm audit fix); done"
+    "build": "npm run remove-webpack-output && npm run webpack",
+    "remove-webpack-output": "find src -type f \\( -name 'bundle.js' -o -name '*.bundle.js' \\) -exec rm {} +"
   },
   "keywords": [],
   "author": "",
   "devDependencies": {
-    "@tsconfig/node16": "^1.0.4",
     "@types/adm-zip": "^0.4.34",
     "@types/aws-lambda": "^8.10.92",
     "@types/cookie": "^0.4.1",
     "@types/fs-extra": "^9.0.13",
+    "@types/ncp": "^2.0.8",
     "@types/node": "^20.2.5",
-    "aws-sdk": "^2.1354.0",
     "html-loader": "^3.1.0",
     "prettier": "^2.5.1",
     "terser-webpack-plugin": "^5.3.1",
@@ -33,9 +29,13 @@
     "webpack-cli": "^4.9.2"
   },
   "dependencies": {
-    "adm-zip": "^0.5.9",
+    "@tsconfig/node20": "^20.1.2",
+    "adm-zip": "^0.5.10",
     "aws-jwt-verify": "^2.1.3",
-    "cookie": "^0.4.1"
+    "aws-sdk": "^2.1571.0",
+    "cookie": "^0.4.1",
+    "ncp": "^2.0.0",
+    "s3-spa-upload": "^2.1.5"
   },
   "prettier": {
     "trailingComma": "es5",

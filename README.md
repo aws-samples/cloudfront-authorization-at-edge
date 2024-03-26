@@ -198,6 +198,15 @@ If choosing compatibility with AWS Elasticsearch with Cognito integration:
 
 You can provide one or more additional cookies that will be set after succesfull sign-in, by setting the parameter AdditionalCookies. This may be of use to you, to dynamically provide configuration that you can read in your SPA's JavaScript.
 
+## Deleting the stack
+
+When deleting the stack in the normal way, some of the Lambda@Edge functions may end up in DELETE_FAILED state, with an error similar to this:
+```
+An error occurred (InvalidParameterValueException) when calling the DeleteFunction operation: Lambda was unable to delete arn:aws:lambda:us-east-1:12345:function:LambdaFunctionName:1 because it is a replicated function. Please see our documentation for Deleting Lambda@Edge Functions and Replicas.
+```
+Simply wait a few hours and try the delete of the nested stack again, then it works.
+This is a development opportunity in Lambda@Edge and not something we can influence unfortunately: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-edge-delete-replicas.html
+
 ## Contributing to this repo
 
 If you want to contribute, please read [CONTRIBUTING](./CONTRIBUTING.md), and note the hints below.

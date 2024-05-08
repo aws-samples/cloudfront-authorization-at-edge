@@ -15,28 +15,25 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   CONFIG.logger.debug("Event:", event);
   const request = event.Records[0].cf.request;
   const domainName = request.headers["host"][0].value;
+  let requestedUri: string | string[] | undefined = "/";
+  let idToken: string | undefined = undefined;
 
   try {
-    const { requestedUri, nonce: currentNonce } = parseQueryString(
-      request.querystring
-    );
-    const {
-      idToken,
-      refreshToken,
-      nonce: originalNonce,
-      nonceHmac,
-    } = common.extractAndParseCookies(
+    const querySting = parseQueryString(request.querystring);
+    requestedUri = querySting.requestedUri;
+    const cookies = common.extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
       CONFIG.cookieCompatibility
     );
+    idToken = cookies.idToken;
 
     validateRefreshRequest(
-      currentNonce,
-      nonceHmac,
-      originalNonce,
-      idToken,
-      refreshToken
+      querySting.nonce,
+      cookies.nonceHmac,
+      cookies.nonce,
+      cookies.idToken,
+      cookies.refreshToken
     );
 
     const headers: { "Content-Type": string; Authorization?: string } = {
@@ -55,7 +52,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const body = stringifyQueryString({
       grant_type: "refresh_token",
       client_id: CONFIG.clientId,
-      refresh_token: refreshToken,
+      refresh_token: cookies.refreshToken,
     });
     const res = await common
       .httpPostToCognitoWithRetry(
@@ -67,6 +64,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       .catch((err) => {
         throw new Error(`Failed to refresh tokens: ${err}`);
       });
+    CONFIG.logger.info("Successfully renewed tokens");
     newIdToken = res.data.id_token as string;
     newAccessToken = res.data.access_token as string;
     const response = {
@@ -88,9 +86,46 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         ...CONFIG.cloudFrontHeaders,
       },
     };
-    CONFIG.logger.debug("Returning response:\n", response);
+    CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
     return response;
   } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message.includes("invalid_grant") &&
+      idToken
+    ) {
+      // The refresh token has likely expired.
+      // We'll clear the refresh token cookie, so that CheckAuth won't redirect any more requests here in vain.
+      // Also, we'll redirect the user to where he/she came from.
+      // (From there CheckAuth will redirect the user to the Cognito hosted UI to sign in)
+      CONFIG.logger.info(
+        "Expiring refresh token cookie, as the refresh token has expired"
+      );
+      const response = {
+        status: "307",
+        statusDescription: "Temporary Redirect",
+        headers: {
+          location: [
+            {
+              key: "location",
+              value: `https://${domainName}${common.ensureValidRedirectPath(
+                requestedUri
+              )}`,
+            },
+          ],
+          "set-cookie": common.generateCookieHeaders.refreshFailed({
+            tokens: {
+              id: idToken,
+            },
+            ...CONFIG,
+          }),
+          ...CONFIG.cloudFrontHeaders,
+        },
+      };
+      CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
+      return response;
+    }
+    CONFIG.logger.error(err);
     const response = {
       body: common.createErrorHtml({
         title: "Refresh issue",
@@ -111,7 +146,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         ],
       },
     };
-    CONFIG.logger.debug("Returning response:\n", response);
+    CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
     return response;
   }
 };

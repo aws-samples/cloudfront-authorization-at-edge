@@ -16,6 +16,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   const requestedUri = `${request.uri}${
     request.querystring ? "?" + request.querystring : ""
   }`;
+  let refreshToken: string | undefined = "";
   try {
     const cookies = common.extractAndParseCookies(
       request.headers,
@@ -23,6 +24,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       CONFIG.cookieCompatibility
     );
     CONFIG.logger.debug("Extracted cookies:", cookies);
+    refreshToken = cookies.refreshToken;
 
     // If there's no ID token in your cookies, then you are not signed in yet
     if (!cookies.idToken) {
@@ -42,7 +44,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     // If the JWT is expired we can try to refresh it
     // This is done by redirecting the user to the refresh path.
     // If the refresh works, the user will be redirected back here (this time with valid JWTs)
-    if (err instanceof common.JwtExpiredError) {
+    if (err instanceof common.JwtExpiredError && refreshToken) {
       CONFIG.logger.debug("Redirecting user to refresh path");
       return redirectToRefreshPath({ domainName, requestedUri });
     }
@@ -122,7 +124,7 @@ function redirectToCognitoHostedUI({
       ...CONFIG.cloudFrontHeaders,
     },
   };
-  CONFIG.logger.debug("Returning response:\n", response);
+  CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
   return response;
 }
 
@@ -150,7 +152,7 @@ function redirectToRefreshPath({
       ...CONFIG.cloudFrontHeaders,
     },
   };
-  CONFIG.logger.debug("Returning response:\n", response);
+  CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
   return response;
 }
 
@@ -182,7 +184,7 @@ function showContactAdminErrorPage({
       ],
     },
   };
-  CONFIG.logger.debug("Returning response:\n", response);
+  CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
   return response;
 }
 

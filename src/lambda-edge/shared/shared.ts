@@ -360,28 +360,31 @@ export const generateCookieHeaders = {
     param: GenerateCookieHeadersParam & {
       tokens: { id: string; access: string; refresh: string };
     }
-  ) => _generateCookieHeaders({ ...param, event: "signIn" }),
+  ) => _generateCookieHeaders({ ...param }),
   refresh: (
     param: GenerateCookieHeadersParam & {
       tokens: { id: string; access: string };
     }
-  ) => _generateCookieHeaders({ ...param, event: "refresh" }),
+  ) => _generateCookieHeaders({ ...param }),
+  refreshFailed: (param: GenerateCookieHeadersParam) =>
+    _generateCookieHeaders({ ...param, expireCookies: "REFRESH_TOKEN" }),
   signOut: (param: GenerateCookieHeadersParam) =>
-    _generateCookieHeaders({ ...param, event: "signOut" }),
+    _generateCookieHeaders({ ...param, expireCookies: "ALL" }),
 };
 
 function _generateCookieHeaders(
   param: GenerateCookieHeadersParam & {
-    event: "signIn" | "signOut" | "refresh";
+    expireCookies?: "ALL" | "REFRESH_TOKEN";
   }
 ) {
   /**
-   * Generate cookie headers for the following scenario's:
-   *  - signIn: called from Parse Auth lambda, when receiving fresh JWTs from Cognito
-   *  - sign out: called from Sign Out Lambda, when the user visits the sign out URL
-   *  - refresh: called from Refresh Auth lambda, when receiving fresh ID and Access JWTs from Cognito
+   * Generate cookie headers to set, or clear, cookies with JWTs.
    *
-   *   Note that there are other places besides this helper function where cookies can be set (search codebase for "set-cookie")
+   * This is centralized in this function because there is logic to determine
+   * the right cookie names, that we do not want to repeat everywhere.
+   *
+   * Note that there are other places besides this helper function where
+   * cookies can be set (search codebase for "set-cookie").
    */
 
   const decodedIdToken = decodeToken(param.tokens.id);
@@ -440,17 +443,19 @@ function _generateCookieHeaders(
     ] = `${param.tokens.refresh}; ${param.cookieSettings.refreshToken}`;
   }
 
-  if (param.event === "signOut") {
+  if (param.expireCookies === "ALL") {
     // Expire all cookies
     Object.keys(cookies).forEach(
       (key) => (cookies[key] = expireCookie(cookies[key]))
     );
+  } else if (param.expireCookies === "REFRESH_TOKEN") {
+    // Expire refresh token
+    cookies[cookieNames.refreshTokenKey] = expireCookie(
+      cookieNames.refreshTokenKey
+    );
   }
 
-  // Always expire nonce, nonceHmac and pkce - this is valid in all scenario's:
-  // * event === 'newTokens' --> you just signed in and used your nonce and pkce successfully, don't need them no more
-  // * event === 'refreshFailed' --> you are signed in already, why do you still have a nonce?
-  // * event === 'signOut' --> clear ALL cookies anyway
+  // Always expire nonce, nonceHmac and pkce
   [
     "spa-auth-edge-nonce",
     "spa-auth-edge-nonce-hmac",
@@ -485,6 +490,8 @@ function decodeToken(jwt: string) {
 
 const AGENT = new Agent({ keepAlive: true });
 
+class NonRetryableFetchError extends Error {}
+
 export async function httpPostToCognitoWithRetry(
   url: string,
   data: Buffer,
@@ -500,22 +507,41 @@ export async function httpPostToCognitoWithRetry(
         ...options,
         method: "POST",
       }).then((res) => {
-        if (res.status !== 200) {
-          throw new Error(`Status is ${res.status}, expected 200`);
-        }
+        const responseData = res.data.toString();
+        logger.debug(
+          `Response from Cognito:`,
+          JSON.stringify({
+            status: res.status,
+            headers: res.headers,
+            data: responseData,
+          })
+        );
         if (!res.headers["content-type"]?.startsWith("application/json")) {
           throw new Error(
             `Content-Type is ${res.headers["content-type"]}, expected application/json`
           );
         }
+        const parsedResponseData = JSON.parse(responseData);
+        if (res.status !== 200) {
+          const errorMessage =
+            parsedResponseData.error || `Status is ${res.status}, expected 200`;
+          if (res.status && res.status >= 400 && res.status < 500) {
+            // No use in retrying client errors
+            throw new NonRetryableFetchError(errorMessage);
+          } else {
+            throw new Error(errorMessage);
+          }
+        }
         return {
           ...res,
-          data: JSON.parse(res.data.toString()),
+          data: parsedResponseData,
         };
       });
     } catch (err) {
-      logger.debug(`HTTP POST to ${url} failed (attempt ${attempts}):`);
-      logger.debug(err);
+      logger.debug(`HTTP POST to ${url} failed (attempt ${attempts}): ${err}`);
+      if (err instanceof NonRetryableFetchError) {
+        throw err;
+      }
       if (attempts >= 5) {
         // Try 5 times at most
         logger.error(

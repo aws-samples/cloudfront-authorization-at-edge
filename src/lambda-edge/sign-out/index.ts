@@ -20,13 +20,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   CONFIG.logger.debug("Event:", event);
   const request = event.Records[0].cf.request;
   const domainName = request.headers["host"][0].value;
-  const { idToken, accessToken, refreshToken } = extractAndParseCookies(
+  const cookies = extractAndParseCookies(
     request.headers,
     CONFIG.clientId,
     CONFIG.cookieCompatibility
   );
 
-  if (!idToken) {
+  if (!cookies.idToken) {
     const response = {
       body: createErrorHtml({
         title: "Signed out",
@@ -45,7 +45,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         ],
       },
     };
-    CONFIG.logger.debug("Returning response:\n", response);
+    CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
     return response;
   }
 
@@ -68,13 +68,13 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       ],
       "set-cookie": generateCookieHeaders.signOut({
         tokens: {
-          id: idToken,
+          id: cookies.idToken,
         },
         ...CONFIG,
       }),
       ...CONFIG.cloudFrontHeaders,
     },
   };
-  CONFIG.logger.debug("Returning response:\n", response);
+  CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
   return response;
 };

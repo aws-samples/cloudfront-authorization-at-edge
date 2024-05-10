@@ -79,14 +79,6 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         );
       });
     CONFIG.logger.info("Successfully exchanged authorization code for tokens");
-    CONFIG.logger.debug("Response from Cognito token endpoint:\n", {
-      status,
-      headers,
-      idToken,
-      accessToken,
-      refreshToken,
-    });
-
     const response = {
       status: "307",
       statusDescription: "Temporary Redirect",
@@ -108,7 +100,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         ...CONFIG.cloudFrontHeaders,
       },
     };
-    CONFIG.logger.debug("Returning response:\n", response);
+    CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
     return response;
   } catch (err) {
     CONFIG.logger.error(err);
@@ -133,7 +125,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
           ...CONFIG.cloudFrontHeaders,
         },
       };
-      CONFIG.logger.debug("Returning response:\n", response);
+      CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
       return response;
     }
     let htmlParams: Parameters<typeof common.createErrorHtml>[0];
@@ -169,7 +161,7 @@ export const handler: CloudFrontRequestHandler = async (event) => {
         ],
       },
     };
-    CONFIG.logger.debug("Returning response:\n", response);
+    CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
     return response;
   }
 };

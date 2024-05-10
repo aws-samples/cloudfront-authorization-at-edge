@@ -11,6 +11,6 @@ export const handler: CloudFrontResponseHandler = async (event) => {
   CONFIG.logger.debug("Event:", event);
   const response = event.Records[0].cf.response;
   Object.assign(response.headers, CONFIG.cloudFrontHeaders);
-  CONFIG.logger.debug("Returning response:\n", response);
+  CONFIG.logger.debug("Returning response:\n", JSON.stringify(response));
   return response;
 };

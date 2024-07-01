@@ -13,9 +13,15 @@ import {
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import CloudFormation from "aws-sdk/clients/cloudformation";
-import S3 from "aws-sdk/clients/s3";
-import Lambda from "aws-sdk/clients/lambda";
+import {
+  CloudFormation,
+  Stack,
+  waitUntilChangeSetCreateComplete,
+  waitUntilStackCreateComplete,
+  waitUntilStackUpdateComplete,
+} from "@aws-sdk/client-cloudformation";
+import { Lambda } from "@aws-sdk/client-lambda";
+import { ListObjectsV2CommandInput, S3 } from "@aws-sdk/client-s3";
 import { sendCfnResponse, Status } from "./cfn-response";
 import { fetch } from "./https";
 
@@ -124,7 +130,6 @@ async function ensureUsEast1LambdaStack(props: {
     const { Stacks: stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
       StackName: props.stackName,
     })
-      .promise()
       .catch(() => ({ Stacks: undefined }));
     if (stacks?.length) {
       console.log("Deleting us-east-1 stack ...");
@@ -136,7 +141,7 @@ async function ensureUsEast1LambdaStack(props: {
       }
       await CFN_CLIENT_US_EAST_1.deleteStack({
         StackName: props.stackName,
-      }).promise();
+      });
       console.log("us-east-1 stack deleted");
     } else {
       console.log("us-east-1 stack already deleted");
@@ -154,7 +159,7 @@ async function ensureUsEast1LambdaStack(props: {
   const { TemplateBody: originalTemplate } = await CFN_CLIENT.getTemplate({
     StackName: props.stackId,
     TemplateStage: "Processed",
-  }).promise();
+  });
   if (!originalTemplate)
     throw new Error(
       `Failed to get template for stack ${props.stackName} (${props.stackId})`
@@ -239,7 +244,7 @@ async function ensureLambdaUsEast1Stack(props: {
     TemplateBody: props.newTemplate,
     ChangeSetType: "UPDATE",
     ResourceTypes: ["AWS::Lambda::Function"],
-  }).promise();
+  });
   if (!changeSetArn)
     throw new Error(
       "Failed to create change set for lambda handlers deployment"
@@ -247,10 +252,12 @@ async function ensureLambdaUsEast1Stack(props: {
   console.log(
     "Waiting for completion of change set for adding lambda functions to us-east-1 stack ..."
   );
-  await CFN_CLIENT_US_EAST_1.waitFor("changeSetCreateComplete", {
+  await waitUntilChangeSetCreateComplete({
+    client: CFN_CLIENT_US_EAST_1,
+    maxWaitTime: 200,
+  }, {
     ChangeSetName: changeSetArn,
   })
-    .promise()
     .catch((err) =>
       console.log(
         `Caught exception while waiting for change set create completion: ${err}`
@@ -259,7 +266,7 @@ async function ensureLambdaUsEast1Stack(props: {
   const { Status: status, StatusReason: reason } =
     await CFN_CLIENT_US_EAST_1.describeChangeSet({
       ChangeSetName: changeSetArn,
-    }).promise();
+    });
   if (status === "FAILED") {
     // The only reason we'll allow a FAILED change set is if there were no changes
     if (!reason?.includes("didn't contain changes")) {
@@ -268,13 +275,13 @@ async function ensureLambdaUsEast1Stack(props: {
       // No changes to make to the Lambda@Edge functions, clean up the change set then
       await CFN_CLIENT_US_EAST_1.deleteChangeSet({
         ChangeSetName: changeSetArn,
-      }).promise();
+      });
 
       // Need to get the outputs (Lambda ARNs) from the existing stack then
       const { Stacks: existingStacks } =
         await CFN_CLIENT_US_EAST_1.describeStacks({
           StackName: props.stackName,
-        }).promise();
+        });
       const existingOutputs = extractOutputsFromStackResponse(existingStacks);
       console.log(
         `us-east-1 stack unchanged. Stack outputs: ${JSON.stringify(
@@ -293,16 +300,16 @@ async function ensureLambdaUsEast1Stack(props: {
   );
   await CFN_CLIENT_US_EAST_1.executeChangeSet({
     ChangeSetName: changeSetArn,
-  }).promise();
+  });
   console.log(
     "Waiting for completion of execute change set for adding lambda functions to us-east-1 stack ..."
   );
-  const { Stacks: updatedStacks } = await CFN_CLIENT_US_EAST_1.waitFor(
-    "stackUpdateComplete",
-    {
-      StackName: props.stackName,
-    }
-  ).promise();
+  const { Stacks: updatedStacks } = await waitUntilStackUpdateComplete({
+    client: CFN_CLIENT_US_EAST_1,
+    maxWaitTime: 200,
+  }, {
+    StackName: props.stackName,
+  });
   const outputs = extractOutputsFromStackResponse(updatedStacks);
   console.log(
     `us-east-1 stack succesfully updated. Stack outputs: ${JSON.stringify(
@@ -314,7 +321,7 @@ async function ensureLambdaUsEast1Stack(props: {
   return outputs as { [key: string]: string };
 }
 
-function extractOutputsFromStackResponse(stacks?: CloudFormation.Stack[]) {
+function extractOutputsFromStackResponse(stacks?: Stack[]) {
   // find the ARNs for all Lambda functions, which will be output from this custom resource
 
   const outputs = LAMBDA_NAMES.reduce((acc, lambdaName) => {
@@ -341,7 +348,6 @@ async function ensureDeploymentUsEast1Stack(props: {
   const { Stacks: usEast1Stacks } = await CFN_CLIENT_US_EAST_1.describeStacks({
     StackName: props.stackName,
   })
-    .promise()
     .catch(() => ({ Stacks: undefined }));
   if (usEast1Stacks?.length) {
     const deploymentBucket = usEast1Stacks[0].Outputs?.find(
@@ -359,7 +365,7 @@ async function ensureDeploymentUsEast1Stack(props: {
   console.log("Getting CFN stack tags ...");
   const { Stacks: mainRegionStacks } = await CFN_CLIENT.describeStacks({
     StackName: props.stackId,
-  }).promise();
+  });
   if (!mainRegionStacks?.length) {
     throw new Error(
       `Failed to describe stack ${props.stackName} (${props.stackId})`
@@ -375,24 +381,27 @@ async function ensureDeploymentUsEast1Stack(props: {
     ChangeSetType: "CREATE",
     ResourceTypes: ["AWS::S3::Bucket"],
     Tags: mainRegionStacks[0].Tags,
-  }).promise();
+  });
   if (!changeSetArn)
     throw new Error("Failed to create change set for bucket deployment");
   console.log("Waiting for change set create complete for us-east-1 stack ...");
-  await CFN_CLIENT_US_EAST_1.waitFor("changeSetCreateComplete", {
+  await waitUntilChangeSetCreateComplete({
+    client: CFN_CLIENT_US_EAST_1,
+    maxWaitTime: 200,
+  }, {
     ChangeSetName: changeSetArn,
-  }).promise();
+  });
   console.log("Executing change set for us-east-1 stack ...");
   await CFN_CLIENT_US_EAST_1.executeChangeSet({
     ChangeSetName: changeSetArn,
-  }).promise();
+  });
   console.log("Waiting for creation of us-east-1 stack ...");
-  const { Stacks: createdStacks } = await CFN_CLIENT_US_EAST_1.waitFor(
-    "stackCreateComplete",
-    {
-      StackName: props.stackName,
-    }
-  ).promise();
+  const { Stacks: createdStacks } = await waitUntilStackCreateComplete({
+    client: CFN_CLIENT_US_EAST_1,
+    maxWaitTime: 200,
+  }, {
+    StackName: props.stackName,
+  });
   const deploymentBucket = createdStacks?.[0].Outputs?.find(
     (output) => output.OutputKey === "DeploymentBucket"
   )?.OutputValue;
@@ -409,7 +418,7 @@ async function copyLambdaCodeToUsEast1(props: {
   console.log(`Copying Lambda code: ${JSON.stringify(props, null, 2)}`);
   const { Code } = await LAMBDA_CLIENT.getFunction({
     FunctionName: props.lambdaArn,
-  }).promise();
+  });
   console.log(
     `Downloading lambda code for ${props.lambdaArn} from ${Code!.Location!}`
   );
@@ -418,18 +427,18 @@ async function copyLambdaCodeToUsEast1(props: {
     Bucket: props.toBucket,
     Key: props.key,
     Body: data,
-  }).promise();
+  });
   return props;
 }
 
 async function emptyBucket(props: { bucket: string }) {
-  const params: S3.ListObjectsV2Request = {
+  const params: ListObjectsV2CommandInput = {
     Bucket: props.bucket,
   };
   do {
     console.log(`Listing objects in bucket ${props.bucket} ...`);
     const { Contents: s3objects, NextContinuationToken } =
-      await S3_CLIENT_US_EAST_1.listObjectsV2(params).promise();
+      await S3_CLIENT_US_EAST_1.listObjectsV2(params);
 
     if (!s3objects?.length) break;
     console.log(`Deleting ${s3objects.length} S3 objects ...`);
@@ -439,7 +448,7 @@ async function emptyBucket(props: { bucket: string }) {
       Delete: {
         Objects: s3objects.filter((o) => !!o.Key).map((o) => ({ Key: o.Key! })),
       },
-    }).promise();
+    });
 
     if (errors?.length) {
       console.log("Failed to delete objects:", JSON.stringify(errors));

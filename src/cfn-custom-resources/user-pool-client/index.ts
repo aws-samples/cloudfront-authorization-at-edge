@@ -13,7 +13,11 @@ import {
   CloudFormationCustomResourceHandler,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
+import {
+  CognitoIdentityProvider,
+  UpdateUserPoolClientCommandInput,
+  UserPoolClientType,
+} from "@aws-sdk/client-cognito-identity-provider";
 import { sendCfnResponse, Status } from "./cfn-response";
 
 const CUSTOM_RESOURCE_CURRENT_VERSION_NAME = "UpdatedUserPoolClientV2";
@@ -22,7 +26,7 @@ const SENTINEL_DOMAIN = "example.com";
 async function getUserPoolClient(props: Props) {
   const userPoolId = props.UserPoolArn.split("/")[1];
   const userPoolRegion = props.UserPoolArn.split(":")[3];
-  const cognitoClient = new CognitoIdentityServiceProvider({
+  const cognitoClient = new CognitoIdentityProvider({
     region: userPoolRegion,
   });
   const input = {
@@ -31,8 +35,7 @@ async function getUserPoolClient(props: Props) {
   };
   console.debug("Describing User Pool Client", JSON.stringify(input, null, 4));
   const { UserPoolClient } = await cognitoClient
-    .describeUserPoolClient(input)
-    .promise();
+    .describeUserPoolClient(input);
   if (!UserPoolClient) {
     throw new Error("User Pool Client not found!");
   }
@@ -43,11 +46,11 @@ async function updateUserPoolClient(
   props: Props,
   redirectUrisSignIn: string[],
   redirectUrisSignOut: string[],
-  existingUserPoolClient: CognitoIdentityServiceProvider.UserPoolClientType
+  existingUserPoolClient: UserPoolClientType
 ) {
   const userPoolId = props.UserPoolArn.split("/")[1];
   const userPoolRegion = props.UserPoolArn.split(":")[3];
-  const cognitoClient = new CognitoIdentityServiceProvider({
+  const cognitoClient = new CognitoIdentityProvider({
     region: userPoolRegion,
   });
 
@@ -81,7 +84,7 @@ async function updateUserPoolClient(
   delete existingFields.LastModifiedDate;
   delete existingFields.ClientSecret;
 
-  const input: CognitoIdentityServiceProvider.Types.UpdateUserPoolClientRequest =
+  const input: UpdateUserPoolClientCommandInput =
     {
       ...existingFields,
       AllowedOAuthFlows,
@@ -93,7 +96,7 @@ async function updateUserPoolClient(
       LogoutURLs,
     };
   console.debug("Updating User Pool Client", JSON.stringify(input, null, 4));
-  await cognitoClient.updateUserPoolClient(input).promise();
+  await cognitoClient.updateUserPoolClient(input);
 }
 
 async function undoPriorUpdate(

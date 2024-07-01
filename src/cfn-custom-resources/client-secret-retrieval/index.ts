@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { CloudFormationCustomResourceHandler } from "aws-lambda";
-import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
+import { CognitoIdentityProvider, DescribeUserPoolClientCommandInput } from "@aws-sdk/client-cognito-identity-provider";
 import { sendCfnResponse, Status } from "./cfn-response";
 
 async function retrieveClientSecret(
@@ -17,17 +17,16 @@ async function retrieveClientSecret(
   }
   const userPoolId = userPoolArn.split("/")[1];
   const userPoolRegion = userPoolArn.split(":")[3];
-  const cognitoClient = new CognitoIdentityServiceProvider({
+  const cognitoClient = new CognitoIdentityProvider({
     region: userPoolRegion,
   });
-  const input: CognitoIdentityServiceProvider.Types.DescribeUserPoolClientRequest =
+  const input: DescribeUserPoolClientCommandInput =
     {
       UserPoolId: userPoolId,
       ClientId: clientId,
     };
   const { UserPoolClient } = await cognitoClient
-    .describeUserPoolClient(input)
-    .promise();
+    .describeUserPoolClient(input);
   if (!UserPoolClient?.ClientSecret) {
     throw new Error(
       `User Pool client ${clientId} is not set up with a client secret`

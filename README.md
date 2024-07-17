@@ -43,7 +43,7 @@ Lambda@Edge functions in [src/lambda-edge](src/lambda-edge):
 - [http-headers](src/lambda-edge/http-headers): Lambda@Edge function that sets HTTP security headers (as good practice)
 - [rewrite-trailing-slash](src/lambda-edge/rewrite-trailing-slash): Lambda@Edge function that appends "index.html" to paths that end with a slash (optional use, intended for static site hosting, controlled via parameter `RewritePathWithTrailingSlashToIndex`, see below)
 - [shared](src/lambda-edge/shared): Utility functions used by several Lambda@Edge functions
-  
+
 CloudFormation custom resources in [src/cfn-custom-resources](src/cfn-custom-resources):
 
 - [us-east-1-lambda-stack](src/cfn-custom-resources/us-east-1-lambda-stack): Lambda function that implements a CloudFormation custom resource that makes sure the Lambda@Edge functions are deployed to us-east-1 (which is a CloudFront requirement, see below.)
@@ -198,12 +198,22 @@ If choosing compatibility with AWS Elasticsearch with Cognito integration:
 
 You can provide one or more additional cookies that will be set after succesfull sign-in, by setting the parameter AdditionalCookies. This may be of use to you, to dynamically provide configuration that you can read in your SPA's JavaScript.
 
+## Accessing Lambda@Edge function logs
+
+The easiest way to locate the right log group and the right region, is to use the CloudFront monitoring dashboard (https://console.aws.amazon.com/cloudfront/v4/home#/monitoring) and navigate to the lambda function logs in the right region, from there.
+
+### Explanation
+
+Accessing Lambda@Edge function logs is different from regular Lambda functions. Assuming a regular lambda function with the name `abc`, it would normally write to log group `/aws/lambda/abc` in the same region as the Lambda function--but this is not so for Lambda@Edge functions. For Lambda@Edge functions the log group will be in the region where the Lambda@Edge function was executed (which can be any region on the Globe), and will have a name like so: `/aws/lambda/us-east-1.abc` (so regardless of actual region, the log group name starts with `/aws/lambda/us-east-1.` followed by the name of the function). For Lambda@Edge functions, the button in the Lambda UI that takes you to the log group would always show you "The specified log group does not exist", as that button would take you to e.g. log group `/aws/lambda/abc`.
+
 ## Deleting the stack
 
 When deleting the stack in the normal way, some of the Lambda@Edge functions may end up in DELETE_FAILED state, with an error similar to this:
+
 ```
 An error occurred (InvalidParameterValueException) when calling the DeleteFunction operation: Lambda was unable to delete arn:aws:lambda:us-east-1:12345:function:LambdaFunctionName:1 because it is a replicated function. Please see our documentation for Deleting Lambda@Edge Functions and Replicas.
 ```
+
 Simply wait a few hours and try the delete of the nested stack again, then it works.
 This is a development opportunity in Lambda@Edge and not something we can influence unfortunately: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/lambda-edge-delete-replicas.html
 

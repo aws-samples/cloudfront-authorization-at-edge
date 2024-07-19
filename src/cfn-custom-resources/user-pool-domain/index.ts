@@ -14,7 +14,7 @@ import {
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import CognitoIdentityServiceProvider from "aws-sdk/clients/cognitoidentityserviceprovider";
+import { CognitoIdentityProvider } from "@aws-sdk/client-cognito-identity-provider";
 import { sendCfnResponse, Status } from "./cfn-response";
 
 async function ensureCognitoUserPoolDomain(
@@ -27,12 +27,11 @@ async function ensureCognitoUserPoolDomain(
   }
   const newUserPoolId = newUserPoolArn.split("/")[1];
   const newUserPoolRegion = newUserPoolArn.split(":")[3];
-  const cognitoClient = new CognitoIdentityServiceProvider({
+  const cognitoClient = new CognitoIdentityProvider({
     region: newUserPoolRegion,
   });
   const { UserPool } = await cognitoClient
-    .describeUserPool({ UserPoolId: newUserPoolId })
-    .promise();
+    .describeUserPool({ UserPoolId: newUserPoolId });
   if (!UserPool) {
     throw new Error(`User Pool ${newUserPoolArn} does not exist`);
   }

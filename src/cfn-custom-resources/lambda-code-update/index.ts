@@ -6,7 +6,7 @@ import {
   CloudFormationCustomResourceDeleteEvent,
   CloudFormationCustomResourceUpdateEvent,
 } from "aws-lambda";
-import Lambda from "aws-sdk/clients/lambda";
+import { Lambda } from "@aws-sdk/client-lambda";
 import Zip from "adm-zip";
 import { writeFileSync, mkdtempSync } from "fs";
 import { resolve } from "path";
@@ -34,8 +34,7 @@ async function updateLambdaCode(
   const { Code } = await lambdaClient
     .getFunction({
       FunctionName: lambdaFunction,
-    })
-    .promise();
+    });
   const data = await fetch(Code!.Location!);
   const lambdaZip = new Zip(data);
   console.log(
@@ -61,16 +60,14 @@ async function updateLambdaCode(
       FunctionName: lambdaFunction,
       ZipFile: newLambdaZip.toBuffer(),
       Publish: true,
-    })
-    .promise();
+    });
   console.log({ CodeSha256, Version, FunctionArn });
   let attempts = 0;
   while (++attempts <= 30) {
     const { State } = await lambdaClient
       .getFunctionConfiguration({
         FunctionName: FunctionArn!,
-      })
-      .promise();
+      });
     if (!State || State === "Pending") {
       console.log(
         `Waiting for updated Lambda function to become Active, is: ${State} (attempts: ${attempts})`

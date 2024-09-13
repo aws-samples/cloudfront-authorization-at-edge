@@ -301,6 +301,7 @@ export function getAmplifyCookieNames(
     idTokenKey: `${keyPrefix}.${tokenUserName}.idToken`,
     accessTokenKey: `${keyPrefix}.${tokenUserName}.accessToken`,
     refreshTokenKey: `${keyPrefix}.${tokenUserName}.refreshToken`,
+    hostedUiKey: "amplify-signin-with-hostedUI",
   };
 }
 
@@ -360,21 +361,21 @@ export const generateCookieHeaders = {
     param: GenerateCookieHeadersParam & {
       tokens: { id: string; access: string; refresh: string };
     }
-  ) => _generateCookieHeaders({ ...param }),
+  ) => _generateCookieHeaders({ ...param, scenario: "SIGN_IN" }),
   refresh: (
     param: GenerateCookieHeadersParam & {
       tokens: { id: string; access: string };
     }
-  ) => _generateCookieHeaders({ ...param }),
+  ) => _generateCookieHeaders({ ...param, scenario: "REFRESH" }),
   refreshFailed: (param: GenerateCookieHeadersParam) =>
-    _generateCookieHeaders({ ...param, expireCookies: "REFRESH_TOKEN" }),
+    _generateCookieHeaders({ ...param, scenario: "REFRESH_FAILED" }),
   signOut: (param: GenerateCookieHeadersParam) =>
-    _generateCookieHeaders({ ...param, expireCookies: "ALL" }),
+    _generateCookieHeaders({ ...param, scenario: "SIGN_OUT" }),
 };
 
 function _generateCookieHeaders(
   param: GenerateCookieHeadersParam & {
-    expireCookies?: "ALL" | "REFRESH_TOKEN";
+    scenario: "SIGN_IN" | "SIGN_OUT" | "REFRESH" | "REFRESH_FAILED";
   }
 ) {
   /**
@@ -390,7 +391,7 @@ function _generateCookieHeaders(
   const decodedIdToken = decodeToken(param.tokens.id);
   const tokenUserName = decodedIdToken["cognito:username"];
 
-  const cookies: Cookies = {};
+  const cookiesToSetOrExpire: Cookies = {};
   let cookieNames:
     | ReturnType<typeof getAmplifyCookieNames>
     | ReturnType<typeof getElasticsearchCookieNames>;
@@ -409,9 +410,7 @@ function _generateCookieHeaders(
       ],
       Username: tokenUserName,
     });
-
-    // Construct object with the cookies
-    Object.assign(cookies, {
+    Object.assign(cookiesToSetOrExpire, {
       [cookieNames.lastUserKey]: `${tokenUserName}; ${param.cookieSettings.idToken}`,
       [cookieNames.scopeKey]: `${param.oauthScopes.join(" ")}; ${
         param.cookieSettings.accessToken
@@ -419,39 +418,55 @@ function _generateCookieHeaders(
       [cookieNames.userDataKey]: `${encodeURIComponent(userData)}; ${
         param.cookieSettings.idToken
       }`,
-      "amplify-signin-with-hostedUI": `true; ${param.cookieSettings.accessToken}`,
+      [cookieNames.hostedUiKey]: `true; ${param.cookieSettings.accessToken}`,
     });
   } else {
     cookieNames = getElasticsearchCookieNames();
-    cookies[
+    cookiesToSetOrExpire[
       cookieNames.cognitoEnabledKey
     ] = `True; ${param.cookieSettings.cognitoEnabled}`;
   }
 
-  // Set JWTs in the cookies
-  cookies[
-    cookieNames.idTokenKey
-  ] = `${param.tokens.id}; ${param.cookieSettings.idToken}`;
-  if (param.tokens.access) {
-    cookies[
+  // Set or clear JWTs from the cookies
+  if (param.scenario === "SIGN_IN") {
+    cookiesToSetOrExpire[
+      cookieNames.idTokenKey
+    ] = `${param.tokens.id}; ${param.cookieSettings.idToken}`;
+    cookiesToSetOrExpire[
       cookieNames.accessTokenKey
     ] = `${param.tokens.access}; ${param.cookieSettings.accessToken}`;
-  }
-  if (param.tokens.refresh) {
-    cookies[
+    cookiesToSetOrExpire[
       cookieNames.refreshTokenKey
     ] = `${param.tokens.refresh}; ${param.cookieSettings.refreshToken}`;
-  }
-
-  if (param.expireCookies === "ALL") {
-    // Expire all cookies
-    Object.keys(cookies).forEach(
-      (key) => (cookies[key] = expireCookie(cookies[key]))
+  } else if (param.scenario === "REFRESH") {
+    cookiesToSetOrExpire[
+      cookieNames.idTokenKey
+    ] = `${param.tokens.id}; ${param.cookieSettings.idToken}`;
+    cookiesToSetOrExpire[
+      cookieNames.accessTokenKey
+    ] = `${param.tokens.access}; ${param.cookieSettings.accessToken}`;
+  } else if (param.scenario === "SIGN_OUT") {
+    // Expire JWTs
+    cookiesToSetOrExpire[cookieNames.idTokenKey] = addExpiry(
+      param.cookieSettings.idToken
     );
-  } else if (param.expireCookies === "REFRESH_TOKEN") {
-    // Expire refresh token
-    cookies[cookieNames.refreshTokenKey] = expireCookie(
-      cookieNames.refreshTokenKey
+    cookiesToSetOrExpire[cookieNames.accessTokenKey] = addExpiry(
+      param.cookieSettings.accessToken
+    );
+    cookiesToSetOrExpire[cookieNames.refreshTokenKey] = addExpiry(
+      param.cookieSettings.refreshToken
+    );
+    // Expire all other cookies
+    Object.keys(cookiesToSetOrExpire).forEach(
+      (key) =>
+        (cookiesToSetOrExpire[key] = addExpiry(
+          cookiesToSetOrExpire[key].replace(/^.*;/, "")
+        ))
+    );
+  } else if (param.scenario === "REFRESH_FAILED") {
+    // Expire refresh token only
+    cookiesToSetOrExpire[cookieNames.refreshTokenKey] = addExpiry(
+      param.cookieSettings.refreshToken
     );
   }
 
@@ -461,31 +476,34 @@ function _generateCookieHeaders(
     "spa-auth-edge-nonce-hmac",
     "spa-auth-edge-pkce",
   ].forEach((key) => {
-    cookies[key] = expireCookie(`;${param.cookieSettings.nonce}`);
+    cookiesToSetOrExpire[key] = addExpiry(param.cookieSettings.nonce);
   });
 
   // Return cookie object in format of CloudFront headers
   return Object.entries({
     ...param.additionalCookies,
-    ...cookies,
+    ...cookiesToSetOrExpire,
   }).map(([k, v]) => ({ key: "set-cookie", value: `${k}=${v}` }));
 }
 
-function expireCookie(cookie: string = "") {
-  const cookieParts = cookie
+/**
+ * Expire a cookie by setting its expiration time to the epoch start
+ * @param cookieSettings The cookie settings to add the expire setting to, for example: "Domain=example.com; Secure; HttpOnly"
+ * @returns Updated cookie settings that you can use as cookie value, i.e. with leading ; and expire instruction, for example: "; Domain=example.com; Secure; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+ */
+function addExpiry(cookieSettings: string) {
+  const parts = cookieSettings
     .split(";")
     .map((part) => part.trim())
     .filter((part) => !part.toLowerCase().startsWith("max-age"))
     .filter((part) => !part.toLowerCase().startsWith("expires"));
   const expires = `Expires=${new Date(0).toUTCString()}`;
-  const [, ...settings] = cookieParts; // first part is the cookie value, which we'll clear
-  return ["", ...settings, expires].join("; ");
+  return ["", ...parts, expires].join("; ");
 }
 
 function decodeToken(jwt: string) {
   const tokenBody = jwt.split(".")[1];
-  const decodableTokenBody = tokenBody.replace(/-/g, "+").replace(/_/g, "/");
-  return JSON.parse(Buffer.from(decodableTokenBody, "base64").toString());
+  return JSON.parse(Buffer.from(tokenBody, "base64url").toString());
 }
 
 const AGENT = new Agent({ keepAlive: true });

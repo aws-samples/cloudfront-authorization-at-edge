@@ -17,8 +17,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     request.querystring ? "?" + request.querystring : ""
   }`;
   let refreshToken: string | undefined = "";
+  let cookies: ReturnType<typeof common["extractAndParseCookies"]> = {};
   try {
-    const cookies = common.extractAndParseCookies(
+    cookies = common.extractAndParseCookies(
       request.headers,
       CONFIG.clientId,
       CONFIG.cookieCompatibility
@@ -42,9 +43,10 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     CONFIG.logger.info("Access denied:", err);
 
     // If the JWT is expired we can try to refresh it
-    // This is done by redirecting the user to the refresh path.
+    // We'll only do this if refresh did not fail earlier (detected by a marker cookie)
+    // Refresh is done by redirecting the user to the refresh path (where it will actually happen)
     // If the refresh works, the user will be redirected back here (this time with valid JWTs)
-    if (err instanceof common.JwtExpiredError && refreshToken) {
+    if (err instanceof common.JwtExpiredError && !cookies.refreshFailed) {
       CONFIG.logger.debug("Redirecting user to refresh path");
       return redirectToRefreshPath({ domainName, requestedUri });
     }

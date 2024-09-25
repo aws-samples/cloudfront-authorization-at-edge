@@ -340,6 +340,7 @@ export function extractAndParseCookies(
     nonce: cookies["spa-auth-edge-nonce"],
     nonceHmac: cookies["spa-auth-edge-nonce-hmac"],
     pkce: cookies["spa-auth-edge-pkce"],
+    refreshFailed: cookies["spa-auth-edge-refresh"],
   };
 }
 
@@ -443,6 +444,10 @@ function _generateCookieHeaders(
       cookiesToSetOrExpire[
         cookieNames.cognitoEnabledKey
       ] = `True; ${param.cookieSettings.cognitoEnabled}`;
+    // Clear marker for failed refresh
+    cookiesToSetOrExpire["spa-auth-edge-refresh"] = addExpiry(
+      param.cookieSettings.nonce
+    );
   } else if (param.scenario === "REFRESH") {
     cookiesToSetOrExpire[
       cookieNames.idTokenKey
@@ -450,6 +455,10 @@ function _generateCookieHeaders(
     cookiesToSetOrExpire[
       cookieNames.accessTokenKey
     ] = `${param.tokens.access}; ${param.cookieSettings.accessToken}`;
+    // Clear marker for failed refresh
+    cookiesToSetOrExpire["spa-auth-edge-refresh"] = addExpiry(
+      param.cookieSettings.nonce
+    );
   } else if (param.scenario === "SIGN_OUT") {
     // Expire JWTs
     cookiesToSetOrExpire[cookieNames.idTokenKey] = addExpiry(
@@ -482,11 +491,19 @@ function _generateCookieHeaders(
       cookiesToSetOrExpire[cookieNames.cognitoEnabledKey] = addExpiry(
         param.cookieSettings.cognitoEnabled
       );
+    // Clear marker for failed refresh
+    cookiesToSetOrExpire["spa-auth-edge-refresh"] = addExpiry(
+      param.cookieSettings.nonce
+    );
   } else if (param.scenario === "REFRESH_FAILED") {
     // Expire refresh token only
     cookiesToSetOrExpire[cookieNames.refreshTokenKey] = addExpiry(
       param.cookieSettings.refreshToken
     );
+    // Add marker for failed refresh
+    cookiesToSetOrExpire[
+      "spa-auth-edge-refresh"
+    ] = `failed; ${param.cookieSettings.nonce}`;
   }
 
   // Always expire nonce, nonceHmac and pkce

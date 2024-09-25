@@ -808,6 +808,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt StaticSiteHandler.Arn
       BucketName: !Ref S3Bucket
+      Version: !Ref Version
 
   StaticSiteHandler:
     Type: AWS::Serverless::Function

@@ -116,7 +116,29 @@ When following this route, also provide parameter `AlternateDomainNames` upon de
 
 ## I already have an S3 bucket, I want to use that one
 
-You can use a pre-existing S3 bucket (e.g. from another region), by providing the buckets regional endpoint domain through parameter "S3OriginDomainName" upon deploying. In this case it's a good practice to also use a CloudFront Origin Access Identity, so you don't have to make your bucket public. If you indeed have a CloudFront Origin Access Identity (make sure to grant it access in the bucket policy), specify its ID in parameter "OriginAccessIdentity".
+You can use a pre-existing S3 bucket (e.g. from another region) by specifying the bucket's regional endpoint domain in the parameter `S3OriginDomainName`. An Origin Access Control will automatically be configured for the CloudFront distribution. We recommend applying an S3 bucket policy that restricts requests only from CloudFront, such as:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowCloudFrontServicePrincipal",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::<bucket-name>/*",
+            "Condition": {
+                "StringEquals": {
+                    "AWS:SourceArn": "arn:aws:cloudfront::123456789012:distribution/<distribution-id>"
+                }
+            }
+        }
+    ]
+}
+```
 
 Alternatively, go for the more barebone deployment, so you can do more yourself––i.e. reuse your bucket. Refer to scenario: [I already have a CloudFront distribution, I just want to add auth](#i-already-have-a-cloudfront-distribution-i-just-want-to-add-auth).
 

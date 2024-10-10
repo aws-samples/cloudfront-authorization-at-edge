@@ -182,8 +182,7 @@ Parameters:
     Default: index.html
   S3OriginDomainName:
     Description: >
-      The S3 origin you want to front with CloudFront. Specify the bucket's region specific hostname, i.e. <bucket-name>.s3.<region>.amazonaws.com,
-      and (optionally) also specify the parameter OriginAccessIdentity.
+      The S3 origin you want to front with CloudFront. Specify the bucket's region specific hostname, in the form of <bucket-name>.s3.<region>.amazonaws.com.
       If you don't provide an origin, and "CreateCloudFrontDistribution" is set to "true" (the default), then an S3 bucket will be created for you.
     Type: String
     Default: ""
@@ -205,12 +204,18 @@ Parameters:
       Only of use if you are also specifying parameter "CustomOriginDomainName".
     Type: String
     Default: ""
-  OriginAccessIdentity:
-    Description: The Origin Access Identity you want to associate with your S3 origin, e.g. 'ABCDEFGHIJKLMN'.
+  CreateCloudFrontAccessLogsBucket:
+    Description: >
+      Set to "true" to create a CloudFront access logs bucket and deliver logs to it. Ignored if CloudFrontAccessLogsBucket is also specified.
     Type: String
-    Default: ""
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
   CloudFrontAccessLogsBucket:
-    Description: The (pre-existing) Amazon S3 bucket to store CloudFront access logs in, for example, myawslogbucket.s3.amazonaws.com. Only of use if "CreateCloudFrontDistribution" is set to "true" (the default).
+    Description: >
+      The (pre-existing) Amazon S3 bucket to store CloudFront access logs in, for example, myawslogbucket.s3.amazonaws.com. Only of use if "CreateCloudFrontDistribution" is set to "true" (the default).
+      This bucket must have ACLs enabled. If this value is unset and CreateCloudFrontAccessLogsBucket is set to "true", a bucket will be created.
     Type: String
     Default: ""
   ResourceSuffix:
@@ -263,12 +268,6 @@ Conditions:
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Equals [!Ref CustomOriginDomainName, ""]
     - !Equals [!Ref S3OriginDomainName, ""]
-  CreateOriginAccessIdentity: !And
-    - !Equals [!Ref CreateCloudFrontDistribution, "true"]
-    - !Equals [!Ref CustomOriginDomainName, ""]
-    - !Equals [!Ref S3OriginDomainName, ""]
-    - !Equals [!Ref OriginAccessIdentity, ""]
-  OriginAccessIdentityProvided: !Not [!Equals [!Ref OriginAccessIdentity, ""]]
   UseS3Origin: !And
     - !Equals [!Ref CreateCloudFrontDistribution, "true"]
     - !Equals [!Ref CustomOriginDomainName, ""]
@@ -287,6 +286,9 @@ Conditions:
     - !Condition StaticSiteMode
     - !Condition NoExistingUserPoolProvidedOrExistingUserPoolIsInThisAccount
     - !Equals [!Ref UserPoolClientSecret, ""]
+  CreateCloudFrontAccessLogsBucket: !And
+    - !Equals [!Ref CreateCloudFrontAccessLogsBucket, "true"]
+    - !Not [!Condition CloudFrontAccessLogsBucketProvided]
 
 Globals:
   Function:
@@ -302,6 +304,18 @@ Resources:
     Type: AWS::S3::Bucket
     Condition: CreateS3Bucket
     Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  AccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateCloudFrontAccessLogsBucket
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -548,7 +562,10 @@ Resources:
         Logging: !If
           - CloudFrontAccessLogsBucketProvided
           - Bucket: !Ref CloudFrontAccessLogsBucket
-          - !Ref AWS::NoValue
+          - !If
+            - CreateCloudFrontAccessLogsBucket
+            - Bucket: !GetAtt AccessLogsBucket.DomainName
+            - !Ref AWS::NoValue
         Origins:
           - DomainName: !If
               - UseS3Origin
@@ -570,15 +587,16 @@ Resources:
                 - - HeaderName: !Ref CustomOriginHeaderName
                     HeaderValue: !Ref CustomOriginHeaderValue
                 - !Ref AWS::NoValue
+            OriginAccessControlId: !If
+              - UseS3Origin
+              - !GetAtt CloudFrontOriginAccessControl.Id
+              - !Ref AWS::NoValue
             S3OriginConfig: !If
               - UseS3Origin
-              - OriginAccessIdentity: !If
-                  - CreateOriginAccessIdentity
-                  - !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
-                  - !If
-                    - OriginAccessIdentityProvided
-                    - !Sub "origin-access-identity/cloudfront/${OriginAccessIdentity}"
-                    - !Ref AWS::NoValue
+              # If you're using origin access control (OAC) instead of origin access identity,
+              # specify an empty OriginAccessIdentity element. For more information, see
+              # Restricting access to an AWS in the Amazon CloudFront Developer Guide.
+              - OriginAccessIdentity: ""
               - !Ref AWS::NoValue
           - DomainName: will-never-be-reached.org
             Id: dummy-origin
@@ -592,14 +610,17 @@ Resources:
               ResponsePagePath: /index.html
             - !Ref AWS::NoValue
 
-  CloudFrontOriginAccessIdentity:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Condition: CreateOriginAccessIdentity
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Condition: UseS3Origin
     Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: "CloudFront OAI"
+      OriginAccessControlConfig:
+        Name: !If [CreateS3Bucket, !GetAtt S3Bucket.DomainName, !Ref S3OriginDomainName]
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
-  CloudfrontBucketPolicy:
+  CloudFrontBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Condition: CreateS3Bucket
     Properties:
@@ -607,24 +628,26 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Action:
+          - Sid: AllowCloudFrontDistributionToGetObjects
+            Action:
               - "s3:GetObject"
             Effect: "Allow"
-            Resource: !Join ["/", [!GetAtt S3Bucket.Arn, "*"]]
+            Resource: !Sub "${S3Bucket.Arn}/*"
             Principal:
-              CanonicalUser: !If
-                - CreateOriginAccessIdentity
-                - !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
-                - !Ref OriginAccessIdentity
-          - Action:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+          - Sid: AllowCloudFrontDistributionToListBucket
+            Action:
               - "s3:ListBucket"
             Effect: "Allow"
             Resource: !GetAtt S3Bucket.Arn
             Principal:
-              CanonicalUser: !If
-                - CreateOriginAccessIdentity
-                - !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
-                - !Ref OriginAccessIdentity
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -1059,7 +1082,7 @@ Resources:
           - >
             {
               "userPoolArn": "${UserPoolArn}",
-              "jwks": ${FetchedJwks.Jwks},              
+              "jwks": ${FetchedJwks.Jwks},
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},
@@ -1122,7 +1145,7 @@ Resources:
           - >
             {
               "userPoolArn": "${UserPoolArn}",
-              "jwks": ${FetchedJwks.Jwks},              
+              "jwks": ${FetchedJwks.Jwks},
               "clientId": "${ClientId}",
               "clientSecret": "${ClientSecret}",
               "oauthScopes": ${OAuthScopesJsonArray},

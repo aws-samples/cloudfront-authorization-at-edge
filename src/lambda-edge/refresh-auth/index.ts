@@ -36,8 +36,9 @@ export const handler: CloudFrontRequestHandler = async (event) => {
       cookies.refreshToken
     );
 
-    const headers: { "Content-Type": string; Authorization?: string } = {
+    const headers: { "Content-Type": string; Authorization?: string; "User-Agent":string } = {
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "authorization-at-edge"
     };
 
     if (CONFIG.clientSecret) {

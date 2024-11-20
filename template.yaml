@@ -676,6 +676,7 @@ Resources:
   UserPoolGroupAttachment:
     Type: AWS::Cognito::UserPoolUserToGroupAttachment
     Condition: AttachUserToPoolGroup
+    DependsOn: User
     Properties:
       GroupName: !Ref UserPoolGroupName
       Username: !Ref EmailAddress

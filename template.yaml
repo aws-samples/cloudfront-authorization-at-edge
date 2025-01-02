@@ -222,6 +222,34 @@ Parameters:
     Description: The suffix to use for Lambda function names. Use this to disambiguate between multiple deployments of this application
     Type: String
     Default: ""
+  Aliases:
+    Description: The custom domain names for the CloudFront distribution. To be provided as a comma-separated list. Also provide AcmCertificateArn in this case.
+    Type: CommaDelimitedList
+    Default: ""
+  AcmCertificateArn:
+    Description: The ARN of an existing ACM certificate to use for the CloudFront distribution.
+    Type: String
+    Default: ""
+  MinimumProtocolVersion:
+    Description: The minimum protocol version to use for the CloudFront distribution. Only used if you provide AcmCertificateArn.
+    Type: String
+    Default: TLSv1.2_2021
+    AllowedValues:
+      - SSLv3
+      - TLSv1
+      - TLSv1_2016
+      - TLSv1.1_2016
+      - TLSv1.2_2018
+      - TLSv1.2_2019
+      - TLSv1.2_2021
+  SslSupportMethod:
+    Description: The SSL/TLS encryption method CloudFront should use to serve HTTPS requests. Only used if you provide AcmCertificateArn.
+    Type: String
+    Default: "sni-only"
+    AllowedValues:
+      - "sni-only"
+      - "vip"
+      - "static-ip"
 
 Conditions:
   ApplyPermissionsBoundary:
@@ -289,6 +317,7 @@ Conditions:
   CreateCloudFrontAccessLogsBucket: !And
     - !Equals [!Ref CreateCloudFrontAccessLogsBucket, "true"]
     - !Not [!Condition CloudFrontAccessLogsBucketProvided]
+  AliasesProvided: !Not [!Equals [!Join ["", !Ref Aliases], ""]]
 
 Globals:
   Function:
@@ -609,13 +638,27 @@ Resources:
               ResponseCode: 200
               ResponsePagePath: /index.html
             - !Ref AWS::NoValue
-
+        Aliases: !If
+          - AliasesProvided
+          - !Ref Aliases
+          - !Ref AWS::NoValue
+        ViewerCertificate: !If
+          - AliasesProvided
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            MinimumProtocolVersion: !Ref MinimumProtocolVersion
+            SslSupportMethod: !Ref SslSupportMethod
+          - !Ref AWS::NoValue
   CloudFrontOriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Condition: UseS3Origin
     Properties:
       OriginAccessControlConfig:
-        Name: !If [CreateS3Bucket, !GetAtt S3Bucket.DomainName, !Ref S3OriginDomainName]
+        Name:
+          !If [
+            CreateS3Bucket,
+            !GetAtt S3Bucket.DomainName,
+            !Ref S3OriginDomainName,
+          ]
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4

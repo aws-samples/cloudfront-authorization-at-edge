@@ -243,6 +243,13 @@ Parameters:
       - "sni-only"
       - "vip"
       - "static-ip"
+  AlwaysUpdateUserPoolClient:
+    Type: String
+    Description: Force update of the user pool client
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
 
 Conditions:
   ApplyPermissionsBoundary:
@@ -277,7 +284,8 @@ Conditions:
     - !Equals
       - !Ref AWS::AccountId
       - !Select [4, !Split [":", !Sub "${UserPoolArn}::::otheraccount"]] # Appending :::::otheraccount is a trick to make the select work even if UserPoolArn is empty
-  UpdateUserPoolClient: !And
+  UpdateUserPoolClient: !Or
+    - !Equals [!Ref UpdateUserPoolClient, "true"]
     - !Or
       - !Equals [!Ref CreateCloudFrontDistribution, "true"]
       - !Not [!Equals [!Join ["", !Ref Aliases], ""]]

@@ -319,7 +319,7 @@ Globals:
       - ApplyPermissionsBoundary
       - !Ref PermissionsBoundaryPolicyArn
       - !Ref AWS::NoValue
-    Runtime: nodejs20.x
+    Runtime: nodejs24.x
 
 Resources:
   S3Bucket:

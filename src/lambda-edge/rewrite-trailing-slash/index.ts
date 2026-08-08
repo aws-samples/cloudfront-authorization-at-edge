@@ -12,6 +12,8 @@ export const handler: CloudFrontRequestHandler = async (event) => {
   const request = event.Records[0].cf.request;
   if (request.uri.endsWith("/")) {
     request.uri += "index.html";
+  } else if (!request.uri.split("/").pop().includes(".")) {
+    request.uri += "/index.html";
   }
   CONFIG.logger.debug("Returning request:\n", request);
   return request;
